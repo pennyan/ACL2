@@ -14,6 +14,8 @@
 (include-book "xdoc/top" :dir :system)
 (include-book "std/util/define" :dir :system)
 
+(include-book "clause-processors/just-expand" :dir :system)
+
 (include-book "hint-interface")
 
 (defsection SMT-computed-hints
@@ -22,7 +24,8 @@
 
   ;; current tag . next computed-hint
   (defconst *SMT-computed-hints-table*
-    '((process-hint . smtlink-cp-w/-in-theory)
+    '((process-hint . expand-hint)
+      (expand-hint . smtlink-cp-w/-in-theory)
       (fix-hint . smtlink-cp-w/-in-theory)
       (smt-hint . nil)
       (fixed-hint . nil)

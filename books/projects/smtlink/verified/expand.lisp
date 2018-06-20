@@ -18,14 +18,10 @@
 
 ;; Include SMT books
 (include-book "hint-interface")
-(include-book "extractor")
 (include-book "basics")
-(include-book "computed-hints")
 
 ;; To be compatible with Arithmetic books
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
-
-(include-book "clause-processors/just-expand" :dir :system)
 
 (defsection function-expansion
   :parents (verified)
@@ -256,8 +252,9 @@
                (equal (len (cadr (car (car (ex-args->term-lst expand-args)))))
                       (len (cdr (car (ex-args->term-lst expand-args))))))
       :hints (("Goal" :in-theory (e/d (pseudo-termp pseudo-lambdap)
-                                      (ACL2::FOLD-CONSTS-IN-+
-                                       ACL2::PSEUDO-TERMP-CAR)))))
+                                      (;; ACL2::FOLD-CONSTS-IN-+
+                                       ;; ACL2::PSEUDO-TERMP-CAR
+                                       )))))
 
     (local (defthm lemma-6
              (implies (and (pseudo-termp x) (not (symbolp x)) (not (pseudo-lambdap (car x))))
@@ -650,4 +647,13 @@
              :use ((:instance pseudo-term-listp-of-pseudo-lambdap-of-cdar-ex-args->term-lst)
                    (:instance symbolp-of-caar-of-ex-args->term-lst)))))
 
-  )
+  (define initialize-fn-lvls ((fn-lst func-alistp))
+    :returns (fn-lvls sym-nat-alistp)
+    :measure (len fn-lst)
+    :hints (("Goal" :in-theory (enable func-alist-fix)))
+    (b* ((fn-lst (func-alist-fix fn-lst))
+         ((unless (consp fn-lst)) nil)
+         ((cons first rest) fn-lst)
+         ((func f) (cdr first)))
+      (cons (cons f.name f.expansion-depth) (initialize-fn-lvls rest))))
+)

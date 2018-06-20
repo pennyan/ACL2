@@ -57,8 +57,8 @@
   ;; A \or G
   ;;
   ;; A : The auxiliary hypothesis clauses
-  ;; G-prim : The expanded original clause
-  ;; G : The original clause
+  ;; G-prim : The expanded clause with type extracted out
+  ;; G : The expanded clause
 
   (define preprocess-auxes ((hinted-As hint-pair-listp) (G pseudo-termp))
     :returns (mv (list-of-A-thm pseudo-term-list-listp)
@@ -205,7 +205,7 @@
   ;; clause-processor.
 
   (local (in-theory (enable smtlink-hint-p smtlink-hint->aux-hint-list
-                            smtlink-hint->expanded-clause-w/-hint)))
+                            smtlink-hint->G-without-type)))
   (define Smtlink-subgoals ((cl pseudo-term-listp) (smtlink-hint t))
     :returns (subgoal-lst
               pseudo-term-list-listp
@@ -219,12 +219,12 @@
          (hinted-As (smtlink-hint->aux-hint-list smtlink-hint))
          (hinted-As-returns (smtlink-hint->aux-thm-list smtlink-hint))
          (hinted-As-types (smtlink-hint->type-decl-list smtlink-hint))
-         (hinted-G-prim (smtlink-hint->expanded-clause-w/-hint smtlink-hint))
+         (G-prim (smtlink-hint->G-without-type smtlink-hint))
          (fix-hint
           `(:clause-processor (smt-fixing-cp clause ',smtlink-hint)))
          (full (construct-smtlink-subgoals hinted-As
                                            hinted-As-returns hinted-As-types
-                                           hinted-G-prim fix-hint
+                                           G-prim fix-hint
                                            (disjoin cl)))
          )
       full))
@@ -234,7 +234,7 @@
   ;;
 
   (local (in-theory (e/d () (smtlink-hint-p smtlink-hint->aux-hint-list
-                                            smtlink-hint->expanded-clause-w/-hint))))
+                                            smtlink-hint->G-without-type))))
   (defthm correctness-of-Smtlink-subgoals-crock
     (implies (and (pseudo-term-listp cl)
                   (alistp b)
@@ -253,7 +253,7 @@
                               (hinted-As-types
                                (smtlink-hint->type-decl-list smtlink-hint))
                               (hinted-G-prim
-                               (smtlink-hint->expanded-clause-w/-hint
+                               (smtlink-hint->G-without-type
                                 smtlink-hint))
                               (fix-hint
                                `(:clause-processor

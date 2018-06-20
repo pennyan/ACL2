@@ -15,6 +15,8 @@
 (include-book "hint-interface")
 (include-book "verified-cps")
 (include-book "../config")
+;; function expansion
+(include-book "expand")
 
 (defsection Smtlink-process-user-hint
   :parents (verified)
@@ -1400,7 +1402,7 @@
                      (t (set-wrld-len second hint)))))
         (combine-hints rest new-hint)))
 
-  (define process-hint ((cl pseudo-term-listp) (user-hint t))
+  (define process-hint ((cl pseudo-term-listp) (user-hint t) (state t))
     :parents (process-smtlink-hints)
     :returns (subgoal-lst pseudo-term-list-listp)
     (b* ((cl (pseudo-term-list-fix cl))
@@ -1408,10 +1410,30 @@
           (prog2$ (cw "User provided Smtlink hint can't be applied because of ~
     syntax error in the hints: ~q0Therefore proceed without Smtlink...~%" user-hint)
                   (list cl)))
-         (combined-hint (combine-hints user-hint (smt-hint)))
+         (hints (combine-hints user-hint (smt-hint)))
+         ;; generate all fty related stuff
+         (flextypes-table (table-alist 'fty::flextypes-table (w state)))
+         ((unless (alistp flextypes-table)) hints)
+         (hints (generate-fty-info-alist hints flextypes-table))
+         (hints (generate-fty-types-top hints flextypes-table))
+         ((smtlink-hint h) hints)
+         ;; Make an alist version of fn-lst
+         (fn-lst (make-alist-fn-lst h.functions))
+         (fn-lvls (initialize-fn-lvls fn-lst))
+         (expand-result
+          (with-fast-alist fn-lst (expand (make-ex-args
+                                           :term-lst (list (disjoin cl))
+                                           :fn-lst fn-lst
+                                           :fn-lvls fn-lvls
+                                           :wrld-fn-len h.wrld-fn-len)
+                                          h.fty-info state)))
+         ((ex-outs e) expand-result)
+         (hints (change-smtlink-hint h
+                                     :expanded-fn-lst e.expanded-fn-lst))
          ;; (- (cw "combined-hint: ~q0" combined-hint))
-         (cp-hint `(:clause-processor (smt-verified-cp clause ',combined-hint)))
-         (subgoal-lst (cons `(hint-please ',cp-hint 'process-hint) cl)))
+         (cp-hint `(:clause-processor (expand-cp clause ',hints state)))
+         (subgoal-lst (cons `(hint-please ',cp-hint 'process-hint) cl))
+         )
         (list subgoal-lst)))
   )
 
@@ -1583,10 +1605,10 @@
   ;; A computed hint will be waiting to take the clause and hint for clause
   ;;   expansion and transformation.
   (defmacro Smtlink (clause hint)
-    `(process-hint ,clause (trans-hint ',hint state)))
+    `(process-hint ,clause (trans-hint ',hint state) state))
 
   (defmacro Smtlink-custom (clause hint)
-    `(process-hint ,clause (trans-hint ',(append hint '(:custom-p t)) state)))
+    `(process-hint ,clause (trans-hint ',(append hint '(:custom-p t)) state) state))
 
   ;; Adding :smtlink as a custom :hints option
   (add-custom-keyword-hint :smtlink

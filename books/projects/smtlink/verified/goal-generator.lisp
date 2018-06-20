@@ -17,7 +17,9 @@
 (include-book "centaur/fty/baselists" :dir :system)
 
 ;; Include SMT books
+(include-book "extractor")
 (include-book "expand")
+(include-book "computed-hints")
 
 ;; To be compatible with Arithmetic books
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
@@ -26,16 +28,6 @@
   :parents (verified)
   :short "SMT-goal-generator generates the three type of goals for the verified
   clause processor"
-
-  (define initialize-fn-lvls ((fn-lst func-alistp))
-    :returns (fn-lvls sym-nat-alistp)
-    :measure (len fn-lst)
-    :hints (("Goal" :in-theory (enable func-alist-fix)))
-    (b* ((fn-lst (func-alist-fix fn-lst))
-         ((unless (consp fn-lst)) nil)
-         ((cons first rest) fn-lst)
-         ((func f) (cdr first)))
-      (cons (cons f.name f.expansion-depth) (initialize-fn-lvls rest))))
 
   ;; Generate auxiliary hypotheses from the user given hypotheses
   (define generate-hyp-hint-lst ((hyp-lst hint-pair-listp)
@@ -446,12 +438,6 @@
       :verify-guards nil
       (b* ((cl (pseudo-term-list-fix cl))
            (hints (smtlink-hint-fix hints))
-           ;; generate all fty related stuff
-           (flextypes-table (table-alist 'fty::flextypes-table (w state)))
-           ((unless (alistp flextypes-table)) hints)
-           (hints (generate-fty-info-alist hints flextypes-table))
-           (hints (generate-fty-types-top hints flextypes-table))
-
            ((smtlink-hint h) hints)
            ;; Make an alist version of fn-lst
            (fn-lst (make-alist-fn-lst h.functions))
@@ -463,21 +449,9 @@
                                                   h.hypotheses fn-lst fn-lvls
                                                   wrld-fn-len h.fty-info state)))
 
-           ;; Expand main clause using fn-lst
-           ;; Generate function hypotheses and their hints from fn-lst
-           (expand-result
-            (with-fast-alist fn-lst (expand (make-ex-args
-                                             :term-lst (list (disjoin cl))
-                                             :fn-lst fn-lst
-                                             :fn-lvls fn-lvls
-                                             :wrld-fn-len wrld-fn-len)
-                                            h.fty-info state)))
-           ((ex-outs e) expand-result)
-           (G-prim (car e.expanded-term-lst))
-
            ;; Generate auxiliary hypotheses from function expansion
            (args (with-fast-alist fn-lst (generate-fn-hint-lst (make-fhg-args
-                                                                :term-lst (list G-prim)
+                                                                :term-lst cl
                                                                 :fn-lst fn-lst
                                                                 :fn-returns-hint-acc
                                                                 nil
@@ -489,26 +463,16 @@
            (fn-more-returns-hint-lst a.fn-more-returns-hint-acc)
 
            ;; Generate auxiliary hypotheses for type extraction
-           ((mv type-decl-list G-prim-without-type) (SMT-extract G-prim h.fty-info))
+           ((unless (consp cl)) h)
+           ((mv type-decl-list cl-without-type) (SMT-extract (car cl) h.fty-info))
            (structured-decl-list (structurize-type-decl-list type-decl-list))
 
            ;; Combine all auxiliary hypotheses
            (total-aux-hint-lst `(,@hyp-hint-lst ,@fn-more-returns-hint-lst))
 
-           ;; Combine expanded main clause and its hint
-           (fncall-lst (strip-cars e.expanded-fn-lst))
-           ((unless (alistp fncall-lst))
-            (prog2$
-             (er hard? 'SMT-goal-generator=>SMT-goal-generator "Function call list should be an alistp: ~q0" fncall-lst)
-             hints))
-           (expand-hint (remove-duplicates-equal (strip-cars fncall-lst)))
-           (hint-with-fn-expand (treat-in-theory-hint expand-hint h.main-hint))
-           (expanded-clause-w/-hint (make-hint-pair :thm G-prim-without-type
-                                                    :hints hint-with-fn-expand))
-
            ;; Update smtlink-hint
            (new-hints
-            (change-smtlink-hint hints
+            (change-smtlink-hint h
                                  :fast-functions fn-lst
                                  :aux-hint-list total-aux-hint-lst
                                  ;; These aux theorems needs to be proved, but
@@ -517,7 +481,7 @@
                                  ;; These type-decl theorems needs to be
                                  ;; proved, too, but also, donot belong to hypothesis
                                  :type-decl-list structured-decl-list
-                                 :expanded-clause-w/-hint expanded-clause-w/-hint
+                                 :G-without-type cl-without-type
                                  )))
         new-hints))
     (verify-guards SMT-goal-generator)
