@@ -722,6 +722,7 @@
     '((:functions . function-lst-syntax-p)
       (:hypotheses . hypothesis-lst-syntax-p)
       (:main-hint . hints-syntax-p)
+      (:precond-hint . hints-syntax-p)
       (:fty . symbol-listp)
       (:int-to-rat . booleanp)
       (:smt-fname . stringp)
@@ -1286,7 +1287,19 @@
     (b* ((hint (smtlink-hint-fix hint))
          (content (hints-syntax-fix content))
          (new-hint (change-smtlink-hint hint :main-hint content)))
-        new-hint))
+      new-hint))
+
+  (define merge-precond-hint ((content hints-syntax-p)
+                              (hint smtlink-hint-p))
+    :parents (process-smtlink-hints)
+    :returns (new-hint smtlink-hint-p)
+    :short "Merge precond-hint"
+    :guard-hints (("Goal"
+                   :in-theory (enable hints-syntax-p)))
+    (b* ((hint (smtlink-hint-fix hint))
+         (content (hints-syntax-fix content))
+         (new-hint (change-smtlink-hint hint :precond-hint content)))
+      new-hint))
 
   (define set-fty-types ((content symbol-listp)
                          (hint smtlink-hint-p))
@@ -1390,6 +1403,7 @@
                                                                     :fast-functions fast-funcs))))
                      (:hypotheses (merge-hypothesis second hint))
                      (:main-hint (merge-main-hint second hint))
+                     (:precond-hint (merge-precond-hint second hint))
                      (:fty (set-fty-types second hint))
                      (:int-to-rat (set-int-to-rat second hint))
                      (:smt-fname (set-fname second hint))

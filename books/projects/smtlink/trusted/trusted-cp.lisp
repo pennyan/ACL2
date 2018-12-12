@@ -42,11 +42,14 @@
            (smtlink-hint (change-smtlink-hint smtlink-hint :smt-cnf smt-cnf))
            ((mv res smt-precond state)
             (SMT-prove-stub (disjoin cl) smtlink-hint state))
-           (subgoal-lst `(((hint-please
-                            '(:in-theory (enable magic-fix
-                                                 hint-please
-                                                 type-hyp)
-                              :expand ((:free (x) (hide x)))))
+           ((smtlink-hint h) smtlink-hint)
+           (precond-hint (smtlink-hint->precond-hint h))
+           (merged-in-theory (treat-in-theory-hint
+                              '(magic-fix hint-please type-hyp)
+                              precond-hint))
+           (the-hint (treat-expand-hint '((:free (x) (hide x)))
+                                        merged-in-theory))
+           (subgoal-lst `(((hint-please ',the-hint)
                            ,smt-precond
                            ,(disjoin cl)))))
         (if res
