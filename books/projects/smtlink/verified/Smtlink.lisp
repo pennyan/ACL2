@@ -723,6 +723,7 @@
       (:hypotheses . hypothesis-lst-syntax-p)
       (:main-hint . hints-syntax-p)
       (:precond-hint . hints-syntax-p)
+      (:type-hint . hints-syntax-p)
       (:fty . symbol-listp)
       (:int-to-rat . booleanp)
       (:smt-fname . stringp)
@@ -1301,6 +1302,18 @@
          (new-hint (change-smtlink-hint hint :precond-hint content)))
       new-hint))
 
+  (define merge-type-hint ((content hints-syntax-p)
+                           (hint smtlink-hint-p))
+    :parents (process-smtlink-hints)
+    :returns (new-hint smtlink-hint-p)
+    :short "Merge precond-hint"
+    :guard-hints (("Goal"
+                   :in-theory (enable hints-syntax-p)))
+    (b* ((hint (smtlink-hint-fix hint))
+         (content (hints-syntax-fix content))
+         (new-hint (change-smtlink-hint hint :type-hint content)))
+      new-hint))
+
   (define set-fty-types ((content symbol-listp)
                          (hint smtlink-hint-p))
     :parents (process-smtlink-hints)
@@ -1404,6 +1417,7 @@
                      (:hypotheses (merge-hypothesis second hint))
                      (:main-hint (merge-main-hint second hint))
                      (:precond-hint (merge-precond-hint second hint))
+                     (:type-hint (merge-type-hint second hint))
                      (:fty (set-fty-types second hint))
                      (:int-to-rat (set-int-to-rat second hint))
                      (:smt-fname (set-fname second hint))

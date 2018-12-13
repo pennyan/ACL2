@@ -785,6 +785,7 @@
         (smtlink-hint->expanded-clause-w/-hint smtlink-hint))
        (expanded-G (hint-pair->thm hinted-expanded-G))
        (main-hint (hint-pair->hints hinted-expanded-G))
+       (- (cw "main-hint: ~q0" main-hint))
        ;; generate first clause
        (next-cp (cdr (assoc-equal 'expand *SMT-architecture*)))
        ((if (null next-cp)) (list (remove-hint-please cl)))

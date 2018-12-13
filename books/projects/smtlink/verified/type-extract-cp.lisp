@@ -13,6 +13,7 @@
 (include-book "hint-interface")
 (include-book "extractor")
 (include-book "type-hyp")
+(include-book "computed-hints")
 
 (defsection type-extract-cp
   :parents (verified)
@@ -73,11 +74,13 @@
          (cl0 `((hint-please ',the-hint)
                 (not (type-hyp (hide ,type-decl-list) ':type))
                 ,G/type))
-         (cl1 `((hint-please '(;; :in-theory (union-theories '(hint-please type-hyp)
-                               ;;                            (theory
-                               ;;                            'minimal-theory))
-                               :in-theory (enable hint-please type-hyp)
-                               :expand ((:free (x) (hide x)))))
+         (type-hint (smtlink-hint->type-hint h))
+         (merged-in-theory (treat-in-theory-hint
+                            '(hint-please type-hyp)
+                            type-hint))
+         (more-type-hint (treat-expand-hint '((:free (x) (hide x)))
+                                            merged-in-theory))
+         (cl1 `((hint-please ',more-type-hint)
                 (not (implies (type-hyp (hide ,type-decl-list) ':type)
                               ,G/type))
                 ,G)))
