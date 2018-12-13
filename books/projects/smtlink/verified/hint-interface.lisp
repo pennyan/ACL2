@@ -250,31 +250,32 @@
   ;; 7. fty: a list of fty types used in the theorem. Will be treated as
   ;; algebraic datatypes in SMT solver.
   ;; 8. int-to-rat: converts all integers to rationals.
-  ;; 9. smt-dir: where to put the generated python files. Default /tmp/z3_files
-  ;; 10. rm-file: configuration for whether to remove generated files.
-  ;; 11. smt-fname: configure the name of generated SMT theorem file.
-  ;; 12. smt-params: hints for parameter tuning of the SMT solver.
+  ;; 9 evilp: use evil clause-processors
+  ;; 10. smt-dir: where to put the generated python files. Default /tmp/z3_files
+  ;; 11. rm-file: configuration for whether to remove generated files.
+  ;; 12. smt-fname: configure the name of generated SMT theorem file.
+  ;; 13. smt-params: hints for parameter tuning of the SMT solver.
   ;;
   ;; Internal fields:
-  ;; 13. fty-info: an alist from fty functions to fty-info-p
-  ;; 14. fty-types: contains all fty type definitions for translation
-  ;; 15. fast-functions: internal field for storing a fast version of function
+  ;; 14. fty-info: an alist from fty functions to fty-info-p
+  ;; 15. fty-types: contains all fty type definitions for translation
+  ;; 16. fast-functions: internal field for storing a fast version of function
   ;; definitions. Might be able to make the functions field a fast one after
   ;; changing the user interface.
-  ;; 16. aux-hint-list: internal field for making a list of auxiliary hints.
-  ;; 17. type-decl-list: internal field for making a list of auxiliary type
+  ;; 17. aux-hint-list: internal field for making a list of auxiliary hints.
+  ;; 18. type-decl-list: internal field for making a list of auxiliary type
   ;; hints.
-  ;; 18. expanded-clause-w/-hint: internal field for storing the SMT theorem.
-  ;; 19. expanded-G/type: clause without type
-  ;; 20. smt-cnf: configuration for connection to the SMT solver.
-  ;; 21. wrld-fn-len: a number specifying the upper bound of the length of the
+  ;; 19. expanded-clause-w/-hint: internal field for storing the SMT theorem.
+  ;; 20. expanded-G/type: clause without type
+  ;; 21. smt-cnf: configuration for connection to the SMT solver.
+  ;; 22. wrld-fn-len: a number specifying the upper bound of the length of the
   ;; current world. It sets a limit to the expansion depth to take care of
   ;; recursive function expansion. This will only ensure termination proof of
   ;; the expand function, but it doesn't guarantee performance since the world
   ;; length can be extremely large, and expansion is exponential. Performance
   ;; is replied upon user who will specify which functions are recursive and
   ;; therefore will be expanded only by a given number of levels.
-  ;; 22. custom-p: Used custom version of Smtlink or not. Default nil.
+  ;; 23. custom-p: Used custom version of Smtlink or not. Default nil.
   ;;
   (defprod smtlink-hint
     :parents (SMT-hint-interface)
@@ -289,6 +290,7 @@
      (fty-info fty-info-alist-p :default nil)
      (fty-types fty-types-p :default nil)
      (int-to-rat booleanp :default nil)
+     (evilp booleanp :default nil)
      (smt-dir stringp :default "")
      (rm-file booleanp :default t)
      (smt-fname stringp :default "")

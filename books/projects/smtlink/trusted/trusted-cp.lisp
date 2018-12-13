@@ -49,9 +49,15 @@
                               precond-hint))
            (the-hint (treat-expand-hint '((:free (x) (hide x)))
                                         merged-in-theory))
-           (subgoal-lst `(((hint-please ',the-hint)
-                           ,smt-precond
-                           ,(disjoin cl)))))
+           (evil-hint
+            `(:clause-processor (evil-cp clause ',smtlink-hint)))
+           (subgoal-lst (if (smtlink-hint->evilp smtlink-hint)
+                            `(((hint-please ',evil-hint)
+                               ,smt-precond
+                               ,(disjoin cl)))
+                          `(((hint-please ',the-hint)
+                             ,smt-precond
+                             ,(disjoin cl))))))
         (if res
             (prog2$ (cw "Proved!~%") (mv nil subgoal-lst state))
           (mv (cons "NOTE: Unable to prove goal with ~

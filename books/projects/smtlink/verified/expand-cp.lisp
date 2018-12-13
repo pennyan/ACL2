@@ -792,7 +792,11 @@
         `(:clause-processor (,next-cp clause ',smtlink-hint)))
        (cl0 `((hint-please ',the-hint) ,expanded-G))
        ;; generate-second clause
-       (cl1 `((hint-please ',main-hint) (not ,expanded-G) ,G))
+       (evil-hint
+        `(:clause-processor (evil-cp clause ',smtlink-hint)))
+       (cl1 (if (smtlink-hint->evilp smtlink-hint)
+                `((hint-please ',evil-hint) (not ,expanded-G) ,G)
+              `((hint-please ',main-hint) (not ,expanded-G) ,G)))
        )
     `(,cl0 ,cl1)))
 

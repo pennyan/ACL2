@@ -726,6 +726,7 @@
       (:type-hint . hints-syntax-p)
       (:fty . symbol-listp)
       (:int-to-rat . booleanp)
+      (:evilp . booleanp)
       (:smt-fname . stringp)
       (:smt-dir . stringp)
       (:rm-file . booleanp)
@@ -1306,7 +1307,7 @@
                            (hint smtlink-hint-p))
     :parents (process-smtlink-hints)
     :returns (new-hint smtlink-hint-p)
-    :short "Merge precond-hint"
+    :short "Merge type-hint"
     :guard-hints (("Goal"
                    :in-theory (enable hints-syntax-p)))
     (b* ((hint (smtlink-hint-fix hint))
@@ -1330,7 +1331,16 @@
     :short "Set :int-to-rat based on user hint."
     (b* ((hint (smtlink-hint-fix hint))
          (new-hint (change-smtlink-hint hint :int-to-rat content)))
-        new-hint))
+      new-hint))
+
+  (define set-evilp ((content booleanp)
+                     (hint smtlink-hint-p))
+    :parents (process-smtlink-hints)
+    :returns (new-hint smtlink-hint-p)
+    :short "Set :evilp based on user hint."
+    (b* ((hint (smtlink-hint-fix hint))
+         (new-hint (change-smtlink-hint hint :evilp content)))
+      new-hint))
 
   (define set-fname ((content stringp) (hint smtlink-hint-p))
     :parents (process-smtlink-hints)
@@ -1420,6 +1430,7 @@
                      (:type-hint (merge-type-hint second hint))
                      (:fty (set-fty-types second hint))
                      (:int-to-rat (set-int-to-rat second hint))
+                     (:evilp (set-evilp second hint))
                      (:smt-fname (set-fname second hint))
                      (:smt-dir (set-smt-dir second hint))
                      (:rm-file (set-rm-file second hint))
