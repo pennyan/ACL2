@@ -199,16 +199,18 @@ class ACL22SMT(object):
         print('failed to prove')
 
     # usage prove(claim) or prove(hypotheses, conclusion)
-    def prove(self, hypotheses, conclusion=None):
-        if(conclusion is None): claim = hypotheses
-        else: claim = Implies(hypotheses, conclusion)
-
+    def prove(self, claim, print_cex=False):
         self.solver.push()
         self.solver.add(Not(claim))
         res = self.solver.check()
 
         if res == unsat: self.proof_success()
-        elif res == sat: self.proof_counterExample()
+        elif res == sat:
+            if print_cex:
+                self.proof_counterExample()
+            else:
+                print("Counter-example found! But print_cex is False, so we don't print the counter-example.")
+
         else: self.proof_fail()
 
         self.solver.pop()
