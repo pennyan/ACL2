@@ -35,28 +35,11 @@
 (include-book "trusted/z3-py/magic-fix")
 
 (in-theory (disable consp-when-member-equal-of-sym-nat-alistp
-                    pseudo-term-list-of-cdar-of-ex-args->term-lst
-                    pseudo-term-listp-of-cdr-of-ex-args->term-lst
-                    symbolp-of-car-of-ex-args->term-lst
-                    pseudo-termp-of-car-of-ex-args->term-lst
-                    len-equal-of-formals-of-pseudo-lambdap-and-actuals-of-pseudo-termp
-                    symbolp-of-caar-of-ex-args->term-lst
                     symbol-listp-of-formals-of-pseudo-lambdap
-                    not-cddr-of-car-of-pseudo-term-list-fix-of-expand-args->term-lst
-                    consp-cdr-of-car-of-pseudo-term-list-fix-of-expand-args->term-lst
-                    pseudo-term-listp-of-pseudo-lambdap-of-cdar-ex-args->term-lst
-                    pseudo-termp-of-body-of-pseudo-lambdap
-                    consp-of-cdr-of-pseudo-lambdap
                     consp-of-pseudo-lambdap
                     consp-of-cddr-of-pseudo-lambdap
                     not-stringp-of-cadr-of-pseudo-lambdap
-                    integerp-of-cdr-of-assoc-equal-of-ex-args->fn-lvls-of-ex-args-p
-                    non-neg-of-cdr-of-assoc-equal-of-ex-args->fn-lvls-of-ex-args-p
-                    consp-of-assoc-equal-of-ex-args->fn-lvls-of-ex-args-p
                     not-symbolp-then-consp-of-car-of-fhg-args->term-lst
-                    pseudo-term-listp-of-cdr-of-fhg-args->term-lst
-                    pseudo-term-listp-of-cdar-of-fhg-args->term-lst
-                    symbolp-of-caar-of-fhg-args->term-lst
                     len-equal-of-formals-of-pseudo-lambdap-and-actuals
                     lemma-8
                     lemma-10

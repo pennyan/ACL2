@@ -29,4 +29,20 @@
 
   (defthm not-stringp-of-cadr-of-pseudo-lambdap
     (implies (pseudo-lambdap x) (not (stringp (cadr x)))))
+
+  ;; I find that Sol has another version of pseudo-lambda-p and
+  ;; pseudo-lambda-fix in clause-processors/pseudo-term-fty.lisp that's
+  ;; probably more FTY friendly.
+  ;; TODO: I will switch to that version in the future. I suspect I will need
+  ;; to change a bunch of places for consistency and now it seems better to
+  ;; first focus on function expansion. The :doc pseudo-term-fty stuff looks
+  ;; really cool.
+  (define pseudo-lambda-fix ((x pseudo-lambdap))
+    :returns (fixed pseudo-lambdap)
+    (mbe :logic (if (pseudo-lambdap x) x '(lambda nil nil))
+         :exec x)
+    ///
+    (more-returns
+     (fixed (implies (pseudo-lambdap x) (equal fixed x))
+            :name equal-fixed-and-x-of-pseudo-lambdap)))
   )

@@ -312,7 +312,7 @@
 
   (define make-alist-fn-lst ((fn-lst func-listp))
     :parents (SMT-hint-interface)
-    :short "@(call make-alist-fn-lst) makes fn-lst a fast alist"
+    :short "@(call make-alist-fn-lst) makes fn-lst a simpler alist"
     :returns (fast-fn-lst func-alistp)
     :measure (len fn-lst)
     (b* ((fn-lst (func-list-fix fn-lst))

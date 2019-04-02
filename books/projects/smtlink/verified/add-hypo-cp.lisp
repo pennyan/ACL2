@@ -88,8 +88,9 @@
          (hinted-hypos h.hypotheses)
          (next-cp (cdr (assoc-equal 'add-hypo *SMT-architecture*)))
          ((if (null next-cp)) (list cl))
+         ;; this one clause-processor has state, it's a bit ugly
          (the-hint
-          `(:clause-processor (,next-cp clause ',smtlink-hint)))
+          `(:clause-processor (,next-cp clause ',smtlink-hint state)))
          (G (disjoin cl))
          ((mv aux-hypo-clauses list-of-not-Hs)
           (add-hypo-subgoals hinted-hypos G))
