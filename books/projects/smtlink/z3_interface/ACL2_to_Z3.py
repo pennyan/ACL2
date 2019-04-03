@@ -6,6 +6,7 @@
 # License: A 3-clause BSD license.
 # See the LICENSE file distributed with ACL2
 import re
+import collections
 from z3 import *
 from functools import reduce # for Python 2/3 compatibility
 
@@ -21,6 +22,7 @@ def sort(x):
             raise Exception('unknown sort for expression')
 
 class ACL22SMT(object):
+
     class Symbol:
         # define the Z3Sym type
         z3Sym = Datatype('Symbol')
@@ -106,6 +108,73 @@ class ACL22SMT(object):
 
     # def hint_okay(self):
     #     return False
+
+    # -------------------------------------------------------------
+    #       Replacing uninterpreted functions with free vars
+    fun2var_count = 0
+    funQ = collections.deque()  # uninterpreted functions we've seen
+
+    def next_fresh_var(self):
+        count = self.fun2var_count
+        self.fun2var_count = self.fun2var_count+1
+        return count
+
+    def reportFun(self, report=None):
+        def print_msg(*args):
+            print(''.join([str(a) for a in args]))
+            return None
+        def dont_print_msg(*args):
+            return None
+        if((report is None) or (report is False)): return dont_print_msg
+        elif(report is True): return print_msg
+        else: return report
+
+    # is x uninterpreted function instance
+    def is_uninterpreted_fun(self, x):
+        d = x.decl()
+        return(
+            all([hasattr(d, a) for a in ('__call__', 'arity', 'domain', 'kind', 'range')]) and
+            (d.kind() == z3.Z3_OP_UNINTERPRETED) and
+            d.arity() > 0)
+
+    # I'll assume that all arguments are z3 expressions except for possibly the
+    # last one.  If the last one is a function, then it's the 'report' function
+    # for debugging.
+    def fun_to_var(self, exprs, report=None):
+        report = self.reportFun(report)
+        report('fun_to_var(', exprs, ', ', report, ')')
+
+        def helper(x):
+            if(x is None):
+                return x
+            elif(self.is_uninterpreted_fun(x)):
+                # Yan: I have to use == instead of is here, because sub-trees
+                # that are the same shape are actually different pointers.
+                # I don't know if this will become a performance issue later.
+                match = [f[1] for f in self.funQ if f[0] == x]
+                if(len(match) == 1):  # found a match
+                    return match[0]
+                else:
+                    rangeSort = x.decl().range()
+                    varName = 'SMT_fun2var_' + str(self.next_fresh_var())
+                    newVar = z3.Const(varName, rangeSort)
+                    self.funQ.append((x, newVar))
+                    return newVar
+            else:
+                ch = x.children()
+                newch = self.fun_to_var(ch, report)
+                if(len(ch) != len(newch)):
+                    raise Exception('Internal error')
+                elif(len(newch) == x.decl().arity()):
+                    return x.decl().__call__(*newch)
+                elif((x.decl().arity() == 2) and (len(newch) > 2)):
+                    return reduce(x.decl(), newch)
+                else:
+                    raise Exception('Internal error')
+
+        newExprs = [helper(x) for x in exprs]
+        report('fun_to_var(', exprs, ') -> ', newExprs)
+        return newExprs
 
     # -------------------------------------------------------------
     #       Proof functions and counter-example generation
@@ -202,6 +271,8 @@ class ACL22SMT(object):
     def prove(self, hypotheses, conclusion=None):
         if(conclusion is None): claim = hypotheses
         else: claim = Implies(hypotheses, conclusion)
+
+        claim = self.fun_to_var([claim], False)[0]
 
         self.solver.push()
         self.solver.add(Not(claim))

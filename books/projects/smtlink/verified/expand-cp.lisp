@@ -307,7 +307,8 @@ definition fact of that term.</p>
          ((if (and lvl (zp (cdr lvl)) user-defined)) (mv nil a))
          ((if (and lvl (zp (cdr lvl)) (null user-defined)))
           (prog2$ (er hard? 'expand-cp=>fact-finder "Possibly
-                       encountered recursive functions that are not user-defined.")
+                       encountered recursive functions that are not
+                       user-defined: ~q0" term)
                   (mv nil a)))
          (fact (function-substitution term state))
          ((if (null fact)) (mv nil a))
@@ -584,7 +585,7 @@ definition fact of that term.</p>
        (next-cp (cdr (assoc-equal 'expand *SMT-architecture*)))
        ((if (null next-cp)) (list cl))
        (the-hint
-        `(:clause-processor (,next-cp clause ',smtlink-hint)))
+        `(:clause-processor (,next-cp clause ',h)))
        (hinted-goal `((hint-please ',the-hint) ,@expanded-goal)))
     (list hinted-goal)))
 )

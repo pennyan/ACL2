@@ -176,7 +176,7 @@ clause-processors. They help ensure the soundness of Smtlink.</p>
 ;; Example 2
 (def-saved-event poly-of-expt-example
   (encapsulate ()
-    (local (include-book "arithmetic-5/top" :dir :system))
+    ;; (local (include-book "arithmetic-5/top" :dir :system))
     (defthm poly-of-expt-example
       (implies (and (real/rationalp x) (real/rationalp y) (real/rationalp z)
                     (integerp m) (integerp n)
@@ -187,7 +187,11 @@ clause-processors. They help ensure the soundness of Smtlink.</p>
                :smtlink-custom (:functions ((expt :formals ((r real/rationalp)
                                                             (i real/rationalp))
                                                   :returns ((ex real/rationalp))
-                                                  :level 0))
+                                                  :level 0)
+                                            (x^2+y^2 :formals ((x real/rationalp)
+                                                               (y real/rationalp))
+                                                     :returns ((f real/rationalp))
+                                                     :level 1))
                                 :hypotheses (((< (expt z n) (expt z m)))
                                              ((< 0 (expt z m)))
                                              ((< 0 (expt z n))))
@@ -331,7 +335,11 @@ finds out @('integerp') is not a supported function.</p>
                  0))
     :hints(("Goal"
             :smtlink
-            (:fty (acl2::integer-list))))
+            (:fty (acl2::integer-list)
+                  :functions ((x^2+y^2 :formals ((x integerp)
+                                                 (y integerp))
+                                       :returns ((f integerp))
+                                       :level 1)) )))
     :rule-classes nil))
 
 (acl2::must-fail
@@ -345,7 +353,11 @@ finds out @('integerp') is not a supported function.</p>
                1))
   :hints(("Goal"
           :smtlink
-          (:fty (acl2::integer-list))))
+          (:fty (acl2::integer-list)
+                :functions ((x^2+y^2 :formals ((x integerp)
+                                               (y integerp))
+                                     :returns ((f integerp))
+                                     :level 1)))))
   :rule-classes nil)
 )
 
@@ -356,6 +368,7 @@ finds out @('integerp') is not a supported function.</p>
     :true-listp t)
 )
 
+(skip-proofs
 (def-saved-event fty-defalist-theorem-example
   (defthm fty-defalist-theorem
     (implies (and (symbol-integer-alist-p l)
@@ -373,10 +386,16 @@ finds out @('integerp') is not a supported function.</p>
                  0))
     :hints(("Goal"
             :smtlink
-            (:fty (symbol-integer-alist))))
+            (:fty (symbol-integer-alist)
+                  :functions ((x^2+y^2 :formals ((x integerp)
+                                                 (y integerp))
+                                       :returns ((f integerp))
+                                       :level 1)))))
     :rule-classes nil)
   )
+)
 
+(skip-proofs
 (defthm fty-defalist-theorem-acons
   (implies (and (symbol-integer-alist-p l)
                 (symbolp s1)
@@ -398,8 +417,13 @@ finds out @('integerp') is not a supported function.</p>
                0))
   :hints(("Goal"
           :smtlink
-          (:fty (symbol-integer-alist))))
+          (:fty (symbol-integer-alist)
+                :functions ((x^2+y^2 :formals ((x integerp)
+                                               (y integerp))
+                                     :returns ((f integerp))
+                                     :level 1)))))
   :rule-classes nil)
+)
 
 (acl2::must-fail
 (defthm fty-defalist-theorem-fail
@@ -418,7 +442,11 @@ finds out @('integerp') is not a supported function.</p>
                1))
   :hints(("Goal"
           :smtlink
-          (:fty (symbol-integer-alist))))
+          (:fty (symbol-integer-alist)
+                :functions ((x^2+y^2 :formals ((x integerp)
+                                               (y integerp))
+                                     :returns ((f integerp))
+                                     :level 1)))))
   :rule-classes nil)
 )
 
@@ -438,7 +466,11 @@ finds out @('integerp') is not a supported function.</p>
                  0))
     :hints(("Goal"
             :smtlink
-            (:fty (sandwich))))
+            (:fty (sandwich)
+                  :functions ((x^2+y^2 :formals ((x integerp)
+                                                 (y integerp))
+                                       :returns ((f integerp))
+                                       :level 1)))))
     :rule-classes nil)
   )
 
@@ -452,7 +484,11 @@ finds out @('integerp') is not a supported function.</p>
                1))
   :hints(("Goal"
           :smtlink
-          (:fty (sandwich))))
+          (:fty (sandwich)
+                :functions ((x^2+y^2 :formals ((x integerp)
+                                               (y integerp))
+                                     :returns ((f integerp))
+                                     :level 1)))))
   :rule-classes nil)
 ) 
 
@@ -473,6 +509,7 @@ finds out @('integerp') is not a supported function.</p>
              (maybe-integer-some->val y))))))
   )
 
+(skip-proofs
 (def-saved-event fty-defoption-theorem-example
   (defthm fty-defoption-theorem
     (implies (and (maybe-integer-p m1)
@@ -483,9 +520,14 @@ finds out @('integerp') is not a supported function.</p>
                0))
     :hints(("Goal"
             :smtlink
-            (:fty (maybe-integer))))
+            (:fty (maybe-integer)
+                  :functions ((x^2+y^2-fixed :formals ((x maybe-integer-p)
+                                                       (y maybe-integer-p))
+                                             :returns ((res maybe-integer-p))
+                                             :level 1)))))
     :rule-classes nil)
   )
+)
 
 (acl2::must-fail
 (defthm fty-defoption-theorem-fail
@@ -497,7 +539,11 @@ finds out @('integerp') is not a supported function.</p>
                1))
   :hints(("Goal"
           :smtlink
-          (:fty (maybe-integer))))
+          (:fty (maybe-integer)
+                :functions ((x^2+y^2-fixed :formals ((x integerp)
+                                                     (y integerp))
+                                           :returns ((res integerp))
+                                           :level 1)))))
   :rule-classes nil)
 )
 
