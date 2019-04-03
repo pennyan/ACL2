@@ -6,7 +6,6 @@
 # License: A 3-clause BSD license.
 # See the LICENSE file distributed with ACL2
 import re
-import collections
 from z3 import *
 from functools import reduce # for Python 2/3 compatibility
 
@@ -112,7 +111,7 @@ class ACL22SMT(object):
     # -------------------------------------------------------------
     #       Replacing uninterpreted functions with free vars
     fun2var_count = 0
-    funQ = collections.deque()  # uninterpreted functions we've seen
+    funQ = dict()  # uninterpreted functions we've seen
 
     def next_fresh_var(self):
         count = self.fun2var_count
@@ -148,17 +147,13 @@ class ACL22SMT(object):
             if(x is None):
                 return x
             elif(self.is_uninterpreted_fun(x)):
-                # Yan: I have to use == instead of is here, because sub-trees
-                # that are the same shape are actually different pointers.
-                # I don't know if this will become a performance issue later.
-                match = [f[1] for f in self.funQ if f[0] == x]
-                if(len(match) == 1):  # found a match
-                    return match[0]
+                if(x in self.funQ):  # found a match
+                    return self.funQ[x]
                 else:
                     rangeSort = x.decl().range()
                     varName = 'SMT_fun2var_' + str(self.next_fresh_var())
                     newVar = z3.Const(varName, rangeSort)
-                    self.funQ.append((x, newVar))
+                    self.funQ[x] = newVar
                     return newVar
             else:
                 ch = x.children()
