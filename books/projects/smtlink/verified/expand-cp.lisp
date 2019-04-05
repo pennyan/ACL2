@@ -27,7 +27,8 @@
                           (typespec-check ts x)
                           (iff a b)
                           (implies a b)
-                          (hint-please hint))
+                          (hint-please hint)
+                          (return-last x y z))
                          :namedp t)
 
 (acl2::def-ev-theoremp expev)
@@ -121,9 +122,10 @@
  )
 
 (define sum-lvls ((fn-lvls sym-nat-alistp))
-  :returns (sum natp :hints (("Goal"
-                              :use ((:instance natp-of-sum-lvls-lemma
-                                               (x (sum-lvls (cdr (sym-nat-alist-fix fn-lvls)))))))))
+  :returns (sum natp
+                :hints (("Goal"
+                         :use ((:instance natp-of-sum-lvls-lemma
+                                          (x (sum-lvls (cdr (sym-nat-alist-fix fn-lvls)))))))))
   :measure (len fn-lvls)
   :hints (("Goal" :in-theory (enable sym-nat-alist-fix)))
   (b* ((fn-lvls (sym-nat-alist-fix fn-lvls))
@@ -160,20 +162,22 @@
                          (:instance alistp-of-pairlis$
                                     (a (cadr fn-call))
                                     (b fn-actuals)))))
-    :returns (subst-term pseudo-termp
-                         :hints (("Goal" :in-theory (e/d ()
-                                                         (pseudo-term-substp-of-pairlis$-for-pseudo-lambda
-                                                          acl2::return-type-of-substitute-into-term.xx))
-                                  :use ((:instance
-                                         pseudo-term-substp-of-pairlis$-for-pseudo-lambda
-                                         (x fn-actuals)
-                                         (y fn-call))
-                                        (:instance
-                                         acl2::return-type-of-substitute-into-term.xx
-                                         (x (lambda-body (pseudo-lambda-fix fn-call)))
-                                         (al (pairlis$ (lambda-formals
-                                                        (pseudo-lambda-fix fn-call))
-                                                       (pseudo-term-list-fix fn-actuals))))))))
+    :returns (subst-term
+              pseudo-termp
+              :hints (("Goal"
+                       :in-theory (e/d ()
+                                       (pseudo-term-substp-of-pairlis$-for-pseudo-lambda
+                                        acl2::return-type-of-substitute-into-term.xx))
+                       :use ((:instance
+                              pseudo-term-substp-of-pairlis$-for-pseudo-lambda
+                              (x fn-actuals)
+                              (y fn-call))
+                             (:instance
+                              acl2::return-type-of-substitute-into-term.xx
+                              (x (lambda-body (pseudo-lambda-fix fn-call)))
+                              (al (pairlis$ (lambda-formals
+                                             (pseudo-lambda-fix fn-call))
+                                            (pseudo-term-list-fix fn-actuals))))))))
     (b* ((fn-call (pseudo-lambda-fix fn-call))
          (fn-actuals (pseudo-term-list-fix fn-actuals))
          (formals (lambda-formals fn-call))
@@ -182,21 +186,22 @@
 
 (define function-substitution ((term pseudo-termp)
                                state)
-  :returns (subst-term pseudo-termp
-                       :hints (("Goal"
-                                :in-theory (e/d ()
-                                                (pseudo-termp
-                                                 pseudo-term-listp
-                                                 acl2::return-type-of-substitute-into-term.xx
-                                                 acl2::return-type-of-simple-one-way-unify.a))
-                                :use ((:instance
-                                       acl2::return-type-of-simple-one-way-unify.a
-                                       (pat (cadr (acl2::meta-extract-formula-w
-                                                   (symbol-fix fn-call)
-                                                   (cdr (assoc-equal 'acl2::current-acl2-world
-                                                                     (nth 2 state))))))
-                                       (term (pseudo-term-fix term))
-                                       (alist nil))))))
+  :returns (subst-term
+            pseudo-termp
+            :hints (("Goal"
+                     :in-theory (e/d ()
+                                     (pseudo-termp
+                                      pseudo-term-listp
+                                      acl2::return-type-of-substitute-into-term.xx
+                                      acl2::return-type-of-simple-one-way-unify.a))
+                     :use ((:instance
+                            acl2::return-type-of-simple-one-way-unify.a
+                            (pat (cadr (acl2::meta-extract-formula-w
+                                        (symbol-fix fn-call)
+                                        (cdr (assoc-equal 'acl2::current-acl2-world
+                                                          (nth 2 state))))))
+                            (term (pseudo-term-fix term))
+                            (alist nil))))))
   (b* ((term (pseudo-term-fix term))
        ((unless (and (not (acl2::variablep term))
                      (not (acl2::fquotep term))
@@ -242,14 +247,16 @@
   :hints (("Goal"
            :in-theory (e/d ()
                            (expev-meta-extract-formula))
-           :use ((:instance expev-meta-extract-formula
-                            (name (car term))
-                            (st state)
-                            (a (expev-alist (mv-nth 1
-                                                    (acl2::simple-one-way-unify
-                                                     (cadr (meta-extract-formula (car term) state))
-                                                     term nil))
-                                            a))))
+           :use ((:instance
+                  expev-meta-extract-formula
+                  (name (car term))
+                  (st state)
+                  (a (expev-alist
+                      (mv-nth 1
+                              (acl2::simple-one-way-unify
+                               (cadr (meta-extract-formula (car term) state))
+                               term nil))
+                      a))))
            ))
   )
 )
@@ -301,7 +308,8 @@ definition fact of that term.</p>
          ;; is expanded, one fact generated
          (basic-function (member-equal fn *SMT-basics*))
          (flex? (fncall-of-flextype fn a.fty-info))
-         ((if (or basic-function flex?)) (mv nil a))
+         ((if (or basic-function flex? (equal fn 'acl2::return-last)))
+          (mv nil a))
          (lvl (assoc-equal fn a.fn-lvls))
          (user-defined (assoc-equal fn a.fn-lst))
          ((if (and lvl (zp (cdr lvl)) user-defined)) (mv nil a))
@@ -373,12 +381,200 @@ definition fact of that term.</p>
 (include-book "ordinals/lexicographic-ordering" :dir :system)
 (set-state-ok t)
 
+(encapsulate ()
+(local
+ (defthm acl2-count-of-last-of-consp-decrease
+   (implies (consp x)
+            (< (acl2-count (pseudo-term-fix (car (last x))))
+               (acl2-count x)))
+   :hints (("Goal"
+            :in-theory (enable pseudo-term-fix)))
+   ))
+
+(local
+ (defthm symbolp-of-fn-call-of-pseudo-termp
+   (implies (and (pseudo-termp x)
+                 (consp x)
+                 (not (acl2::fquotep x))
+                 (not (pseudo-lambdap (car x))))
+            (symbolp (car x)))
+   :hints (("Goal" :in-theory (enable pseudo-lambdap)))))
+
+(defines transform
+  :well-founded-relation l<
+  :flag-local nil
+  :flag-defthm-macro defthm-transform
+  :verify-guards nil
+
+  (define transform-list ((term-lst pseudo-term-listp))
+    :returns (new-term-lst pseudo-term-listp)
+    :measure (acl2-count (pseudo-term-list-fix term-lst))
+    (b* ((term-lst (pseudo-term-list-fix term-lst))
+         ((unless (consp term-lst)) term-lst)
+         ((cons first rest) term-lst)
+         (first-term (transform first)))
+      (cons first-term
+            (transform-list rest))))
+
+  (define transform ((term pseudo-termp))
+    :returns (new-term pseudo-termp)
+    :measure (acl2-count (pseudo-term-fix term))
+    :hints (("Goal"
+             :in-theory (e/d ()
+                             (acl2-count-of-last-of-consp-decrease))
+             :use ((:instance acl2-count-of-last-of-consp-decrease
+                              (x (cdr (pseudo-term-fix term)))))))
+    (b* ((term (pseudo-term-fix term))
+         ;; If first term is a symbolp or is quoted, return the current facts
+         ((if (or (acl2::variablep term) (acl2::fquotep term))) term)
+         ;; The first term is now a function call:
+         ;; Cons the function call and function actuals out of term
+         ((cons fn-call fn-actuals) term)
+         ;; If fn-call is a pseudo-lambdap, transform the body
+         ((if (pseudo-lambdap fn-call))
+          (b* (((list 'lambda formal-lst body) fn-call)
+               (transformed-body (transform body))
+               (transformed-actuals (transform-list fn-actuals))
+               ((unless (mbt (equal (len formal-lst)
+                                    (len transformed-actuals))))
+                nil))
+            (cons `(lambda ,formal-lst ,transformed-body)
+                  transformed-actuals)))
+         ;; If fn-call is neither a lambda expression nor a function call
+         ((unless (mbt (symbolp fn-call))) nil)
+
+         ;; -----------------------------------------------------------
+         ;; Now the term is a function call
+         ((if (and (equal fn-call 'acl2::return-last)
+                   (equal (len fn-actuals) 3)))
+          (transform (car (last term)))))
+      (cons fn-call (transform-list fn-actuals))))
+  )
+
+(local
+(defthm tranform-list-maintain-length
+  (implies (pseudo-term-listp term-lst)
+           (equal (len (transform-list term-lst))
+                  (len term-lst)))
+  :hints (("Goal"
+           :expand (transform-list term-lst))))
+)
+
+(local
+ (defthm pseudo-termp-of-car-of-last-of-return-last
+   (implies (and (pseudo-term-listp x)
+                 (consp x))
+            (pseudo-termp (car (last x))))
+   :hints (("Goal"
+            :in-theory (enable pseudo-term-listp last)))
+   ))
+
+(verify-guards transform)
+
+(defines induction-scheme
+  :well-founded-relation l<
+  :flag-local nil
+  :verify-guards nil
+
+  (define induction-scheme-list ((term-lst pseudo-term-listp)
+                                 (al))
+    (declare (irrelevant al))
+    :measure (acl2-count (pseudo-term-list-fix term-lst))
+    (b* ((term-lst (pseudo-term-list-fix term-lst))
+         ((unless (consp term-lst)) term-lst)
+         ((cons first rest) term-lst))
+      (cons (induction-scheme first al)
+            (induction-scheme-list rest al))))
+
+  (define induction-scheme ((term pseudo-termp)
+                            (al))
+    (declare (irrelevant al))
+    :measure (acl2-count (pseudo-term-fix term))
+    :hints (("Goal"
+             :in-theory (e/d ()
+                             (acl2-count-of-last-of-consp-decrease))
+             :use ((:instance acl2-count-of-last-of-consp-decrease
+                              (x (cdr (pseudo-term-fix term)))))))
+    (b* ((term (pseudo-term-fix term))
+         ;; If first term is a symbolp or is quoted, return the current facts
+         ((if (or (acl2::variablep term) (acl2::fquotep term))) term)
+         ;; The first term is now a function call:
+         ;; Cons the function call and function actuals out of term
+         ((cons fn-call fn-actuals) term)
+         ;; If fn-call is a pseudo-lambdap, transform the body
+         ((if (pseudo-lambdap fn-call))
+          (b* (((list 'lambda formal-lst body) fn-call)
+               ;; (transformed-body (transform body))
+               ;; (transformed-actuals (transform-list fn-actuals))
+               ((unless (mbt (equal (len formal-lst)
+                                    (len fn-actuals))))
+                nil))
+            (cons (induction-scheme body
+                                    (pairlis$ formal-lst
+                                              (expev-lst fn-actuals al)))
+                  (induction-scheme-list fn-actuals al))))
+         ;; If fn-call is neither a lambda expression nor a function call
+         ((unless (mbt (symbolp fn-call))) nil)
+
+         ;; -----------------------------------------------------------
+         ;; Now the term is a function call
+         ((if (and (equal fn-call 'acl2::return-last)
+                   (equal (len fn-actuals) 3)))
+          (induction-scheme (car (last term)) al)))
+      (induction-scheme-list fn-actuals al)))
+  )
+
+(local
+ (defthm induction-scheme-list-maintain-length
+   (implies (pseudo-term-listp term-lst)
+            (equal (len (induction-scheme-list term-lst al))
+                   (len term-lst)))
+   :hints (("Goal"
+            :expand ((induction-scheme-list term-lst al)
+                     (induction-scheme-list nil al)))))
+ )
+
+(local
+ (defthm cdr-of-transform-list
+   (implies (pseudo-term-listp x)
+            (equal (transform-list (cdr x))
+                   (cdr (transform-list x))))
+   :hints (("Goal"
+            :expand (transform-list x)))
+   ))
+
+(local
+ (defthm crock1
+   (implies (equal (len x) 1)
+            (equal (car (last x))
+                   (car x)))
+   :hints (("Goal"
+            :in-theory (enable last len)))))
+
+(defthm-induction-scheme-flag
+  (defthm transform-pseudo-termp
+    (implies (and (expev-meta-extract-global-facts)
+                  (pseudo-termp term))
+             (equal (expev (transform term) a)
+                    (expev term a)))
+    :hints ('(:expand ((transform term))
+                      :in-theory (enable expev-of-fncall-args)))
+    :flag induction-scheme)
+  (defthm transform-pseudo-term-listp
+    (implies (and (expev-meta-extract-global-facts)
+                  (pseudo-term-listp term-lst))
+             (equal (expev-lst (transform-list term-lst) a)
+                    (expev-lst term-lst a)))
+    :hints ('(:expand ((transform-list term-lst)
+                       (transform-list nil))))
+    :flag induction-scheme-list)
+  :hints(("Goal" :induct (induction-scheme-flag flag term-lst term a))))
+
 (defines expand
   :well-founded-relation l<
   :flag-local nil
   :verify-guards nil
   :flag-defthm-macro defthm-expand
-  :measure-debug t
 
   (define expand-list ((term-lst pseudo-term-listp)
                        (expand-args ex-args-p)
@@ -416,6 +612,8 @@ definition fact of that term.</p>
                    (:instance fact-finder-same-3
                               (term (pseudo-term-fix term))
                               (expand-args (ex-args-fix expand-args)))
+                   (:instance acl2-count-of-last-of-consp-decrease
+                              (x (cdr (pseudo-term-fix term))))
                    )))
     (b* ((term (pseudo-term-fix term))
          (expand-args (ex-args-fix expand-args))
@@ -438,7 +636,11 @@ definition fact of that term.</p>
          ((unless (mbt (symbolp fn-call))) nil)
 
          ;; -----------------------------------------------------------
-         ;; Now the term is a function call, we first test if term already exists
+         ;; Now the term is a function call, if it is return-last, skip the
+         ;; whole subtree
+         ((if (equal fn-call 'acl2::return-last))
+          (expand (car (last term)) a state))
+         ;; we first test if term already exists
          ;; in facts alist.
          (exists? (assoc-equal term a.facts))
          ;; I can skip the whole subtree because if such a term already exists in
@@ -448,27 +650,12 @@ definition fact of that term.</p>
          ((mv new-term new-args) (fact-finder term a state))
          ;; new-term being nil meaning there's no fact to prove
          ((unless new-term)
-          (expand-list fn-actuals new-args state))
-         (body-fact (expand new-term new-args state))
-         (actuals-fact
-          (expand-list fn-actuals
-                       (change-ex-args new-args :facts body-fact)
-                       state)))
-      actuals-fact))
+          (expand-list fn-actuals new-args state)))
+      (expand new-term new-args state)))
   )
 
-(encapsulate ()
-  (local
-   (defthm symbolp-of-fn-call-of-pseudo-termp
-     (implies (and (pseudo-termp x)
-                   (consp x)
-                   (not (acl2::fquotep x))
-                   (not (pseudo-lambdap (car x))))
-              (symbolp (car x)))
-     :hints (("Goal" :in-theory (enable pseudo-lambdap)))))
-
-  (verify-guards expand)
-  )
+(verify-guards expand)
+)
 
 (define initialize-fn-lvls ((fn-lst func-alistp))
   :returns (fn-lvls sym-nat-alistp)
@@ -527,6 +714,13 @@ definition fact of that term.</p>
 (encapsulate ()
 (local (in-theory (e/d (compose-goal) ())))
 
+(local
+ (defthm expev-of-disjoin
+   (iff (expev (disjoin clause) a)
+        (acl2::or-list (expev-lst clause a)))
+   :hints(("Goal" :in-theory (enable acl2::or-list len)
+           :induct (len clause)))))
+
 (defthm compose-goal-correct
   (implies (and (expev-meta-extract-global-facts)
                 (pseudo-term-listp clause)
@@ -536,6 +730,7 @@ definition fact of that term.</p>
                        a))
            (expev (disjoin clause) a))
   :hints (("Goal"
+           :in-theory (disable expev-of-disjoin)
            :expand (compose-goal clause to-be-learnt state)
            :use
            ((:instance function-substitution-correct
@@ -544,6 +739,16 @@ definition fact of that term.</p>
                        (state state)))
            ))
   )
+
+(defthm compose-transformed-goal-correct
+  (implies (and (expev-meta-extract-global-facts)
+                (pseudo-term-listp clause)
+                (alistp a)
+                (expev
+                 (disjoin
+                  (compose-goal (transform-list clause) to-be-learnt state))
+                 a))
+           (expev (disjoin clause) a)))
 )
 
 (encapsulate ()
@@ -581,7 +786,8 @@ definition fact of that term.</p>
                      :fty-info h.fty-info
                      :wrld-fn-len wrld-fn-len)
                   state)))
-       (expanded-goal (compose-goal cl (strip-cars to-be-learnt) state))
+       (transformed-cl (transform-list cl))
+       (expanded-goal (compose-goal transformed-cl (strip-cars to-be-learnt) state))
        (next-cp (cdr (assoc-equal 'expand *SMT-architecture*)))
        ((if (null next-cp)) (list cl))
        (the-hint

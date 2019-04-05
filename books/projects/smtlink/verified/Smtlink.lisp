@@ -1425,12 +1425,13 @@
 (defsection translate-cmp-smtlink
   :parents (Smtlink-process-user-hint)
 
-  (define wrld-fn-len ((state))
+  (define wrld-fn-len ((cl t) (state))
     :parents (translate-cmp-smtlink)
     :mode :program
     (b* ((world (w state)))
-      (len (remove-duplicates-eq
-            (strip-cadrs (universal-theory :here))))))
+      (+ (acl2-count cl)
+         (len (remove-duplicates-eq
+               (strip-cadrs (universal-theory :here)))))))
 
   (define trans-hypothesis ((val t) (state))
     :parents (translate-cmp-smtlink)
@@ -1544,17 +1545,17 @@
                 wrld-len!"))
           (t val)))
 
-  (define trans-hint ((hint t) (state))
+  (define trans-hint ((cl t) (hint t) (state))
     :parents (translate-cmp-smtlink)
     :mode :program
     (b* (((unless (true-listp hint)) hint)
-         (wrld-len (wrld-fn-len state))
+         (wrld-len (wrld-fn-len cl state))
          ((if (atom hint)) `(:wrld-len ,wrld-len))
          ((unless (cdr hint)) hint)
          ((list* first second rest) hint)
          (new-second (trans-hint-option first second state))
-         (new-hint `(,first ,new-second ,@(trans-hint rest state))))
-      new-hint))
+         (new-hint `(,first ,new-second ,@(trans-hint cl rest state))))
+        new-hint))
   )
 
 ;; ------------------------------------------------------------
@@ -1589,10 +1590,10 @@
   ;; A computed hint will be waiting to take the clause and hint for clause
   ;;   expansion and transformation.
   (defmacro Smtlink (clause hint)
-    `(process-hint ,clause (trans-hint ',hint state)))
+    `(process-hint ,clause (trans-hint ,clause ',hint state)))
 
   (defmacro Smtlink-custom (clause hint)
-    `(process-hint ,clause (trans-hint ',(append hint '(:custom-p t)) state)))
+    `(process-hint ,clause (trans-hint ,clause ',(append hint '(:custom-p t)) state)))
 
   ;; Adding :smtlink as a custom :hints option
   (add-custom-keyword-hint :smtlink

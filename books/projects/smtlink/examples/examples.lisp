@@ -786,4 +786,8 @@ Possible counter-example found: ((M2 (SOME 0)) (M1 (SOME 0)))
                     1))
            (< y (- (* 3 (- x (/ 17 8)) (- x (/ 17 8))) 3)))
   :hints(("Goal"
-          :smtlink nil)))
+          :smtlink
+          (:functions ((x^2-y^2 :formals ((x real/rationalp)
+                                          (y real/rationalp))
+                                :returns ((f real/rationalp))
+                                :level 1))))))
