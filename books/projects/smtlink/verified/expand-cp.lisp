@@ -7,6 +7,10 @@
 ;; for symbol-list-fix
 (include-book "centaur/fty/baselists" :dir :system)
 (include-book "centaur/misc/hons-extra" :dir :system)
+;; To be compatible with Arithmetic books
+(include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
+;; Meta-extract stuff
+(include-book "clause-processors/just-expand" :dir :system)
 
 ;; Include SMT books
 (include-book "pseudo-lambda-lemmas")
@@ -16,10 +20,11 @@
 (include-book "hint-please")
 (include-book "computed-hints")
 
-;; To be compatible with Arithmetic books
-(include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
+(set-state-ok t)
 
-(include-book "clause-processors/just-expand" :dir :system)
+(defsection function-expansion
+  :parents (verified)
+  :short "Function expansion"
 
 (acl2::defevaluator-fast expev expev-lst
                          ((if a b c) (equal a b) (not a)
@@ -308,7 +313,7 @@ definition fact of that term.</p>
          ;; is expanded, one fact generated
          (basic-function (member-equal fn *SMT-basics*))
          (flex? (fncall-of-flextype fn a.fty-info))
-         ((if (or basic-function flex? (equal fn 'acl2::return-last)))
+         ((if (or basic-function flex?))
           (mv nil a))
          (lvl (assoc-equal fn a.fn-lvls))
          (user-defined (assoc-equal fn a.fn-lst))
@@ -377,9 +382,6 @@ definition fact of that term.</p>
      )
     )
   )
-
-(include-book "ordinals/lexicographic-ordering" :dir :system)
-(set-state-ok t)
 
 (encapsulate ()
 (local
@@ -636,12 +638,8 @@ definition fact of that term.</p>
          ((unless (mbt (symbolp fn-call))) nil)
 
          ;; -----------------------------------------------------------
-         ;; Now the term is a function call, if it is return-last, skip the
-         ;; whole subtree
-         ((if (equal fn-call 'acl2::return-last))
-          (expand (car (last term)) a state))
-         ;; we first test if term already exists
-         ;; in facts alist.
+         ;; Now the term is a function call we first test if term already
+         ;; exists in facts alist.
          (exists? (assoc-equal term a.facts))
          ;; I can skip the whole subtree because if such a term already exists in
          ;; facts, then it's subterms, subsubterms ... must also exist in the
@@ -774,19 +772,19 @@ definition fact of that term.</p>
        (fn-lst (make-alist-fn-lst h.functions))
        (fn-lvls (initialize-fn-lvls fn-lst))
        (wrld-fn-len h.wrld-fn-len)
-       (G (disjoin cl))
+       (transformed-cl (transform-list cl))
        ;; Do function expansion
        (facts nil)
        (to-be-learnt
         (with-fast-alists (facts fn-lvls fn-lst)
-          (expand G (make-ex-args
-                     :fn-lvls fn-lvls
-                     :fn-lst fn-lst
-                     :facts facts
-                     :fty-info h.fty-info
-                     :wrld-fn-len wrld-fn-len)
+          (expand (disjoin transformed-cl)
+                  (make-ex-args
+                   :fn-lvls fn-lvls
+                   :fn-lst fn-lst
+                   :facts facts
+                   :fty-info h.fty-info
+                   :wrld-fn-len wrld-fn-len)
                   state)))
-       (transformed-cl (transform-list cl))
        (expanded-goal (compose-goal transformed-cl (strip-cars to-be-learnt) state))
        (next-cp (cdr (assoc-equal 'expand *SMT-architecture*)))
        ((if (null next-cp)) (list cl))
@@ -815,3 +813,4 @@ definition fact of that term.</p>
                  a))
            (expev (disjoin clause) a))
   :rule-classes :clause-processor)
+)

@@ -176,7 +176,7 @@ clause-processors. They help ensure the soundness of Smtlink.</p>
 ;; Example 2
 (def-saved-event poly-of-expt-example
   (encapsulate ()
-    ;; (local (include-book "arithmetic-5/top" :dir :system))
+    (local (include-book "arithmetic-5/top" :dir :system))
     (defthm poly-of-expt-example
       (implies (and (real/rationalp x) (real/rationalp y) (real/rationalp z)
                     (integerp m) (integerp n)
