@@ -170,13 +170,20 @@
              (car term) (cadr term) (not (cddr term))
              (symbolp (car term))
              (smt-typep (cadr term)))
-        ;; the name, the type and the :hints
+        ;; ;; the name, the type and the :hints
+        ;; (and (true-listp term)
+        ;;      (car term) (cadr term) (not (cddddr term))
+        ;;      (symbolp (car term))
+        ;;      (smt-typep (cadr term))
+        ;;      (equal ':hints (caddr term))
+        ;;      (hints-syntax-p (cadddr term)))
+        ;; the name, the type and the meta-extract theorems
         (and (true-listp term)
              (car term) (cadr term) (not (cddddr term))
              (symbolp (car term))
              (smt-typep (cadr term))
-             (equal ':hints (caddr term))
-             (hints-syntax-p (cadddr term)))
+             (equal ':meta-extract-thms (caddr term))
+             (symbol-listp (cadddr term)))
         ))
 
   (define argument-syntax-fix ((term argument-syntax-p))

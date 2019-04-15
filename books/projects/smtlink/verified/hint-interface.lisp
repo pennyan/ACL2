@@ -175,7 +175,8 @@
     ((name symbolp :default nil)
      (type hint-pair-p
            :default (make-hint-pair)
-           :reqfix (decl->type-reqfix type)))
+           :reqfix (decl->type-reqfix type))
+     (meta-extract-thms symbol-listp :default nil))
     :require (symbolp (hint-pair->thm type)))
 
   (deflist decl-list
@@ -207,7 +208,8 @@
      (more-returns hint-pair-listp :default nil)  ;; belong to auxiliary hypotheses
      (expansion-depth natp :default 1)
      (flattened-formals symbol-listp :default nil)
-     (flattened-returns symbol-listp :default nil)))
+     (flattened-returns symbol-listp :default nil)
+     (meta-extract-thms symbol-listp :default nil)))
 
   (deflist func-list
     :parents (func)
@@ -303,14 +305,18 @@
     :parents (smtlink-hint))
 
   (define flatten-formals/returns ((formal/return-lst decl-listp))
-    :returns (flattened-lst symbol-listp)
+    :returns (mv (flattened-lst symbol-listp)
+                 (meta-extract-thms symbol-listp))
     :measure (len formal/return-lst)
     :hints (("Goal" :in-theory (enable decl-list-fix)))
     (b* ((formal/return-lst (decl-list-fix formal/return-lst))
-         ((if (endp formal/return-lst)) nil)
+         ((if (endp formal/return-lst)) (mv nil nil))
          ((cons first rest) formal/return-lst)
-         ((decl d) first))
-      (cons d.name (flatten-formals/returns rest))))
+         ((decl d) first)
+         ((mv rest-formals/returns rest-meta)
+          (flatten-formals/returns rest)))
+      (mv (cons d.name rest-formals/returns)
+          (append d.meta-extract-thms rest-meta))))
 
   (define make-alist-fn-lst ((fn-lst func-listp))
     :parents (SMT-hint-interface)
@@ -321,9 +327,12 @@
          ((unless (consp fn-lst)) nil)
          ((cons first rest) fn-lst)
          ((func f) first)
+         ((mv formals &) (flatten-formals/returns f.formals))
+         ((mv returns meta) (flatten-formals/returns f.returns))
          (new-f (change-func f
-                             :flattened-formals (flatten-formals/returns f.formals)
-                             :flattened-returns (flatten-formals/returns f.returns))))
+                             :flattened-formals formals
+                             :flattened-returns returns
+                             :meta-extract-thms meta)))
       (cons (cons f.name new-f) (make-alist-fn-lst rest))))
 
   (define generate-fty-info-alist ((hints smtlink-hint-p)
