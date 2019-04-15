@@ -28,7 +28,7 @@
   ;;          :clause-processor
   ;;          (SMT::smtlink clause
   ;;                        '(:functions ((f0 :formals ((a0 rationalp))
-  ;;                                          :returns (r0 rationalp :hints (:use ((:instance returns-lemma))))
+  ;;                                          :returns ((r0 rationalp :hints (:use ((:instance returns-lemma)))))
   ;;                                          :level 1
   ;;                                          :guard ((> a0 0) :hints (:use ((:instance guard-lemma))))
   ;;                                          :more-returns (((> r0 0) :hints (:use ((:instance more-lemma)))))))
@@ -77,8 +77,11 @@
       :fix   hints-syntax-fix
       :equiv hints-syntax-equiv
       :define t
-      :forward t
-      :topic hints-syntax-p))
+      :topic hints-syntax-p)
+    (defthm hints-syntax-p-when-hints-syntax-fix
+      (implies (hints-syntax-p x)
+               (equal (hints-syntax-fix x) x)))
+    )
   )
 
 (defsection hypothesis-lst-syntax
@@ -127,42 +130,17 @@
       :fix   hypothesis-syntax-fix
       :equiv hypothesis-syntax-equiv
       :define t
-      :forward t
       :topic hypothesis-syntax-p)
+    (defthm hypothesis-syntax-p-when-hypothesis-syntax-fix
+      (implies (hypothesis-syntax-p acl2::x)
+               (equal (hypothesis-syntax-fix acl2::x)
+                      acl2::x)))
     )
 
-  (define hypothesis-lst-syntax-p ((term t))
-    :parents (hypothesis-lst-syntax)
-    :returns (syntax-good? booleanp)
-    :short "Recognizer for hypothesis-lst-syntax."
-    (b* (((if (atom term)) (equal term nil))
-         ((cons first rest) term))
-      (and (hypothesis-syntax-p first)
-           (hypothesis-lst-syntax-p rest))))
-
-  (define hypothesis-lst-syntax-fix ((term hypothesis-lst-syntax-p))
-    :parents (hypothesis-lst-syntax)
-    :returns (fixed-term hypothesis-lst-syntax-p
-                         :hints (("Goal"
-                                  :in-theory (enable hypothesis-lst-syntax-p))))
-    :guard-hints (("Goal" :in-theory (enable hypothesis-syntax-fix
-                                             hypothesis-lst-syntax-p hypothesis-lst-syntax-fix)))
-    :short "Fixing function for a hypothesis-lst-syntax-p."
-    (mbe :logic (if (consp term)
-                    (cons (hypothesis-syntax-fix (car term))
-                          (hypothesis-lst-syntax-fix (cdr term)))
-                  nil)
-         :exec term))
-
-  (encapsulate ()
-    (local (in-theory (enable hypothesis-lst-syntax-fix)))
-    (deffixtype hypothesis-lst-syntax
-      :pred  hypothesis-lst-syntax-p
-      :fix   hypothesis-lst-syntax-fix
-      :equiv hypothesis-lst-syntax-equiv
-      :define t
-      :forward t
-      :topic hypothesis-lst-syntax-p))
+  (deflist hypothesis-lst-syntax
+    :pred hypothesis-lst-syntax-p
+    :elt-type hypothesis-syntax-p
+    :true-listp t)
   )
 
 (defsection argument-lst-syntax
@@ -180,25 +158,26 @@
   (define argument-syntax-p ((term t))
     :parents (argument-lst-syntax)
     :returns (syntax-good? booleanp)
-    :short "Recognizer for argument-syntax."
+    :short "recognizer for argument-syntax."
     (or (and (atom term)
              (equal term nil))
-        ;; Just the name
+        ;; just the name
         (and (true-listp term)
              (car term) (not (cdr term))
              (symbolp (car term)))
-        ;; The name and the type/guard
+        ;; the name and the type/guard
         (and (true-listp term)
              (car term) (cadr term) (not (cddr term))
              (symbolp (car term))
              (smt-typep (cadr term)))
-        ;; The name, the type and the :hints
+        ;; the name, the type and the :hints
         (and (true-listp term)
-             (car term) (cadr term) (not (cddddr term)) 
+             (car term) (cadr term) (not (cddddr term))
              (symbolp (car term))
              (smt-typep (cadr term))
              (equal ':hints (caddr term))
-             (hints-syntax-p (cadddr term)))))
+             (hints-syntax-p (cadddr term)))
+        ))
 
   (define argument-syntax-fix ((term argument-syntax-p))
     :parents (argument-lst-syntax)
@@ -215,40 +194,17 @@
       :equiv argument-syntax-equiv
       :define t
       :forward t
-      :topic argument-syntax-p))
+      :topic argument-syntax-p)
+    (defthm argument-syntax-p-when-argument-syntax-fix
+      (implies (argument-syntax-p x)
+               (equal (argument-syntax-fix x)
+                      x)))
+    )
 
-  (define argument-lst-syntax-p ((term t))
-    :parents (argument-lst-syntax)
-    :short "Recognizer for argument-lst-syntax."
-    :returns (syntax-good? booleanp)
-    (b* (((if (atom term)) (equal term nil))
-         ((cons first rest) term))
-      (and (argument-syntax-p first)
-           (argument-lst-syntax-p rest))))
-
-  (define argument-lst-syntax-fix ((term argument-lst-syntax-p))
-    :parents (argument-lst-syntax)
-    :short "Fixing function for argument-lst-syntax."
-    :returns (fixed-term argument-lst-syntax-p
-                         :hints (("Goal"
-                                  :in-theory (enable argument-lst-syntax-p))))
-    :guard-hints (("Goal"
-                   :in-theory (enable argument-lst-syntax-fix argument-syntax-fix argument-lst-syntax-p)))
-    (mbe :logic (if (consp term)
-                    (cons (argument-syntax-fix (car term))
-                          (argument-lst-syntax-fix (cdr term)))
-                  nil)
-         :exec term))
-
-  (encapsulate ()
-    (local (in-theory (enable argument-lst-syntax-fix)))
-    (deffixtype argument-lst-syntax
-      :pred  argument-lst-syntax-p
-      :fix   argument-lst-syntax-fix
-      :equiv argument-lst-syntax-equiv
-      :define t
-      :forward t
-      :topic argument-lst-syntax-p))
+  (deflist argument-lst-syntax
+    :elt-type argument-syntax-p
+    :pred argument-lst-syntax-p
+    :true-listp t)
   )
 
 (defsection true-set-equiv-relation
@@ -334,10 +290,10 @@
         :fix   function-option-name-fix
         :equiv function-option-name-equiv
         :define t
-        :forward t
         :topic function-option-name-p)
 
       (deflist function-option-name-lst
+        :parents (function-option-name)
         :elt-type function-option-name
         :true-listp t))
 
@@ -552,7 +508,6 @@
       :fix   function-option-lst-syntax-fix
       :equiv function-option-lst-syntax-equiv
       :define t
-      :forward t
       :topic function-option-lst-syntax-p))
 
   (encapsulate ()
@@ -633,41 +588,15 @@
       :fix   function-syntax-fix
       :equiv function-syntax-equiv
       :define t
-      :forward t
-      :topic function-syntax-p))
+      :topic function-syntax-p)
+    (defthm function-syntax-p-when-function-syntax-fix
+      (implies (function-syntax-p x)
+               (equal (function-syntax-fix x) x))))
 
-  (define function-lst-syntax-p ((term t))
-    :parents (function-syntax)
-    :returns (syntax-good? booleanp)
-    :short "Recognizer for function-lst-syntax"
-    (b* (((if (atom term)) (equal term nil))
-         ((cons first rest) term))
-      (and (function-syntax-p first)
-           (function-lst-syntax-p rest))))
-
-  (define function-lst-syntax-fix ((term function-lst-syntax-p))
-    :parents (function-syntax)
-    :returns (fixed-term function-lst-syntax-p
-                         :hints (("Goal" :in-theory (enable
-                                                     function-lst-syntax-p))))
-    :short "Fixing function for function-lst-syntax-fix"
-    :guard-hints (("Goal" :in-theory (enable function-lst-syntax-fix
-                                             function-syntax-fix function-lst-syntax-p function-syntax-p)))
-    (mbe :logic (if (consp term)
-                    (cons (function-syntax-fix (car term))
-                          (function-lst-syntax-fix (cdr term)))
-                  nil)
-         :exec term))
-
-  (encapsulate ()
-    (local (in-theory (enable function-lst-syntax-fix)))
-    (deffixtype function-lst-syntax
-      :pred  function-lst-syntax-p
-      :fix   function-lst-syntax-fix
-      :equiv function-lst-syntax-equiv
-      :define t
-      :forward t
-      :topic function-lst-syntax-p))
+  (deflist function-lst-syntax
+    :elt-type function-syntax-p
+    :pred function-lst-syntax-p
+    :true-listp t)
 
   (in-theory (disable ;; set-equiv-if-true-set-equiv
               ;; subsetp-if-true-set-equiv
@@ -714,7 +643,6 @@
       :fix   smt-solver-params-fix
       :equiv smt-solver-params-equiv
       :define t
-      :forward t
       :topic smt-solver-params-p))
   )
 
@@ -776,7 +704,6 @@
       :fix   smtlink-option-name-fix
       :equiv smtlink-option-name-equiv
       :define t
-      :forward t
       :topic smtlink-option-name-p)
 
     (deflist smtlink-option-name-lst
@@ -1044,7 +971,6 @@
       :fix   smtlink-hint-syntax-fix
       :equiv smtlink-hint-syntax-equiv
       :define t
-      :forward t
       :topic smtlink-hint-syntax-p))
 
   (in-theory (disable smtlink-option-name-fix-preserves-member
@@ -1081,10 +1007,8 @@
     :hints (("Goal" :in-theory (enable argument-lst-syntax-fix)))
     :guard-hints (("Goal" :in-theory (enable argument-lst-syntax-fix
                                              argument-lst-syntax-p
-                                             argument-syntax-fix
                                              argument-syntax-p
-                                             smt-typep
-                                             hints-syntax-p)))
+                                             smt-typep)))
     (b* ((content (argument-lst-syntax-fix content))
          ((unless (consp content)) nil)
          ((cons first rest) content)
@@ -1127,17 +1051,14 @@
     :guard-hints (("Goal" :in-theory (enable argument-lst-syntax-fix
                                              argument-lst-syntax-p
                                              argument-syntax-p
-                                             argument-syntax-fix
-                                             hints-syntax-p
-                                             smt-typep
-                                             )))
+                                             smt-typep)))
     (b* ((content (argument-lst-syntax-fix content))
          ((unless (consp content)) nil)
          ((cons first rest) content)
-         ((cons argname (cons type (cons & hints))) first)
+         ((list* argname type & hints) first)
          (new-return (make-decl :name argname
                                 :type (make-hint-pair :thm type
-                                                      :hints (car hints)))))
+                                                      :hints hints))))
       (cons new-return (make-merge-returns-helper rest))))
 
   (define make-merge-returns ((content argument-lst-syntax-p) (smt-func func-p))
@@ -1151,12 +1072,14 @@
                                            nil)))
       (change-func f :returns all-returns)))
 
-  (define make-merge-guard ((content hypothesis-syntax-p) (smt-func func-p))
+  (define make-merge-guard ((content hypothesis-syntax-p)
+                            (smt-func func-p))
     :parents (process-smtlink-hints)
     :returns (func func-p)
     :short "Adding user defined guard to smt-func."
     :guard-hints (("Goal"
-                   :in-theory (enable hypothesis-syntax-fix hypothesis-syntax-p)))
+                   :in-theory (enable hypothesis-syntax-fix
+                                      hypothesis-syntax-p)))
     (b* ((content (hypothesis-syntax-fix content))
          (smt-func (func-fix smt-func))
          ((cons thm (cons & hints-lst)) content)
@@ -1173,9 +1096,8 @@
     :measure (len content)
     :hints (("Goal" :in-theory (enable hypothesis-lst-syntax-fix)))
     :guard-hints (("Goal" :in-theory (enable hypothesis-lst-syntax-p
-                                             hypothesis-lst-syntax-fix
                                              hypothesis-syntax-p
-                                             hypothesis-syntax-fix)))
+                                             hints-syntax-p)))
     (b* ((content (hypothesis-lst-syntax-fix content))
          (smt-func (func-fix smt-func))
          ((func f) smt-func)
@@ -1185,7 +1107,8 @@
          (hints (car hints-lst))
          (new-more-return (make-hint-pair :thm thm :hints hints))
          (new-func (change-func smt-func
-                                :more-returns (cons new-more-return f.more-returns))))
+                                :more-returns (cons new-more-return
+                                                    f.more-returns))))
       (make-merge-more-returns rest new-func)))
 
   ;; Bozo:
@@ -1555,7 +1478,7 @@
          ((list* first second rest) hint)
          (new-second (trans-hint-option first second state))
          (new-hint `(,first ,new-second ,@(trans-hint cl rest state))))
-        new-hint))
+      new-hint))
   )
 
 ;; ------------------------------------------------------------
