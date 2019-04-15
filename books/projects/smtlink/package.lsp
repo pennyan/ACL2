@@ -58,6 +58,9 @@
       strip-cadrs
       bfix
       real/rationalp
+      sublis-var
+      sublis-var1
+      sublis-var1-lst
 
       read-string
 

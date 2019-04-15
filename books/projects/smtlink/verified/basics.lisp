@@ -50,6 +50,16 @@
     ;; (booleanp      . ("_SMT_.booleanp"   . 1))
     ))
 
+(defval *SMT-fixers*
+  :parents (SMT-basics)
+  :short "Fixing functions for basic types that are not in user-defined FTY types."
+  ;;(ACL2 type      .  The fixer)
+  `((realp          . realfix)
+    (rationalp      . rfix)
+    (integerp       . ifix)
+    (booleanp       . bfix)
+    (symbolp        . symbol-fix)))
+
 (defval *SMT-types*
   :parents (SMT-basics)
   :short "ACL2 type functions and their corresponding Z3 type declarations."

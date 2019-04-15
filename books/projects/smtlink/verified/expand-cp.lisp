@@ -665,32 +665,6 @@ definition fact of that term.</p>
        ((func f) (cdr first)))
     (cons (cons f.name f.expansion-depth) (initialize-fn-lvls rest))))
 
-(define generate-fty-info-alist ((hints smtlink-hint-p)
-                                 (flextypes-table alistp))
-  :returns (updated-hints smtlink-hint-p)
-  (b* ((hints (smtlink-hint-fix hints))
-       ((smtlink-hint h) hints)
-       ((unless (alistp flextypes-table)) h)
-       (fty-info (generate-fty-info-alist-rec h.fty nil flextypes-table)))
-    (change-smtlink-hint h :fty-info fty-info)))
-
-(local
- (defthm crock-for-generate-fty-types-top
-   (implies (fty-types-p x)
-            (fty-types-p (reverse x)))))
-
-(define generate-fty-types-top ((hints smtlink-hint-p)
-                                (flextypes-table alistp))
-  :returns (updated-hints smtlink-hint-p)
-  (b* ((hints (smtlink-hint-fix hints))
-       ((smtlink-hint h) hints)
-       ((unless (alistp flextypes-table)) h)
-       ((mv & ordered-acc)
-        (generate-fty-type-list h.fty flextypes-table
-                                h.fty-info nil nil))
-       (fty-types (reverse ordered-acc)))
-    (change-smtlink-hint h :fty-types fty-types)))
-
 (define compose-goal ((cl pseudo-term-listp)
                       (to-be-learnt pseudo-term-listp)
                       state)

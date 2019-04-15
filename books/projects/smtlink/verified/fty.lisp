@@ -1666,4 +1666,58 @@
   (verify-guards generate-fty-type-list
     :guard-debug t
     :hints nil)
+
+  ;;----------------------------------------------------------
+  ;;     Construct fty-decls
+
+  (defprod fty-decl
+    ((name symbolp)
+     (fixer symbolp)))
+
+  (defalist fty-decl-alist
+    :key-type symbolp ;; fty type name without -p/p
+    :val-type fty-decl-p ;; the fty type declaration
+    :pred fty-decl-alistp
+    :true-listp t)
+
+  (define construct-fixer-table ((fty-info fty-info-alist-p))
+    :returns (fixer-table fty-decl-alistp
+                          :hints (("Goal" :in-theory (enable fty-decl-p))))
+    :measure (len fty-info)
+    :hints (("Goal"
+             :in-theory (enable fty-info-alist-fix)))
+    (b* ((fty-info (fty-info-alist-fix fty-info))
+         ((unless (consp fty-info)) nil)
+         ((cons first rest) fty-info)
+         ((cons fn fty-func) first)
+         ((unless (equal (fty-info->type fty-func) :fix))
+          (construct-fixer-table rest))
+         (name (fty-info->name fty-func)))
+      (acons name
+             (make-fty-decl :name name :fixer fn)
+             (construct-fixer-table rest))))
+
+  (local
+   (defthm fty-decl-p-of-cdr-of-assoc-equal-of-fty-decl-alistp
+     (implies (and (fty-decl-alistp fixer-table)
+                   (assoc-equal name fixer-table))
+              (and (consp (assoc-equal name fixer-table))
+                   (fty-decl-p (cdr (assoc-equal name fixer-table))))))
+   )
+
+  (define lookup-fixer ((type-recog symbolp)
+                        (fty-info fty-info-alist-p)
+                        (fixer-table fty-decl-alistp))
+    :returns (the-fixer symbolp)
+    :guard-hints (("Goal" :in-theory (enable fty-decl-alistp)))
+    (b* ((type-recog (symbol-fix type-recog))
+         (fty-info (fty-info-alist-fix fty-info))
+         (basic-fixer (assoc-equal type-recog *SMT-fixers*))
+         ((if basic-fixer) (cdr basic-fixer))
+         (fty-func (assoc-equal type-recog fty-info))
+         ((unless fty-func) nil)
+         (name (fty-info->name (cdr fty-func)))
+         (fty-decl (assoc-equal name fixer-table))
+         ((unless fty-decl) nil))
+      (fty-decl->fixer (cdr fty-decl))))
   )

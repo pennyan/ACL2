@@ -173,7 +173,9 @@
   (defprod decl
     :parents (smtlink-hint)
     ((name symbolp :default nil)
-     (type hint-pair-p :default (make-hint-pair) :reqfix (decl->type-reqfix type)))
+     (type hint-pair-p
+           :default (make-hint-pair)
+           :reqfix (decl->type-reqfix type)))
     :require (symbolp (hint-pair->thm type)))
 
   (deflist decl-list
@@ -323,6 +325,32 @@
                              :flattened-formals (flatten-formals/returns f.formals)
                              :flattened-returns (flatten-formals/returns f.returns))))
       (cons (cons f.name new-f) (make-alist-fn-lst rest))))
+
+  (define generate-fty-info-alist ((hints smtlink-hint-p)
+                                   (flextypes-table alistp))
+    :returns (updated-hints smtlink-hint-p)
+    (b* ((hints (smtlink-hint-fix hints))
+         ((smtlink-hint h) hints)
+         ((unless (alistp flextypes-table)) h)
+         (fty-info (generate-fty-info-alist-rec h.fty nil flextypes-table)))
+      (change-smtlink-hint h :fty-info fty-info)))
+
+  (local
+   (defthm crock-for-generate-fty-types-top
+     (implies (fty-types-p x)
+              (fty-types-p (reverse x)))))
+
+  (define generate-fty-types-top ((hints smtlink-hint-p)
+                                  (flextypes-table alistp))
+    :returns (updated-hints smtlink-hint-p)
+    (b* ((hints (smtlink-hint-fix hints))
+         ((smtlink-hint h) hints)
+         ((unless (alistp flextypes-table)) h)
+         ((mv & ordered-acc)
+          (generate-fty-type-list h.fty flextypes-table
+                                  h.fty-info nil nil))
+         (fty-types (reverse ordered-acc)))
+      (change-smtlink-hint h :fty-types fty-types)))
 
   (defconst *default-smtlink-hint*
     (make-smtlink-hint))
