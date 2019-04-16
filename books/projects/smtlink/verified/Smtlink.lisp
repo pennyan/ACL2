@@ -1019,10 +1019,10 @@
     (b* ((content (argument-lst-syntax-fix content))
          ((unless (consp content)) nil)
          ((cons first rest) content)
-         ((list* argname type & hints) first)
+         ((list argname type & hints) first)
          (new-formal (make-decl :name argname
-                                :type (make-hint-pair :thm type
-                                                      :hints hints))))
+                                :type (make-hint-pair :thm type)
+                                :meta-extract-thms hints)))
       (cons new-formal (make-merge-formals-helper rest))))
 
   (define remove-duplicate-from-decl-list ((decls decl-listp) (seen symbol-listp))
@@ -1062,10 +1062,10 @@
     (b* ((content (argument-lst-syntax-fix content))
          ((unless (consp content)) nil)
          ((cons first rest) content)
-         ((list* argname type & hints) first)
+         ((list argname type & hints) first)
          (new-return (make-decl :name argname
-                                :type (make-hint-pair :thm type
-                                                      :hints hints))))
+                                :type (make-hint-pair :thm type)
+                                :meta-extract-thms hints)))
       (cons new-return (make-merge-returns-helper rest))))
 
   (define make-merge-returns ((content argument-lst-syntax-p) (smt-func func-p))
@@ -1397,7 +1397,7 @@
     (b* (((unless (and (true-listp val)
                        (car val) (cadr val)))
           val)
-         ((list name type) val)
+         ((list* name type rest) val)
          (to-be-trans `(,type ,name))
          ((mv err term)
           (acl2::translate-cmp to-be-trans t t nil 'Smtlink-process-user-hint->trans-hypothesis
@@ -1405,7 +1405,7 @@
          ((when err)
           (er hard? 'Smtlink-process-user-hint->trans-argument "Error ~
     translating form: ~@0" to-be-trans)))
-      `(,name ,(car term))))
+      `(,name ,(car term) ,@rest)))
 
   (define trans-formals ((val t) (state))
     :parents (translate-cmp-smtlink)

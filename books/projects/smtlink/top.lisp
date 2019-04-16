@@ -39,8 +39,4 @@
                     consp-of-pseudo-lambdap
                     consp-of-cddr-of-pseudo-lambdap
                     not-stringp-of-cadr-of-pseudo-lambdap
-                    not-symbolp-then-consp-of-car-of-fhg-args->term-lst
-                    len-equal-of-formals-of-pseudo-lambdap-and-actuals
-                    lemma-8
-                    lemma-10
                     symbol-string-alistp-is-true-listp))

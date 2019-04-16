@@ -189,6 +189,21 @@
          (body (lambda-body fn-call)))
       (acl2::substitute-into-term body (pairlis$ formals fn-actuals)))))
 
+(local (defthm expev-alist-of-pairlis$
+         (equal (expev-alist (pairlis$ x y) a)
+                (pairlis$ x (expev-lst y a)))))
+
+(defthm lambda-substitution-correct
+  (implies (and (expev-meta-extract-global-facts)
+                (alistp a)
+                (pseudo-lambdap fn-call)
+                (pseudo-term-listp fn-actuals))
+           (equal
+            (expev (lambda-substitution fn-call fn-actuals) a)
+            (expev (cons fn-call fn-actuals) a)))
+  :hints (("Goal"
+           :in-theory (enable lambda-substitution))))
+
 (define function-substitution ((term pseudo-termp)
                                state)
   :returns (subst-term
@@ -313,7 +328,8 @@ definition fact of that term.</p>
          ;; is expanded, one fact generated
          (basic-function (member-equal fn *SMT-basics*))
          (flex? (fncall-of-flextype fn a.fty-info))
-         ((if (or basic-function flex?))
+         (basic-fix (member-equal fn (strip-cdrs *SMT-fixers*)))
+         ((if (or basic-function flex? basic-fix))
           (mv nil a))
          (lvl (assoc-equal fn a.fn-lvls))
          (user-defined (assoc-equal fn a.fn-lst))

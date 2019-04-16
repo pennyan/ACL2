@@ -57,8 +57,28 @@
   `((realp          . realfix)
     (rationalp      . rfix)
     (integerp       . ifix)
-    (booleanp       . bfix)
+    (booleanp       . bool-fix)
     (symbolp        . symbol-fix)))
+
+(defthm rfix-when-rationalp
+  (implies (rationalp x)
+           (equal (rfix x) x)))
+
+(defthm realfix-when-real/rationalp
+  (implies (real/rationalp x)
+           (equal (realfix x) x)))
+
+(defthm ifix-when-integerp
+  (implies (integerp x)
+           (equal (ifix x) x)))
+
+(defthm bool-fix-when-booleanp
+  (implies (booleanp x)
+           (equal (bool-fix x) x)))
+
+(defthm symbol-fix-when-symbolp
+  (implies (symbolp x)
+           (equal (symbol-fix x) x)))
 
 (defval *SMT-types*
   :parents (SMT-basics)

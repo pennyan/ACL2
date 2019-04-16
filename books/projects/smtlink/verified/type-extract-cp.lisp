@@ -68,7 +68,7 @@
          (next-cp (cdr (assoc-equal 'type-extract *SMT-architecture*)))
          ((if (null next-cp)) (list cl))
          (the-hint
-          `(:clause-processor (,next-cp clause ',h)))
+          `(:clause-processor (,next-cp clause ',h state)))
          (cl0 `((hint-please ',the-hint)
                 (not (type-hyp (hide ,type-decl-list) ':type))
                 ,G/type))

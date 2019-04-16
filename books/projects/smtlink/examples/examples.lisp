@@ -20,9 +20,19 @@
 
 ;; Example 1
 (def-saved-event x^2-y^2
-  (defun x^2-y^2 (x y) (- (* x x) (* y y))))
+  (define x^2-y^2 ((x real/rationalp)
+                   (y real/rationalp))
+    :returns (f real/rationalp)
+    (b* ((x (realfix x))
+         (y (realfix y)))
+      (- (* x x) (* y y)))))
 (def-saved-event x^2+y^2
-  (defun x^2+y^2 (x y) (+ (* x x) (* y y))))
+  (define x^2+y^2 ((x real/rationalp)
+                   (y real/rationalp))
+    :returns (f real/rationalp)
+    (b* ((x (realfix x))
+         (y (realfix y)))
+      (+ (* x x) (* y y)))))
 
 (def-saved-event poly-ineq
   (defthm poly-ineq-example
@@ -34,7 +44,11 @@
             :smtlink
             (:functions ((x^2-y^2 :formals ((x real/rationalp)
                                             (y real/rationalp))
-                                  :returns ((f real/rationalp))
+                                  :returns ((f real/rationalp
+                                               :meta-extract-thms
+                                               (real/rationalp-of-x^2-y^2
+                                                realfix-when-real/rationalp)
+                                               ))
                                   :level 1))))))
   )
 
