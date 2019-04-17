@@ -349,7 +349,8 @@
            ;; Now the term is a function call
            (basic-function (member-equal fn-call *SMT-basics*))
            (flex? (fncall-of-flextype fn-call fty-info))
-           ((if (or basic-function flex?))
+           (basic-fix (member-equal fn-call (strip-cdrs *SMT-fixers*)))
+           ((if (or basic-function flex? basic-fix))
             (cons fn-call
                   (uninterpreted-list fn-actuals fn-lst fty-info state)))
            ;; fn-call is not a basic function nor a flex function
