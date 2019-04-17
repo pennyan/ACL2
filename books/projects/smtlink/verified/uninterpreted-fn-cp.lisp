@@ -71,8 +71,7 @@
           (er hard? 'uninterpreted-fn-cp=>type-thm-remove-lambda "Type theorem type-of-f is
  not of the expected shape: ~q0" type-thm))
          ((cons fn fn-actuals) type-thm)
-         (type-thm-w/o-lambda (lambda-substitution fn fn-actuals))
-         (- (cw "type-thm-w/o-lambda: ~q0" type-thm-w/o-lambda)))
+         (type-thm-w/o-lambda (lambda-substitution fn fn-actuals)))
       type-thm-w/o-lambda))
 
 
@@ -135,8 +134,6 @@
     (b* ((term (pseudo-term-fix term))
          (type-thm (pseudo-term-fix type-thm))
          (vars (reverse (acl2::simple-term-vars type-thm)))
-         (- (cw "vars: ~q0" vars))
-         (- (cw "vars term: ~q0" term))
          ((unless (and (consp term)
                        (acl2::pseudo-term-substp (pairlis$ vars (cdr term)))))
           (prog2$ (er hard? 'uninterpreted-fn-cp=>uninterpreted-substitution
@@ -198,10 +195,8 @@
           (er hard? 'uninterpreted-fn-cp=>fix-thm-meta-extract "Smtlink need two theorems
  to justify the proof of return types of uninterpreted functions. Expected
  [type-of-f] and [type-fix-when-type], but got: ~q0" thms))
-         (- (cw "type-fix-when-type: ~q0" type-fix-when-type))
          (fix-thm (acl2::meta-extract-formula-w type-fix-when-type (w
                                                                     state)))
-         (- (cw "fix-thm1: ~q0" fix-thm))
          ((unless (and (pseudo-termp fix-thm) (not (equal fix-thm ''t))))
           (er hard? 'uninterpreted-fn-cp=>fix-thm-meta-extract "Type theorem
                               type-of-f is not of the expected shape: ~q0"
@@ -234,7 +229,6 @@
           (er hard? 'uninterpreted-fn-cp=>fix-thm-full
               "Something is wrong with fix-thm-meta-extract."))
          (vars (reverse (acl2::simple-term-vars fix-thm)))
-         (- (cw "fix-thm: ~q0" fix-thm))
          ((unless (and (consp vars) (null (cdr vars))))
           (er hard? 'uninterpreted-fn-cp=>fix-thm-full
               "Free vars from fix-thm: ~q0" vars)))
@@ -271,9 +265,6 @@
          ((unless fix-thm)
           (er hard? 'uninterpreted-fn-cp=>find-fixer
               "Something is wrong with fix-thm-full."))
-         (- (cw "fix-thm: ~q0" fix-thm))
-         (- (cw "type-thm: ~q0" type-thm))
-         (- (cw "term: ~q0" term))
          ((mv ok fixed)
           (case-match fix-thm
             (('implies !type-thm
@@ -439,7 +430,6 @@ defined the uninterpreted function: ~q0" fn-call)
                             state)
     :returns (new-term pseudo-term-list-listp)
     (b* (((unless (pseudo-term-listp cl)) nil)
-         (- (cw "cl: ~q0" cl))
          ((unless (smtlink-hint-p smtlink-hint)) (list cl))
          ;; generate all fty related stuff
          (flextypes-table (table-alist 'fty::flextypes-table (w state)))
