@@ -410,15 +410,6 @@ definition fact of that term.</p>
                 :in-theory (enable pseudo-term-fix)))
        ))
 
-    (local
-     (defthm symbolp-of-fn-call-of-pseudo-termp
-       (implies (and (pseudo-termp x)
-                     (consp x)
-                     (not (acl2::fquotep x))
-                     (not (pseudo-lambdap (car x))))
-                (symbolp (car x)))
-       :hints (("Goal" :in-theory (enable pseudo-lambdap)))))
-
     (defines transform
       :well-founded-relation l<
       :flag-local nil

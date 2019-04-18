@@ -26,6 +26,7 @@
     (b* ((x (realfix x))
          (y (realfix y)))
       (- (* x x) (* y y)))))
+
 (def-saved-event x^2+y^2
   (define x^2+y^2 ((x real/rationalp)
                    (y real/rationalp))

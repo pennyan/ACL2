@@ -16,11 +16,12 @@
 (include-book "../../verified/extractor")
 (include-book "translate-fty")
 (include-book "recover-type-hyp")
+(include-book "recover-uninterpreted")
 (include-book "pretty-printer")
 
-(defsection SMT-translator
-  :parents (z3-py)
-  :short "SMT-translator does the LISP to Python translation."
+;; (defsection SMT-translator
+;;   :parents (z3-py)
+;;   :short "SMT-translator does the LISP to Python translation."
 
   (define SMT-numberp ((sym))
     (declare (xargs :guard t))
@@ -290,9 +291,7 @@
      (defthm crock0-translate-expression.translated
        (implies (and (symbol-string-alistp alist)
                      (cdr (assoc-equal key alist)))
-                (stringp (cdr (assoc-equal key alist))))
-       :hints (("Goal"
-                :in-theory (enable paragraphp wordp))))
+                (stringp (cdr (assoc-equal key alist)))))
      )
 
     (local
@@ -336,14 +335,29 @@
       :returns (mv (translated
                     paragraphp
                     :hints (("Goal"
-                             :in-theory (e/d (paragraphp wordp)
-                                             ()))))
+                             :in-theory (e/d (paragraphp
+                                              wordp)
+                                             (consp-of-pseudo-lambdap
+                                              pseudo-termp
+                                              true-listp
+                                              consp-of-cdr-of-pseudo-lambdap
+                                              symbolp-of-caar-when-symbol-string-alistp
+                                              symbol-listp
+                                              symbolp-of-fn-call-of-pseudo-termp
+                                              pseudo-term-listp
+                                              len
+                                              length)))))
                    (smt-precond pseudo-termp)
                    (symbols string-listp)
                    (symbol-index natp)
                    (symbol-map symbol-string-alistp))
       :measure (acl2-count (te-args->expr-lst args))
-      :hints (("Goal" :in-theory (enable pseudo-lambdap)))
+      :hints (("Goal" :in-theory (e/d (pseudo-lambdap)
+                                      (consp-of-pseudo-lambdap
+                                       pseudo-termp
+                                       symbol-listp len length
+                                       symbolp-of-fn-call-of-pseudo-termp
+                                       pseudo-term-listp))))
       :verify-guards nil
       (b* ((args (te-args-fix args))
            ((te-args a) args)
@@ -401,46 +415,9 @@
 
            ;; If fn-call is a lambda
            ((if (pseudo-lambdap fn-call))
-            (b* ((formals (lambda-formals fn-call))
-                 ((unless (and (symbol-listp formals)
-                               (equal (len formals)
-                                      (len fn-actuals))
-                               ;; shouldn't need this
-                               (pseudo-term-listp fn-actuals)))
-                  (mv (er hard? 'SMT-translator=>translate-expression
-                          "bad lambda: ~q0" fn-call)
-                      nil nil 0 nil))
-                 (body (lambda-body fn-call))
-                 (lambda-sym (car fn-call))
-                 ((mv translated-lambda &) (translate-function lambda-sym))
-                 (translated-formals (translate-symbol-lst formals))
-                 ((mv translated-body smt-precond-1
-                      symbol-list-1 symbol-index-1 symbol-map-1)
-                  (translate-expression
-                   (change-te-args a :expr-lst (list body)
-                                   :symbol-list symbols-rest
-                                   :symbol-index symbol-index-rest
-                                   :symbol-map symbol-map-rest)))
-                 ((mv translated-actuals smt-precond-2
-                      symbol-list-2 symbol-index-2 symbol-map-2)
-                  (translate-expression
-                   (change-te-args a :expr-lst fn-actuals
-                                   :symbol-list symbol-list-1
-                                   :symbol-index symbol-index-1
-                                   :symbol-map symbol-map-1)))
-                 (translated-lambda-whole
-                  `(#\( ,translated-lambda #\Space ,translated-formals #\:
-                    ,translated-body #\)
-                    #\( ,(map-translated-actuals translated-actuals) #\))))
-              (mv (cons translated-lambda-whole translated-rest)
-                  `(if (if ((lambda (,@formals) ,smt-precond-1) ,@fn-actuals)
-                           ,smt-precond-2
-                         'nil)
-                       ,smt-precond-rest
-                     'nil)
-                  symbol-list-2
-                  symbol-index-2
-                  symbol-map-2)))
+            (mv (er hard? 'SMT-translator=>translate-expression
+                    "There is still a lambda in the term, weird: ~q0" expr)
+                nil nil 0 nil))
 
            ;; If fn-call is smt::magic-fix, this function is used by the user.
            ;; Therefore probably in a different package?
@@ -483,6 +460,11 @@
                   symbol-index-1
                   symbol-map-1)))
 
+           ;; If fn-call is a basic fixing call
+           (guard (fixing-of-basetype fn-call *SMT-fixers*))
+           ((if guard)
+            (translate-expression (change-te-args a :expr-lst fn-actuals)))
+
            ;; If fn-call is a fty fixing call
            ((mv fixing? guards) (fixing-of-flextype fn-call a.fty-info))
            ((if fixing?)
@@ -520,11 +502,7 @@
                                    :symbol-index symbol-index-rest
                                    :symbol-map symbol-map-rest))))
               (mv (cons translated-actuals translated-rest)
-                  `(if (if (,(car guards) ,fixed)
-                           ,smt-precond-1
-                         'nil)
-                       ,smt-precond-rest
-                     'nil)
+                  `(if ,smt-precond-1 ,smt-precond-rest 'nil)
                   symbol-list-1
                   symbol-index-1
                   symbol-map-1)))
@@ -695,20 +673,6 @@
                     (not (consp (cdr (car (te-args->expr-lst args))))))
                (not (cdr (car (te-args->expr-lst args))))))
 
-    (local (defthm lemma-6
-             (implies (and (pseudo-term-listp x) (consp x)
-                           (pseudo-lambdap (caar x)))
-                      (symbolp (caaar x)))))
-
-    (defthm symbolp-of-caaar-of-te-args->expr-lst
-      (implies (and (te-args-p args)
-                    (consp (te-args->expr-lst args))
-                    (not (symbolp (car (te-args->expr-lst args))))
-                    (not (equal (car (car (te-args->expr-lst args)))
-                                'quote))
-                    (pseudo-lambdap (car (car (te-args->expr-lst args)))))
-               (symbolp (car (car (car (te-args->expr-lst args)))))))
-
     (local (defthm lemma-7
              (implies (and (pseudo-term-listp x) (consp x)
                            (not (symbolp (car x))) (not (pseudo-lambdap (caar x))))
@@ -722,51 +686,6 @@
                     (not (symbolp (car (te-args->expr-lst args))))
                     (not (pseudo-lambdap (car (car (te-args->expr-lst args))))))
                (symbolp (car (car (te-args->expr-lst args))))))
-
-    (local (defthm lemma-8
-             (implies (and (pseudo-term-listp x) (consp x) (pseudo-lambdap (caar x)))
-                      (symbol-listp (cadaar x)))
-             :hints (("Goal" :in-theory (enable pseudo-termp pseudo-lambdap pseudo-term-listp)))))
-
-    (defthm symbol-listp-of-cadaar-of-te-args->expr-lst
-      (implies (and (te-args-p args)
-                    (consp (te-args->expr-lst args))
-                    (not (symbolp (car (te-args->expr-lst args))))
-                    (not (equal (car (car (te-args->expr-lst args)))
-                                'quote))
-                    (pseudo-lambdap (car (car (te-args->expr-lst args)))))
-               (symbol-listp (cadr (car (car (te-args->expr-lst args)))))))
-
-    (local (defthm lemma-9
-             (implies (and (pseudo-term-listp x) (consp x)
-                           (pseudo-lambdap (caar x)))
-                      (pseudo-termp (caddr (caar x))))
-             :hints (("Goal" :in-theory (enable pseudo-lambdap
-                                                pseudo-term-listp
-                                                pseudo-termp)))))
-
-    (defthm pseudo-termp-of-caddaar-of-te-args->expr-lst
-      (implies (and (te-args-p args)
-                    (consp (te-args->expr-lst args))
-                    (not (symbolp (car (te-args->expr-lst args))))
-                    (not (equal (car (car (te-args->expr-lst args)))
-                                'quote))
-                    (pseudo-lambdap (car (car (te-args->expr-lst args)))))
-               (pseudo-termp (caddr (car (car (te-args->expr-lst args)))))))
-
-    (local (defthm lemma-10
-             (implies (and (pseudo-term-listp x) (consp x)
-                           (pseudo-lambdap (caar x)))
-                      (pseudo-term-listp (cdar x)))))
-
-    (defthm pseudo-term-listp-of-cdar-te-args->expr-lst
-      (implies (and (te-args-p args)
-                    (consp (te-args->expr-lst args))
-                    (not (symbolp (car (te-args->expr-lst args))))
-                    (not (equal (car (car (te-args->expr-lst args)))
-                                'quote))
-                    (pseudo-lambdap (car (car (te-args->expr-lst args)))))
-               (pseudo-term-listp (cdr (car (te-args->expr-lst args))))))
 
     (local (defthm lemma-11
              (implies (and (pseudo-term-listp x) (consp x)
@@ -800,66 +719,6 @@
                                (pseudo-term-listp-of-cdar-of-te-args->expr-lst))
                :use ((:instance pseudo-term-listp-of-cdar-of-te-args->expr-lst
                                 (args args))))))
-
-    (local (defthm lemma-12
-             (implies (and (pseudo-term-listp x) (consp x)
-                           (pseudo-lambdap (caar x)))
-                      (consp (cdaar x)))
-             :hints (("Goal" :in-theory (enable pseudo-lambdap
-                                                pseudo-term-listp
-                                                pseudo-termp)))))
-
-    (defthm not-cdaar-te-args->expr-lst
-      (implies (and (te-args-p args)
-                    (consp (te-args->expr-lst args))
-                    (not (symbolp (car (te-args->expr-lst args))))
-                    (not (equal (car (car (te-args->expr-lst args)))
-                                'quote))
-                    (pseudo-lambdap (car (car (te-args->expr-lst args))))
-                    (not (consp (cdr (car (car (te-args->expr-lst args)))))))
-               (not (cdr (car (car (te-args->expr-lst args)))))))
-
-    (local (defthm lemma-13
-             (implies (and (pseudo-term-listp x) (consp x)
-                           (pseudo-lambdap (caar x)))
-                      (consp (cddaar x)))
-             :hints (("Goal" :in-theory (enable pseudo-lambdap
-                                                pseudo-term-listp
-                                                pseudo-termp)))))
-
-    (defthm not-cddaar-of-te-args->expr-lst
-      (implies (and (te-args-p args)
-                    (consp (te-args->expr-lst args))
-                    (not (symbolp (car (te-args->expr-lst args))))
-                    (not (equal (car (car (te-args->expr-lst args)))
-                                'quote))
-                    (pseudo-lambdap (car (car (te-args->expr-lst args))))
-                    (not (consp (cddr (car (car (te-args->expr-lst args)))))))
-               (not (cddr (car (car (te-args->expr-lst args)))))))
-
-    (local (defthm lemma-14
-             (implies (and (pseudo-term-listp x) (consp x)
-                           (pseudo-lambdap (caar x)))
-                      (consp (caar x)))
-             :hints (("Goal" :in-theory (enable pseudo-lambdap
-                                                pseudo-term-listp
-                                                pseudo-termp)))))
-
-    (defthm not-caar-of-te-args->expr-lst
-      (implies (and (te-args-p args)
-                    (consp (te-args->expr-lst args))
-                    (not (symbolp (car (te-args->expr-lst args))))
-                    (not (equal (car (car (te-args->expr-lst args)))
-                                'quote))
-                    (pseudo-lambdap (car (car (te-args->expr-lst args))))
-                    (not (consp (car (car (te-args->expr-lst args))))))
-               (not (car (car (te-args->expr-lst args))))))
-
-    (defthm consp-of-pseudo-lambdap
-      (implies (pseudo-lambdap x)
-               (consp x))
-      :hints (("Goal"
-               :in-theory (enable pseudo-lambdap))))
 
     (defthm symbol-string-alistp-is-true-listp
       (implies (and (symbol-string-alistp alist)
@@ -912,8 +771,16 @@
     :returns (translated
               paragraphp
               :hints (("Goal"
-                       :in-theory (enable translate-symbol translate-type
-                                          paragraphp wordp))))
+                       :in-theory (e/d (translate-symbol translate-type
+                                                         paragraphp wordp)
+                                       (consp-of-pseudo-lambdap
+                                        pseudo-termp
+                                        symbol-listp
+                                        len length
+                                        symbolp-of-fn-call-of-pseudo-termp
+                                        true-listp
+                                        pseudo-term-listp
+                                        )))))
     (b* ((name (symbol-fix name))
          (type (symbol-fix type))
          (translated-name (translate-symbol name))
@@ -930,9 +797,7 @@
                                       (fty-info fty-info-alist-p)
                                       (acc paragraphp)
                                       (int-to-rat booleanp))
-      :returns (translated
-                paragraphp
-                :hints (("Goal" :in-theory (enable translate-declaration))))
+      :returns (translated paragraphp)
       :measure (len type-decl-lst)
       (b* ((type-decl-lst (decl-list-fix type-decl-lst))
            (acc (paragraph-fix acc))
@@ -982,7 +847,14 @@
     :returns (translated paragraphp
                          :hints (("Goal" :in-theory (e/d (wordp
                                                           paragraphp translate-type)
-                                                         (true-listp)))))
+                                                         (consp-of-pseudo-lambdap
+                                                          pseudo-termp
+                                                          symbol-listp
+                                                          len length
+                                                          symbolp-of-fn-call-of-pseudo-termp
+                                                          true-listp
+                                                          pseudo-term-listp
+                                                          )))))
     :measure (len args)
     (b* ((type (symbol-fix type))
          (args (decl-list-fix args))
@@ -1005,7 +877,14 @@
               paragraphp
               :hints (("Goal" :in-theory (e/d (wordp
                                                paragraphp translate-type)
-                                              (true-listp)))))
+                                              (consp-of-pseudo-lambdap
+                                               pseudo-termp
+                                               symbol-listp
+                                               len length
+                                               symbolp-of-fn-call-of-pseudo-termp
+                                               true-listp
+                                               pseudo-term-listp
+                                               )))))
     (b* ((fn (func-fix fn))
          ;; Bind everything needed from fn
          ((func f) fn)
@@ -1034,7 +913,6 @@
                                               (int-to-rat booleanp))
       :measure (len (func-alist-fix fn-lst))
       :returns (translated paragraphp)
-      :guard-debug t
       (b* ((fn-lst (func-alist-fix fn-lst))
            (acc (paragraph-fix acc))
            ((unless (consp fn-lst)) acc)
@@ -1084,7 +962,8 @@
 
   (define SMT-translation ((term pseudo-termp) (smtlink-hint smtlink-hint-p) state)
     ;; :returns (mv (py-term paragraphp)
-    ;;              (smt-precond pseudo-termp))
+    ;;              (smt-precond pseudo-termp)
+    ;;              (uninterpreted-precond pseudo-term-listp))
     :mode :program
     (b* ((term (pseudo-term-fix term))
          (smtlink-hint (smtlink-hint-fix smtlink-hint))
@@ -1092,20 +971,30 @@
          ;; Make an alist version of fn-lst
          (fn-alst (make-alist-fn-lst h.functions))
          ((mv decl-list theorem) (smt-extract term h.fty-info))
-         ((mv fn-decl-list type-decl-list)
-          (recover-type-hyp decl-list fn-alst h.fty-info nil state))
-         ((unless (and (func-alistp fn-decl-list)
-                       (decl-listp type-decl-list)))
+         ;; recover type declaration information
+         (type-decl-list
+          (recover-type-hyp decl-list h.fty-info state))
+         ((unless (decl-listp type-decl-list))
           (mv (er hard? 'translator=>SMT-translation "returned values from ~
     recover-type-hyp is not of the right type!~%")
-              nil))
+              nil nil))
+         ;; recover uninterpreted-function return type information
+         ((mv unfixed-theorem fn-decl-list uninterpreted-precond)
+          (recover-uninterpreted-top theorem fn-alst h.fty-info))
+         ((unless (func-alistp fn-decl-list))
+          (mv (er hard? 'translator=>SMT-translation "recover-uninterpreted
+  didn't return the correct type of thing.~%")
+              nil nil))
          (acc (acl2::all-vars1 term nil))
          ((unless (symbol-listp acc))
           (mv (er hard? 'translator=>SMT-translation "returned values from ~
     acl2::all-vars1 is not of type symbol-listp!~%")
-              nil))
+              nil nil))
          ((mv translated-theorem smt-precond symbols)
-          (translate-theorem theorem fn-decl-list h.fty-info acc))
+          (translate-theorem unfixed-theorem fn-decl-list h.fty-info acc))
+         ;; Pretty-translated-theorem is the theorem with change lines at 160
+         ;; characters. We did this because apparently super long code is
+         ;; making Python slow for unknown reason.
          (pretty-translated-theorem (pretty-print-theorem translated-theorem 160))
          (symbols (remove-duplicates-equal symbols))
          (translated-uninterpreted-decls
@@ -1125,5 +1014,6 @@
          (translated-symbol (translate-symbol-enumeration symbols))
          )
       (mv `(,translated-symbol ,@translated-theorem-with-fty-type-decls)
-          smt-precond)))
-  )
+          smt-precond
+          uninterpreted-precond)))
+;;  )

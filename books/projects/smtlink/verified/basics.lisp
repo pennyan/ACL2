@@ -10,6 +10,7 @@
 (include-book "std/util/defval" :dir :system)
 (include-book "std/strings/decimal" :dir :system)
 (include-book "std/strings/case-conversion" :dir :system)
+(include-book "centaur/fty/top" :dir :system)
 
 (defxdoc SMT-basics
   :parents (verified)
@@ -20,7 +21,7 @@
   :short "Basic ACL2 functions supported in Smtlink."
   (append
    '(magic-fix)
-   '(rationalp realp booleanp integerp symbolp)
+   '(real/rationalp rationalp realp booleanp integerp symbolp)
    '(binary-+ binary-* unary-/ unary--
               equal <
               implies if not
@@ -54,11 +55,29 @@
   :parents (SMT-basics)
   :short "Fixing functions for basic types that are not in user-defined FTY types."
   ;;(ACL2 type      .  The fixer)
-  `((realp          . realfix)
+  `((real/rationalp . realfix)
+    (realp          . realfix)
     (rationalp      . rfix)
     (integerp       . ifix)
     (booleanp       . bool-fix)
     (symbolp        . symbol-fix)))
+
+(defalist symbol-symbol-alist
+  :key-type symbolp
+  :val-type symbolp
+  :pred symbol-symbol-alistp
+  :true-listp t)
+
+(define fixing-of-basetype ((fn-name symbolp)
+                            (smt-fixer symbol-symbol-alistp))
+  :returns (recog symbolp)
+  :measure (len (symbol-symbol-alist-fix smt-fixer))
+  (b* ((fn-name (symbol-fix fn-name))
+       (smt-fixer (symbol-symbol-alist-fix smt-fixer))
+       ((unless (consp smt-fixer)) nil)
+       ((cons (cons typep fixer) rest) smt-fixer)
+       ((if (equal fixer fn-name)) typep))
+    (fixing-of-basetype fn-name rest)))
 
 (defthm rfix-when-rationalp
   (implies (rationalp x)
@@ -86,6 +105,7 @@
   ;;(ACL2 type      .  SMT type)
   `((realp          . "_SMT_.RealSort()")
     (rationalp      . "_SMT_.RealSort()")
+    (real/rationalp . "_SMT_.RealSort()")
     (integerp       . "_SMT_.IntSort()")
     (booleanp       . "_SMT_.BoolSort()")
     (symbolp        . "Symbol_z3.z3Sym")))

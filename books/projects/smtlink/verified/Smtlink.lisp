@@ -1391,21 +1391,14 @@
          (new-first (trans-hypothesis first state)))
       (cons new-first (trans-more-returns rest state))))
 
-  (define trans-argument ((val t) (state))
+  (define trans-argument ((val t))
     :parents (translate-cmp-smtlink)
     :mode :program
     (b* (((unless (and (true-listp val)
                        (car val) (cadr val)))
           val)
-         ((list* name type rest) val)
-         (to-be-trans `(,type ,name))
-         ((mv err term)
-          (acl2::translate-cmp to-be-trans t t nil 'Smtlink-process-user-hint->trans-hypothesis
-                               (w state) (acl2::default-state-vars t)))
-         ((when err)
-          (er hard? 'Smtlink-process-user-hint->trans-argument "Error ~
-    translating form: ~@0" to-be-trans)))
-      `(,name ,(car term) ,@rest)))
+         ((list* name type rest) val))
+      `(,name ,type ,@rest)))
 
   (define trans-formals ((val t) (state))
     :parents (translate-cmp-smtlink)
@@ -1413,7 +1406,7 @@
     (b* (((unless (true-listp val)) val)
          ((unless (consp val)) val)
          ((cons first rest) val)
-         (new-first (trans-argument first state)))
+         (new-first (trans-argument first)))
       (cons new-first (trans-formals rest state))))
 
   (define trans-returns ((val t) (state))
@@ -1422,7 +1415,7 @@
     (b* (((unless (true-listp val)) val)
          ((unless (consp val)) val)
          ((cons first rest) val)
-         (new-first (trans-argument first state)))
+         (new-first (trans-argument first)))
       (cons new-first (trans-formals rest state))))
 
   (define trans-func-option ((opt t) (val t) (state))

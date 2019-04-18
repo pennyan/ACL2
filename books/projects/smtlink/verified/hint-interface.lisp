@@ -79,6 +79,18 @@
     :equiv pseudo-term-list-equiv
     :define t)
 
+  (defthmd pseudo-term-listp-of-cdr-pseudo-termp
+    (implies (and (pseudo-termp term)
+                  (consp term)
+                  (not (equal (car term) 'quote)))
+             (pseudo-term-listp (cdr term)))
+    :hints (("Goal" :in-theory (enable pseudo-termp))))
+
+  (defthmd pseudo-termp-of-car-of-pseudo-term-listp
+    (implies (and (pseudo-term-listp term)
+                  (consp term))
+             (pseudo-termp (car term))))
+
   (define pseudo-term-list-list-fix ((x pseudo-term-list-listp))
     :returns (fixed pseudo-term-list-listp)
     (mbe :logic (if (consp x)
@@ -222,6 +234,13 @@
     :val-type func
     :true-listp t
     :pred func-alistp)
+
+  (defthm func-p-of-assoc-equal-of-func-alist
+    (implies (and (func-alistp x)
+                  (symbolp y)
+                  (assoc-equal y x))
+             (and (consp (assoc-equal y x))
+                  (func-p (cdr (assoc-equal y x))))))
 
   (defprod binding
     :parents (smtlink-hint)

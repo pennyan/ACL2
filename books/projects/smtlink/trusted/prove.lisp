@@ -72,6 +72,7 @@
   (define SMT-prove ((term pseudo-termp) (smtlink-hint smtlink-hint-p) (state))
     ;; :returns (mv (proved? booleanp)
     ;;              (smt-precond pseudo-termp)
+    ;;              (uninterpreted-precond pseudo-term-listp)
     ;;              (state))
     :mode :program
     (b* ((term (pseudo-term-fix term))
@@ -80,16 +81,16 @@
          ;; trusting smtlink-hint, which can be changed by malicious
          ;; attacker/careless user
          (flextypes-table (table-alist 'fty::flextypes-table (w state)))
-         ((unless (alistp flextypes-table)) (mv nil nil state))
+         ((unless (alistp flextypes-table)) (mv nil nil nil state))
          (smtlink-hint1 (generate-fty-info-alist smtlink-hint flextypes-table))
          (smtlink-hint2 (generate-fty-types-top smtlink-hint1 flextypes-table))
          ((smtlink-hint h) smtlink-hint2)
          (c h.smt-cnf)
          (smt-file (make-fname h.smt-dir h.smt-fname))
-         ((mv smt-term smt-precond) (SMT-translation term h state))
+         ((mv smt-term smt-precond uninterpreted-precond) (SMT-translation term h state))
          ((mv head import) (SMT-head c))
          ;; (state (SMT-write-file smt-file (cons head (ACL22SMT)) import smt-term state))
          (state (SMT-write-file smt-file head import smt-term state))
          ((mv result state) (SMT-interpret smt-file h.rm-file c state)))
-      (mv result smt-precond state)))
+      (mv result smt-precond uninterpreted-precond state)))
   )
