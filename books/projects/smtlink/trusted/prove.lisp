@@ -72,7 +72,7 @@
   (define SMT-prove ((term pseudo-termp) (smtlink-hint smtlink-hint-p) (state))
     ;; :returns (mv (proved? booleanp)
     ;;              (smt-precond pseudo-termp)
-    ;;              (uninterpreted-precond pseudo-term-listp)
+    ;;              (uninterpreted-precond pseudo-term-list-listp)
     ;;              (state))
     :mode :program
     (b* ((term (pseudo-term-fix term))

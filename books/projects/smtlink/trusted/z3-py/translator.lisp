@@ -19,9 +19,9 @@
 (include-book "recover-uninterpreted")
 (include-book "pretty-printer")
 
-;; (defsection SMT-translator
-;;   :parents (z3-py)
-;;   :short "SMT-translator does the LISP to Python translation."
+(defsection SMT-translator
+  :parents (z3-py)
+  :short "SMT-translator does the LISP to Python translation."
 
   (define SMT-numberp ((sym))
     (declare (xargs :guard t))
@@ -463,7 +463,18 @@
            ;; If fn-call is a basic fixing call
            (guard (fixing-of-basetype fn-call *SMT-fixers*))
            ((if guard)
-            (translate-expression (change-te-args a :expr-lst fn-actuals)))
+            (b* (((mv translated-actuals smt-precond-1 symbol-list-1 symbol-index-1
+                      symbol-map-1)
+                  (translate-expression (change-te-args a
+                                                        :expr-lst fn-actuals
+                                                        :symbol-list symbols-rest
+                                                        :symbol-index symbol-index-rest
+                                                        :symbol-map symbol-map-rest))))
+              (mv (cons translated-actuals translated-rest)
+                  `(if ,smt-precond-1 ,smt-precond-rest 'nil)
+                  symbol-list-1
+                  symbol-index-1
+                  symbol-map-1)))
 
            ;; If fn-call is a fty fixing call
            ((mv fixing? guards) (fixing-of-flextype fn-call a.fty-info))
@@ -963,7 +974,7 @@
   (define SMT-translation ((term pseudo-termp) (smtlink-hint smtlink-hint-p) state)
     ;; :returns (mv (py-term paragraphp)
     ;;              (smt-precond pseudo-termp)
-    ;;              (uninterpreted-precond pseudo-term-listp))
+    ;;              (uninterpreted-precond pseudo-term-list-listp))
     :mode :program
     (b* ((term (pseudo-term-fix term))
          (smtlink-hint (smtlink-hint-fix smtlink-hint))
@@ -980,7 +991,7 @@
               nil nil))
          ;; recover uninterpreted-function return type information
          ((mv unfixed-theorem fn-decl-list uninterpreted-precond)
-          (recover-uninterpreted-top theorem fn-alst h.fty-info))
+          (recover-uninterpreted-top theorem fn-alst h.fty-info state))
          ((unless (func-alistp fn-decl-list))
           (mv (er hard? 'translator=>SMT-translation "recover-uninterpreted
   didn't return the correct type of thing.~%")
@@ -1016,4 +1027,4 @@
       (mv `(,translated-symbol ,@translated-theorem-with-fty-type-decls)
           smt-precond
           uninterpreted-precond)))
-;;  )
+  )
