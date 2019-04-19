@@ -182,7 +182,7 @@ clause-processors. They help ensure the soundness of Smtlink.</p>
     (change-smtlink-config (default-smt-cnf)
                            :smt-module    "RewriteExpt"
                            :smt-class     "to_smt_w_expt"
-                           :smt-cmd       "python"
+                           :smt-cmd       "/usr/bin/env python"
                            :pythonpath    "")))
 
 (def-saved-event smtconf-expt-defattach-tutorial
@@ -192,26 +192,54 @@ clause-processors. They help ensure the soundness of Smtlink.</p>
 (def-saved-event poly-of-expt-example
   (encapsulate ()
     (local (include-book "arithmetic-5/top" :dir :system))
+
+    (define expt-rationalp ((r real/rationalp)
+                            (i integerp))
+      :returns (ex real/rationalp)
+      :guard (>= i 0)
+      (b* ((r (realfix r))
+           (i (ifix i)))
+        (expt r i)))
+
     (defthm poly-of-expt-example
       (implies (and (real/rationalp x) (real/rationalp y) (real/rationalp z)
                     (integerp m) (integerp n)
                     (< 0 z) (< z 1) (< 0 m) (< m n))
-               (<= (* 2 (expt z n) x y)
-                   (* (expt z m) (x^2+y^2 x y))))
+               (<= (* 2 (expt-rationalp z n) x y)
+                   (* (expt-rationalp z m) (x^2+y^2 x y))))
       :hints (("Goal"
-               :smtlink-custom (:functions ((expt :formals ((r real/rationalp)
-                                                            (i real/rationalp))
-                                                  :returns ((ex real/rationalp))
-                                                  :level 0)
+               :smtlink-custom (:functions ((expt-rationalp
+                                             :formals ((r real/rationalp)
+                                                       (i real/rationalp))
+                                             :returns ((ex real/rationalp
+                                                           :meta-extract-thms
+                                                           (real/rationalp-of-expt-rationalp
+                                                            realfix-when-real/rationalp)))
+                                             :level 0)
                                             (x^2+y^2 :formals ((x real/rationalp)
                                                                (y real/rationalp))
-                                                     :returns ((f real/rationalp))
+                                                     :returns ((f
+                                                                real/rationalp
+                                                                :meta-extract-thms
+                                                                (real/rationalp-of-x^2+y^2
+                                                                 realfix-when-real/rationalp)))
                                                      :level 1))
-                                :hypotheses (((< (expt z n) (expt z m)))
-                                             ((< 0 (expt z m)))
-                                             ((< 0 (expt z n))))
-                                :int-to-rat t)
-      )))))
+                                           :hypotheses (((< (expt-rationalp z n)
+                                                            (expt-rationalp z m))
+                                                         :hints (:in-theory
+                                                                 (enable
+                                                                  expt-rationalp))))
+                                           ;; We can prove this theorem using
+                                           ;; purely smtlink by enabling below
+                                           ;; two hypotheses.
+                                           ;;              ((< 0 (expt-rationalp z m))
+                                           ;;               :hints (:in-theory
+                                           ;;                       (enable expt-rationalp)))
+                                           ;;              ((< 0 (expt-rationalp z n))
+                                           ;;               :hints (:in-theory
+                                           ;;                       (enable expt-rationalp))))
+                                           :int-to-rat t)
+               )))))
 
 (deftutorial Example-2
   :parents (Tutorial)
@@ -333,28 +361,42 @@ finds out @('integerp') is not a supported function.</p>
   :hints(("Goal"
           :smtlink
           (:functions ((foo :formals ((x real/rationalp))
-                            :returns ((rx real/rationalp))
+                            :returns ((rx real/rationalp
+                                          :meta-extract-thms
+                                          (real/rationalp-of-foo
+                                           realfix-when-real/rationalp)))
                             :level 0))
            :hypotheses (((<= 1 (foo x))
                          :hints (:in-theory (enable foo))))
           ))))
+
+(def-saved-event x^2+y^2-integer
+  (define x^2+y^2-integer ((x integerp)
+                           (y integerp))
+    :returns (f integerp)
+    (b* ((x (ifix x))
+         (y (ifix y)))
+      (+ (* x x) (* y y)))))
 
 (def-saved-event fty-deflist-theorem-example
   (defthm fty-deflist-theorem
     (implies (and (integer-listp l)
                   (consp (acl2::integer-list-fix l))
                   (consp (acl2::integer-list-fix (cdr (acl2::integer-list-fix l)))))
-             (>= (x^2+y^2 (car (acl2::integer-list-fix l))
-                          (car (acl2::integer-list-fix
-                                (cdr (acl2::integer-list-fix l)))))
+             (>= (x^2+y^2-integer (car (acl2::integer-list-fix l))
+                                  (car (acl2::integer-list-fix
+                                        (cdr (acl2::integer-list-fix l)))))
                  0))
     :hints(("Goal"
             :smtlink
             (:fty (acl2::integer-list)
-                  :functions ((x^2+y^2 :formals ((x integerp)
-                                                 (y integerp))
-                                       :returns ((f integerp))
-                                       :level 1)) )))
+                  :functions ((x^2+y^2-integer :formals ((x integerp)
+                                                         (y integerp))
+                                               :returns ((f integerp
+                                                            :meta-extract-thms
+                                                            (integerp-of-x^2+y^2-integer
+                                                             ifix-when-integerp)))
+                                               :level 1)) )))
     :rule-classes nil))
 
 (acl2::must-fail
@@ -362,17 +404,20 @@ finds out @('integerp') is not a supported function.</p>
   (implies (and (integer-listp l)
                 (consp (acl2::integer-list-fix l))
                 (consp (acl2::integer-list-fix (cdr (acl2::integer-list-fix l)))))
-           (>= (x^2+y^2 (car (acl2::integer-list-fix l))
-                        (car (acl2::integer-list-fix
-                              (cdr (acl2::integer-list-fix l)))))
+           (>= (x^2+y^2-integer (car (acl2::integer-list-fix l))
+                                (car (acl2::integer-list-fix
+                                      (cdr (acl2::integer-list-fix l)))))
                1))
   :hints(("Goal"
           :smtlink
           (:fty (acl2::integer-list)
-                :functions ((x^2+y^2 :formals ((x integerp)
-                                               (y integerp))
-                                     :returns ((f integerp))
-                                     :level 1)))))
+                :functions ((x^2+y^2-integer :formals ((x integerp)
+                                                       (y integerp))
+                                             :returns ((f integerp
+                                                          :meta-extract-thms
+                                                          (integerp-of-x^2+y^2-integer
+                                                           ifix-when-integerp)))
+                                             :level 1)))))
   :rule-classes nil)
 )
 
@@ -383,7 +428,6 @@ finds out @('integerp') is not a supported function.</p>
     :true-listp t)
 )
 
-(skip-proofs
 (def-saved-event fty-defalist-theorem-example
   (defthm fty-defalist-theorem
     (implies (and (symbol-integer-alist-p l)
@@ -393,7 +437,7 @@ finds out @('integerp') is not a supported function.</p>
                               (smt::magic-fix 'symbolp_integerp nil)))
                   (not (equal (assoc-equal s2 (symbol-integer-alist-fix l))
                               (smt::magic-fix 'symbolp_integerp nil))))
-             (>= (x^2+y^2
+             (>= (x^2+y^2-integer
                   (cdr (smt::magic-fix 'symbolp_integerp
                                        (assoc-equal s1 (symbol-integer-alist-fix l))))
                   (cdr (smt::magic-fix 'symbolp_integerp
@@ -402,15 +446,16 @@ finds out @('integerp') is not a supported function.</p>
     :hints(("Goal"
             :smtlink
             (:fty (symbol-integer-alist)
-                  :functions ((x^2+y^2 :formals ((x integerp)
-                                                 (y integerp))
-                                       :returns ((f integerp))
-                                       :level 1)))))
+                  :functions ((x^2+y^2-integer :formals ((x integerp)
+                                                         (y integerp))
+                                               :returns ((f integerp
+                                                            :meta-extract-thms
+                                                            (integerp-of-x^2+y^2-integer
+                                                             ifix-when-integerp)))
+                                               :level 1)))))
     :rule-classes nil)
   )
-)
 
-(skip-proofs
 (defthm fty-defalist-theorem-acons
   (implies (and (symbol-integer-alist-p l)
                 (symbolp s1)
@@ -421,7 +466,7 @@ finds out @('integerp') is not a supported function.</p>
                             (smt::magic-fix 'symbolp_integerp nil)))
                 (not (equal (assoc-equal s2 (symbol-integer-alist-fix l))
                             (smt::magic-fix 'symbolp_integerp nil))))
-           (>= (x^2+y^2
+           (>= (x^2+y^2-integer
                 (cdr (smt::magic-fix
                       'symbolp_integerp
                       (assoc-equal s1 (symbol-integer-alist-fix
@@ -433,12 +478,14 @@ finds out @('integerp') is not a supported function.</p>
   :hints(("Goal"
           :smtlink
           (:fty (symbol-integer-alist)
-                :functions ((x^2+y^2 :formals ((x integerp)
-                                               (y integerp))
-                                     :returns ((f integerp))
-                                     :level 1)))))
+                :functions ((x^2+y^2-integer :formals ((x integerp)
+                                                       (y integerp))
+                                             :returns ((f integerp
+                                                          :meta-extract-thms
+                                                          (integerp-of-x^2+y^2-integer
+                                                           ifix-when-integerp)))
+                                             :level 1)))))
   :rule-classes nil)
-)
 
 (acl2::must-fail
 (defthm fty-defalist-theorem-fail
@@ -449,7 +496,7 @@ finds out @('integerp') is not a supported function.</p>
                             (smt::magic-fix 'symbolp_integerp nil)))
                 (not (equal (assoc-equal s2 (symbol-integer-alist-fix l))
                             (smt::magic-fix 'symbolp_integerp nil))))
-           (>= (x^2+y^2
+           (>= (x^2+y^2-integer
                 (cdr (smt::magic-fix 'symbolp_integerp
                                      (assoc-equal s1 (symbol-integer-alist-fix l))))
                 (cdr (smt::magic-fix 'symbolp_integerp
@@ -458,10 +505,13 @@ finds out @('integerp') is not a supported function.</p>
   :hints(("Goal"
           :smtlink
           (:fty (symbol-integer-alist)
-                :functions ((x^2+y^2 :formals ((x integerp)
-                                               (y integerp))
-                                     :returns ((f integerp))
-                                     :level 1)))))
+                :functions ((x^2+y^2-integer :formals ((x integerp)
+                                                       (y integerp))
+                                             :returns ((f integerp
+                                                          :meta-extract-thms
+                                                          (integerp-of-x^2+y^2-integer
+                                                           ifix-when-integerp)))
+                                             :level 1)))))
   :rule-classes nil)
 )
 
@@ -475,17 +525,20 @@ finds out @('integerp') is not a supported function.</p>
   (defthm fty-defprod-theorem
     (implies (and (sandwich-p s1)
                   (sandwich-p s2))
-             (>= (x^2+y^2
+             (>= (x^2+y^2-integer
                   (sandwich->bread s1)
                   (sandwich->bread s2))
                  0))
     :hints(("Goal"
             :smtlink
             (:fty (sandwich)
-                  :functions ((x^2+y^2 :formals ((x integerp)
-                                                 (y integerp))
-                                       :returns ((f integerp))
-                                       :level 1)))))
+                  :functions ((x^2+y^2-integer :formals ((x integerp)
+                                                         (y integerp))
+                                               :returns ((f integerp
+                                                            :meta-extract-thms
+                                                            (integerp-of-x^2+y^2-integer
+                                                             ifix-when-integerp)))
+                                               :level 1)))))
     :rule-classes nil)
   )
 
@@ -493,17 +546,20 @@ finds out @('integerp') is not a supported function.</p>
 (defthm fty-defprod-theorem-fail
   (implies (and (sandwich-p s1)
                 (sandwich-p s2))
-           (>= (x^2+y^2
+           (>= (x^2+y^2-integer
                 (sandwich->bread (sandwich-fix s1))
                 (sandwich->bread (sandwich-fix s2)))
                1))
   :hints(("Goal"
           :smtlink
           (:fty (sandwich)
-                :functions ((x^2+y^2 :formals ((x integerp)
-                                               (y integerp))
-                                     :returns ((f integerp))
-                                     :level 1)))))
+                :functions ((x^2+y^2-integer :formals ((x integerp)
+                                                       (y integerp))
+                                             :returns ((f integerp
+                                                          :meta-extract-thms
+                                                          (integerp-of-x^2+y^2-integer
+                                                           ifix-when-integerp)))
+                                             :level 1)))))
   :rule-classes nil)
 ) 
 
@@ -524,7 +580,6 @@ finds out @('integerp') is not a supported function.</p>
              (maybe-integer-some->val y))))))
   )
 
-(skip-proofs
 (def-saved-event fty-defoption-theorem-example
   (defthm fty-defoption-theorem
     (implies (and (maybe-integer-p m1)
@@ -538,11 +593,13 @@ finds out @('integerp') is not a supported function.</p>
             (:fty (maybe-integer)
                   :functions ((x^2+y^2-fixed :formals ((x maybe-integer-p)
                                                        (y maybe-integer-p))
-                                             :returns ((res maybe-integer-p))
+                                             :returns ((res maybe-integer-p
+                                                            :meta-extract-thms
+                                                            (maybe-integer-p-of-x^2+y^2-fixed
+                                                             maybe-integer-fix-when-maybe-integer-p)))
                                              :level 1)))))
     :rule-classes nil)
   )
-)
 
 (acl2::must-fail
 (defthm fty-defoption-theorem-fail
@@ -555,9 +612,12 @@ finds out @('integerp') is not a supported function.</p>
   :hints(("Goal"
           :smtlink
           (:fty (maybe-integer)
-                :functions ((x^2+y^2-fixed :formals ((x integerp)
-                                                     (y integerp))
-                                           :returns ((res integerp))
+                :functions ((x^2+y^2-fixed :formals ((x maybe-integer-p)
+                                                     (y maybe-integer-p))
+                                           :returns ((res maybe-integer-p
+                                                          :meta-extract-thms
+                                                          (maybe-integer-p-of-x^2+y^2-fixed
+                                                           maybe-integer-fix-when-maybe-integer-p)))
                                            :level 1)))))
   :rule-classes nil)
 )
@@ -565,23 +625,23 @@ finds out @('integerp') is not a supported function.</p>
 (acl2::must-fail
 (defthm bogus-revised
   (implies (and (symbolp symx) (symbolp symy))
-           (or (eq (symbol-fix symx) 'sym1) (eq (symbol-fix symx) 'sym2)
-               (eq (symbol-fix symx) 'sym3)
-               (eq (symbol-fix symy) 'sym1) (eq (symbol-fix symy) 'sym2)
-               (eq (symbol-fix symy) 'sym3)
-               (eq (symbol-fix symx)
-                   (symbol-fix symy))))
+           (or (equal (symbol-fix symx) 'sym1) (equal (symbol-fix symx) 'sym2)
+               (equal (symbol-fix symx) 'sym3)
+               (equal (symbol-fix symy) 'sym1) (equal (symbol-fix symy) 'sym2)
+               (equal (symbol-fix symy) 'sym3)
+               (equal (symbol-fix symx)
+                      (symbol-fix symy))))
   :hints (("Goal" :smtlink nil)))
 )
 
 (acl2::must-fail
 (defthm bogus-revised-still-bogus
   (implies (and (symbolp symx) (symbolp symy))
-           (or (eq symx 'symx) (eq symx 'sym2)
-               (eq symx 'sym3)
-               (eq symy 'symx) (eq symy 'sym2)
-               (eq symy 'sym3)
-               (eq symx symy)))
+           (or (equal symx 'symx) (equal symx 'sym2)
+               (equal symx 'sym3)
+               (equal symy 'symx) (equal symy 'sym2)
+               (equal symy 'sym3)
+               (equal symx symy)))
   :hints (("Goal" :smtlink nil)))
 )
 
@@ -591,11 +651,11 @@ finds out @('integerp') is not a supported function.</p>
 (acl2::must-fail
 (defthm bogus-revised-still-bogus-prod
   (implies (and (sym-prod-p x) (sym-prod-p y))
-           (or (eq (sym-prod->sym x) 'sym1) (eq (sym-prod->sym x) 'sym2)
-               (eq (sym-prod->sym x) 'sym3)
-               (eq (sym-prod->sym y) 'sym1) (eq (sym-prod->sym y) 'sym2)
-               (eq (sym-prod->sym y) 'sym3)
-               (eq (sym-prod->sym x) (sym-prod->sym y))))
+           (or (equal (sym-prod->sym x) 'sym1) (equal (sym-prod->sym x) 'sym2)
+               (equal (sym-prod->sym x) 'sym3)
+               (equal (sym-prod->sym y) 'sym1) (equal (sym-prod->sym y) 'sym2)
+               (equal (sym-prod->sym y) 'sym3)
+               (equal (sym-prod->sym x) (sym-prod->sym y))))
   :hints (("Goal" :smtlink (:fty (sym-prod)))))
 )
 
@@ -804,5 +864,8 @@ Possible counter-example found: ((M2 (SOME 0)) (M1 (SOME 0)))
           :smtlink
           (:functions ((x^2-y^2 :formals ((x real/rationalp)
                                           (y real/rationalp))
-                                :returns ((f real/rationalp))
+                                :returns ((f real/rationalp
+                                             :meta-extract-thms
+                                             (real/rationalp-of-x^2-y^2
+                                              realfix-when-real/rationalp)))
                                 :level 1))))))
