@@ -199,8 +199,8 @@
                                                                     state)))
          ((unless (and (pseudo-termp fix-thm) (not (equal fix-thm ''t))))
           (er hard? 'uninterpreted-fn-cp=>fix-thm-meta-extract "Type theorem
-                              type-of-f is not of the expected shape: ~q0"
-              fix-thm)))
+                              type-of-f is not of the expected shape: ~p0 for ~p1~%"
+              fix-thm type-fix-when-type)))
       fix-thm))
 
   (defthm fix-thm-meta-extract-correct

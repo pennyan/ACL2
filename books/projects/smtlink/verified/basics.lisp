@@ -59,7 +59,7 @@
     (realp          . realfix)
     (rationalp      . rfix)
     (integerp       . ifix)
-    (booleanp       . bool-fix)
+    (booleanp       . bool-fix$inline)
     (symbolp        . symbol-fix)))
 
 (defalist symbol-symbol-alist
@@ -93,7 +93,7 @@
 
 (defthm bool-fix-when-booleanp
   (implies (booleanp x)
-           (equal (bool-fix x) x)))
+           (equal (bool-fix$inline x) x)))
 
 (defthm symbol-fix-when-symbolp
   (implies (symbolp x)

@@ -62,6 +62,7 @@
       sublis-var1
       sublis-var1-lst
       bool-fix
+      bool-fix$inline
       realfix
       rfix
       ifix
