@@ -456,6 +456,59 @@ finds out @('integerp') is not a supported function.</p>
     :rule-classes nil)
   )
 
+(defthm assoc-equal-of-symbol-integer-alist-p
+  (implies (and (symbol-integer-alist-p l)
+                (assoc-equal s l))
+           (and (consp (assoc-equal s l))
+                (integerp (cdr (assoc-equal s l))))))
+
+(define x^2+y^2-integer-consp ((s1 symbolp)
+                               (s2 symbolp)
+                               (l symbol-integer-alist-p))
+  :returns (res integerp)
+  (b* ((l (symbol-integer-alist-fix l))
+       ((if (equal (assoc-equal s1 (symbol-integer-alist-fix l))
+                   (smt::magic-fix 'symbolp_integerp nil)))
+        0)
+       ((if (equal (assoc-equal s2 (symbol-integer-alist-fix l))
+                   (smt::magic-fix 'symbolp_integerp nil)))
+        1)
+       (x1 (cdr (smt::magic-fix 'symbolp_integerp
+                                (assoc-equal s1 (symbol-integer-alist-fix
+                                                 l)))))
+       (x2 (cdr (smt::magic-fix 'symbolp_integerp
+                                (assoc-equal s2 (symbol-integer-alist-fix
+                               l))))))
+    (x^2+y^2-integer x1 x2)))
+
+(def-saved-event fty-defalist-theorem-example-consp
+  (defthm fty-defalist-theorem-consp
+    (implies (and (symbol-integer-alist-p l)
+                  (symbolp s1)
+                  (symbolp s2))
+             (>= (x^2+y^2-integer-consp s1 s2 l) 0))
+    :hints(("Goal"
+            :smtlink
+            (:fty (symbol-integer-alist)
+                  :functions ((x^2+y^2-integer :formals ((x integerp)
+                                                         (y integerp))
+                                               :returns ((f integerp
+                                                            :meta-extract-thms
+                                                            (integerp-of-x^2+y^2-integer
+                                                             ifix-when-integerp)))
+                                               :level 1)
+                              (x^2+y^2-integer-consp :formals ((s1 symbolp)
+                                                               (s2 symbolp)
+                                                               (l symbol-integer-alist-p))
+                                                     :returns ((f integerp
+                                                                  :meta-extract-thms
+                                                                  (integerp-of-x^2+y^2-integer-consp
+                                                                   ifix-when-integerp)))
+                                                     :level 1)))))
+    :rule-classes nil)
+  )
+
+
 (defthm fty-defalist-theorem-acons
   (implies (and (symbol-integer-alist-p l)
                 (symbolp s1)
@@ -561,7 +614,6 @@ finds out @('integerp') is not a supported function.</p>
                                                            ifix-when-integerp)))
                                              :level 1)))))
   :rule-classes nil)
-) 
 
 (def-saved-event x^2+y^2-fixed-example
   (define x^2+y^2-fixed ((x maybe-integer-p)

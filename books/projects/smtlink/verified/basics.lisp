@@ -128,7 +128,8 @@
     (expand                . type-extract-cp)
     (type-extract          . uninterpreted-fn-cp)
     (uninterpreted         . smt-trusted-cp)
-    (uninterpreted-custom  . smt-trusted-cp-custom)))
+    (uninterpreted-custom  . smt-trusted-cp-custom)
+    (trusted               . bsimplify-cp)))
 
 
 ;;----------------------------------------------------------------
