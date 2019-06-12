@@ -18,6 +18,7 @@
 (include-book "hint-interface")
 (include-book "computed-hints")
 (include-book "expand-cp")
+(include-book "return-type")
 
 (include-book "ordinals/lexicographic-ordering" :dir :system)
 (set-state-ok t)
@@ -42,143 +43,60 @@
   (acl2::def-meta-extract unev unev-lst)
   (acl2::def-unify unev unev-alist)
 
-  (local
-   (defthm unev-of-disjoin
-     (iff (unev (disjoin clause) a)
-          (acl2::or-list (unev-lst clause a)))
-     :hints(("Goal" :in-theory (enable acl2::or-list len)
-             :induct (len clause)))))
+  (encapsulate ()
+    (local
+     (defthm type-thm-full-correct-uninterpreted-1
+       (implies (not (unev acl2::x acl2::a))
+                (not (unev acl2::x (unev-falsify acl2::x))))
+       :hints (("Goal"
+                :use ((:functional-instance unev-falsify))
+                )))
+     )
 
-  (define type-thm-remove-lambda ((func func-p)
-                                  state)
-    :returns (type-thm pseudo-termp) ;; type-fix
-    (b* ((func (func-fix func))
-         (thms (func->meta-extract-thms func))
-         ((mv ok type-of-f)
-          (case-match thms
-            ((type-of-f &)
-             (mv t type-of-f))
-            (& (mv nil nil))))
-         ((unless ok)
-          (er hard? 'uninterpreted-fn-cp=>type-thm-remove-lambda "Smtlink need two theorems
- to justify the proof of return types of uninterpreted functions. Expected
- [type-of-f] and [type-fix-when-type], but got: ~q0" thms))
-         (type-thm (acl2::meta-extract-formula-w type-of-f (w state)))
-         ((unless (and (pseudo-termp type-thm)
-                       (consp type-thm)
-                       (pseudo-lambdap (car type-thm))
-                       (pseudo-term-listp (cdr type-thm))))
-          (er hard? 'uninterpreted-fn-cp=>type-thm-remove-lambda "Type theorem type-of-f is
- not of the expected shape: ~q0" type-thm))
-         ((cons fn fn-actuals) type-thm)
-         (type-thm-w/o-lambda (lambda-substitution fn fn-actuals)))
-      type-thm-w/o-lambda))
+    (local
+     (defthm type-thm-full-correct-uninterpreted-2
+       (implies
+        (unev
+         (meta-extract-global-fact+
+          (mv-nth 0
+                  (unev-meta-extract-global-badguy state))
+          (mv-nth 1
+                  (unev-meta-extract-global-badguy state))
+          state)
+         (unev-falsify (meta-extract-global-fact+
+                        (mv-nth 0
+                                (unev-meta-extract-global-badguy state))
+                        (mv-nth 1
+                                (unev-meta-extract-global-badguy state))
+                        state)))
+        (unev
+         (meta-extract-global-fact+ acl2::obj acl2::st state)
+         (unev-falsify (meta-extract-global-fact+ acl2::obj acl2::st state))))
+       :hints (("Goal"
+                :use ((:functional-instance unev-meta-extract-global-badguy)))))
+     )
 
 
-  ;; BOZO: Should be able to do functional-instantiation of
-  ;; lambda-substitution-correct, but I got lost at the symbols from package acl2
-  ;; and current package
-  (local (defthm unev-alist-of-pairlis$
-           (equal (unev-alist (pairlis$ x y) a)
-                  (pairlis$ x (unev-lst y a)))))
-
-  (defthm lambda-substitution-correct-uninterpreted
-    (implies (and (unev-meta-extract-global-facts)
-                  (alistp a)
-                  (pseudo-lambdap fn-call)
-                  (pseudo-term-listp fn-actuals))
-             (equal
-              (unev (lambda-substitution fn-call fn-actuals) a)
-              (unev (cons fn-call fn-actuals) a)))
-    :hints (("Goal"
-             :in-theory (enable lambda-substitution))))
-
-  (defthm type-thm-remove-lambda-correct
-    (implies (and (unev-meta-extract-global-facts)
-                  (alistp a))
-             (or (null (type-thm-remove-lambda func state))
-                 (unev (type-thm-remove-lambda func state) a)))
-    :hints (("Goal"
-             :do-not-induct t
-             :in-theory (e/d (type-thm-remove-lambda
-                              unev-of-fncall-args)
-                             (pseudo-term-listp
-                              pseudo-termp
-                              car-cdr-elim
-                              w
-                              lambda-substitution-correct-uninterpreted))
-             :use ((:instance
-                    lambda-substitution-correct-uninterpreted
-                    (a a)
-                    (fn-call
-                     (car (meta-extract-formula (car (func->meta-extract-thms func))
-                                                state)))
-                    (fn-actuals
-                     (cdr (meta-extract-formula (car (func->meta-extract-thms func))
-                                                state)))
-                    ))
-             )))
-
-  (local
-   (defthm alistp-of-pairlis$
-     (alistp (pairlis$ keys vals)))
-   )
-
-  (define uninterpreted-substitution ((term pseudo-termp)
-                                      (type-thm pseudo-termp))
-    :returns (new-term pseudo-termp
-                       :hints (("Goal"
-                                :in-theory (enable pseudo-termp
-                                                   pseudo-term-fix
-                                                   pairlis$))))
-    (b* ((term (pseudo-term-fix term))
-         (type-thm (pseudo-term-fix type-thm))
-         (vars (reverse (acl2::simple-term-vars type-thm)))
-         ((unless (and (consp term)
-                       (acl2::pseudo-term-substp (pairlis$ vars (cdr term)))))
-          (prog2$ (er hard? 'uninterpreted-fn-cp=>uninterpreted-substitution
-                      "acl2::simple-term-vars failed with ~p0
-                                    and ~p1" type-thm term)
-                  nil)))
-      (acl2::substitute-into-term type-thm (pairlis$ vars (cdr term)))))
-
-  (define type-thm-full ((term pseudo-termp)
-                         (func func-p)
-                         state)
-    :returns (new-term pseudo-termp)
-    (b* ((term (pseudo-term-fix term))
-         (type-thm-w/o-lambda (type-thm-remove-lambda func state))
-         ((unless type-thm-w/o-lambda)
-          (prog2$ (er hard? 'uninterpreted-fn-cp=>type-thm-full
-                      "Something is wrong with type-thm-remove-lambda.")
-                  nil))
-         (type-thm (uninterpreted-substitution term type-thm-w/o-lambda))
-         ((unless type-thm)
-          (prog2$ (er hard? 'uninterpreted-fn-cp=>type-thm-full
-                      "Something is wrong with uninterpreted-substitution.")
-                  nil)))
-      type-thm))
-
-  (local (defthm alistp-of-unev-alist (alistp (unev-alist x a))))
-
-  (defthm type-thm-full-correct
-    (implies (and (unev-meta-extract-global-facts)
-                  (alistp a)
-                  (pseudo-termp term))
-             (or (null (type-thm-full term func state))
-                 (unev (type-thm-full term func state) a)))
-    :hints (("Goal"
-             :do-not-induct t
-             :in-theory (e/d (type-thm-full
-                              uninterpreted-substitution)
-                             (type-thm-remove-lambda-correct))
-             :use ((:instance type-thm-remove-lambda-correct
-                              (func func)
-                              (a (pairlis$
-                                  (reverse (acl2::simple-term-vars
-                                            (type-thm-remove-lambda func state)))
-                                  (unev-lst (cdr term) a)))))
-             )))
+    (defthm type-thm-full-correct-uninterpreted
+      (implies (and (unev-meta-extract-global-facts)
+                    (alistp a)
+                    (pseudo-termp term))
+               (or (null (type-thm-full term func state))
+                   (unev (type-thm-full term func state) a)))
+      :hints (("Goal"
+               :do-not-induct t
+               :in-theory (e/d (unev-of-fncall-args)
+                               (type-thm-full-correct))
+               :use ((:functional-instance
+                      type-thm-full-correct
+                      (rtev unev)
+                      (rtev-lst unev-lst)
+                      (rtev-alist unev-alist)
+                      (rtev-falsify unev-falsify)
+                      (rtev-meta-extract-global-badguy
+                       unev-meta-extract-global-badguy)))
+               )))
+    )
 
 
   (define fix-thm-meta-extract ((func func-p)
@@ -291,12 +209,12 @@
                               car-cdr-elim
                               w
                               fix-thm-full-correct
-                              type-thm-full-correct))
+                              type-thm-full-correct-uninterpreted))
              :use ((:instance fix-thm-full-correct
                               (a a)
                               (term term)
                               (func func))
-                   (:instance type-thm-full-correct
+                   (:instance type-thm-full-correct-uninterpreted
                               (a a)
                               (term term)
                               (func func)))
