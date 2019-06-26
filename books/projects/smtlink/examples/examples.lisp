@@ -614,6 +614,7 @@ finds out @('integerp') is not a supported function.</p>
                                                            ifix-when-integerp)))
                                              :level 1)))))
   :rule-classes nil)
+)
 
 (def-saved-event x^2+y^2-fixed-example
   (define x^2+y^2-fixed ((x maybe-integer-p)
