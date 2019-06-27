@@ -20,7 +20,6 @@
 (include-book "clause-processors/generalize" :dir :system)
 
 ;; Include SMT books
-(include-book "pseudo-lambda-lemmas")
 (include-book "hint-interface")
 (include-book "extractor")
 (include-book "basics")

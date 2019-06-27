@@ -9,6 +9,7 @@
 (include-book "std/util/bstar" :dir :system)
 (include-book "xdoc/top" :dir :system)
 (include-book "std/util/define" :dir :system)
+(include-book "basics")
 (include-book "hint-please")
 (include-book "hint-interface")
 (include-book "computed-hints")
@@ -33,7 +34,7 @@
   ;; ...
   ;; Hn or G
 
-  (define add-hypo-subgoals ((hinted-hypos hint-pair-listp)
+  (define add-hypo-subgoals ((hinted-hypos hint-pair-list-p)
                              (G pseudo-termp))
     :returns (mv (list-of-H-thm pseudo-term-list-listp)
                  (list-of-not-Hs pseudo-term-listp))
@@ -55,7 +56,7 @@
     (defthm add-hypo-subgoals-correctness
       (implies (and (pseudo-termp G)
                     (alistp b)
-                    (hint-pair-listp hinted-hypos)
+                    (hint-pair-list-p hinted-hypos)
                     (ev-add-hypo
                      (disjoin
                       (mv-nth 1 (add-hypo-subgoals hinted-hypos G)))

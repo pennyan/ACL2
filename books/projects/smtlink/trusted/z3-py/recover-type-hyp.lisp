@@ -15,38 +15,22 @@
   :parents (z3-py)
   :short "Recovering types from type-hyp"
 
-  (define is-type-decl ((type symbolp)
-                        (fty-info fty-info-alist-p))
-    :returns (ok booleanp)
-    (b* ((type (symbol-fix type))
-         (fty-info (fty-info-alist-fix fty-info)))
-      (if (or ;; basic types
-           (member-equal type (strip-cars *SMT-types*))
-           ;; fty types
-           (typedecl-of-flextype type fty-info))
-          t nil)))
-
-  (define recover-type-decl-list ((hyp-lst t)
-                                  (fty-info fty-info-alist-p))
-    :returns (type-decl-list decl-listp)
-    (b* ((fty-info (fty-info-alist-fix fty-info))
+  (define recover-type-decl-list ((hyp-lst pseudo-term-listp)
+                                  (fixtypes smt-fixtype-list-p))
+    :returns (type-decl-list decl-list-p)
+    (b* ((fixtypes (smt-fixtype-list-fix fixtypes))
+         (hyp-lst (pseudo-term-list-fix hyp-lst))
          ((unless (consp hyp-lst)) nil)
          ((cons first rest) hyp-lst)
-         ((unless (and (equal (len first) 2)
-                       (symbolp (car first))
-                       (and (symbolp (cadr first)) (cadr first))))
+         ((unless (type-decl-p first fixtypes))
           (er hard? 'recover-type-hype=>recover-type-decl-list "ill-formed ~
                           type term: ~q0" first))
-         (type (car first))
-         (var (cadr first))
-         ((unless (is-type-decl type fty-info))
-          (er hard? 'recover-type-hyp=>recover-type-decl-list "not a type: ~q0"
-              type)))
-      (cons (make-decl :name var :type (make-hint-pair :thm type :hints nil))
-            (recover-type-decl-list rest fty-info))))
+         (var (cadr first)))
+      (cons (make-decl :name var :type (make-hint-pair :thm first))
+            (recover-type-decl-list rest fixtypes))))
 
   (define recover-type-hyp ((decl-list pseudo-term-listp)
-                            (fty-info fty-info-p)
+                            (fixtypes smt-fixtype-list-p)
                             state)
     ;; :returns (type-decl-list decl-listp)
     :mode :program ;; because of untranslate
@@ -70,8 +54,8 @@
                           hyp-lst returns something unrecognizable: ~q0"
                           untranslated-hyp-lst))
                      (hyp-lst (cdr untranslated-hyp-lst))
-                     (first-type-decl (recover-type-decl-list hyp-lst fty-info))
-                     (rest-type-decl (recover-type-hyp rest fty-info state)))
+                     (first-type-decl (recover-type-decl-list hyp-lst fixtypes))
+                     (rest-type-decl (recover-type-hyp rest fixtypes state)))
                   (append first-type-decl rest-type-decl)))
                (t (prog2$ (er hard? 'recover-type-hyp=>recover-type-hyp "tag ~
                           isn't recognized: ~q0" tag)

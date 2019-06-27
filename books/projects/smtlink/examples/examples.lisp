@@ -46,11 +46,8 @@
             (:functions ((x^2-y^2 :formals ((x real/rationalp)
                                             (y real/rationalp))
                                   :returns ((f real/rationalp
-                                               :meta-extract-thms
-                                               (real/rationalp-of-x^2-y^2
-                                                realfix-when-real/rationalp)
-                                               ))
-                                  :level 1))))))
+                                               :name real/rationalp-of-x^2-y^2))
+                                  :expansion-depth 1))))))
   )
 
 (deftutorial Example-1

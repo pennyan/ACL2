@@ -13,7 +13,7 @@
 (include-book "verified/basics")
 (include-book "verified/computed-hints")
 (include-book "verified/extractor")
-(include-book "verified/Smtlink")
+(include-book "verified/process")
 (include-book "verified/hint-interface")
 (include-book "verified/hint-please")
 (include-book "verified/type-hyp")
@@ -38,5 +38,4 @@
                     symbol-listp-of-formals-of-pseudo-lambdap
                     consp-of-pseudo-lambdap
                     consp-of-cddr-of-pseudo-lambdap
-                    not-stringp-of-cadr-of-pseudo-lambdap
-                    symbol-string-alistp-is-true-listp))
+                    not-stringp-of-cadr-of-pseudo-lambdap))

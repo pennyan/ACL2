@@ -13,7 +13,6 @@
 (include-book "clause-processors/just-expand" :dir :system)
 (include-book "clause-processors/sublis-var-meaning" :dir :system)
 
-(include-book "pseudo-lambda-lemmas")
 (include-book "hint-please")
 (include-book "hint-interface")
 (include-book "computed-hints")
@@ -44,20 +43,16 @@
    :hints(("Goal" :in-theory (enable acl2::or-list len)
            :induct (len clause)))))
 
-(define type-thm-remove-lambda ((func func-p)
+(define type-thm-remove-lambda ((func smt-function-p)
                                 state)
   :returns (type-thm pseudo-termp) ;; type-fix
-  (b* ((func (func-fix func))
-       (thms (func->meta-extract-thms func))
-       ((mv ok type-of-f)
-        (case-match thms
-          ((type-of-f &)
-           (mv t type-of-f))
-          (& (mv nil nil))))
-       ((unless ok)
-        (er hard? 'return-type=>type-thm-remove-lambda "Smtlink need two theorems
- to justify the proof of return types of uninterpreted functions. Expected
- [type-of-f] and [type-fix-when-type], but got: ~q0" thms))
+  (b* ((func (smt-function-fix func))
+       (returns (smt-function->returns func))
+       ((unless (and (car returns) (null (cdr returns))))
+        (er hard? 'return-type=>type-thm-remove-lambda "Smtlink requires
+                                exactly one returns~%" returns))
+       (type (decl->type (car returns)))
+       (type-of-f (hint-pair->name type))
        (type-thm (acl2::meta-extract-formula-w type-of-f (w state)))
        ((unless (and (pseudo-termp type-thm)
                      (consp type-thm)
@@ -106,10 +101,10 @@
                   lambda-substitution-correct-uninterpreted
                   (a a)
                   (fn-call
-                   (car (meta-extract-formula (car (func->meta-extract-thms func))
+                   (car (meta-extract-formula (hint-pair->name (decl->type (car (smt-function->returns func))))
                                               state)))
                   (fn-actuals
-                   (cdr (meta-extract-formula (car (func->meta-extract-thms func))
+                   (cdr (meta-extract-formula (hint-pair->name (decl->type (car (smt-function->returns func))))
                                               state)))
                   ))
            )))
@@ -133,7 +128,7 @@
     (acl2::substitute-into-term type-thm (pairlis$ vars (cdr term)))))
 
 (define type-thm-full ((term pseudo-termp)
-                       (func func-p)
+                       (func smt-function-p)
                        state)
   :returns (new-term pseudo-termp)
   (b* ((term (pseudo-term-fix term))

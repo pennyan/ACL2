@@ -97,11 +97,11 @@
     :short "Argument list for function expand"
     ((fn-lvls sym-nat-alistp "Levels to expand each functions to."
               :default nil)
-     (fn-lst func-alistp "List of function definitions to use for
+     (fn-lst smt-function-list-p "List of function definitions to use for
       function expansion." :default nil)
      (facts fact-alistp "An alist of current learnt equivalence facts."
             :default nil)
-     (fty-info fty-info-alist-p "FTY information." :default nil)
+     (fixtypes smt-fixtype-list-p "FTY information." :default nil)
      (wrld-fn-len natp "Number of function definitions in curent world."
                   :default 0)))
 
@@ -260,12 +260,12 @@ definition fact of that term.</p>
            ;; 3. otherwise, fn will be expanded once -- fn-lvls decrease by 1, fn
            ;; is expanded, one fact generated
            (basic-function (member-equal fn *SMT-basics*))
-           (flex? (fncall-of-flextype fn a.fty-info))
+           (flex? (fncall-of-fixtypes fn a.fixtypes))
            (basic-fix (member-equal fn (strip-cdrs *SMT-fixers*)))
            ((if (or basic-function flex? basic-fix))
             (mv nil a))
            (lvl (assoc-equal fn a.fn-lvls))
-           (user-defined (assoc-equal fn a.fn-lst))
+           (user-defined (is-function fn a.fn-lst))
            ((if (and lvl (zp (cdr lvl)) user-defined)) (mv nil a))
            ((if (and lvl (zp (cdr lvl)) (null user-defined)))
             (prog2$ (er hard? 'expand-cp=>fact-finder "Possibly
@@ -279,14 +279,14 @@ definition fact of that term.</p>
                 (make-ex-args :fn-lvls (update-fn-lvls fn a.fn-lvls)
                               :fn-lst a.fn-lst
                               :facts (acons term fact a.facts)
-                              :fty-info a.fty-info
+                              :fixtypes a.fixtypes
                               :wrld-fn-len a.wrld-fn-len))))
         ;; if not in fn-lvls
         (mv fact
             (make-ex-args :fn-lst a.fn-lst
                           :fn-lvls (cons `(,fn . 0) a.fn-lvls)
                           :facts (acons term fact a.facts)
-                          :fty-info a.fty-info
+                          :fixtypes a.fixtypes
                           :wrld-fn-len (1- a.wrld-fn-len))))
       ///
       (more-returns
@@ -656,36 +656,36 @@ definition fact of that term.</p>
     (verify-guards expand)
     )
 
-  (define initialize-fn-lvls ((fn-lst func-alistp))
+  (define initialize-fn-lvls ((fn-lst smt-function-list-p))
     :returns (fn-lvls sym-nat-alistp)
     :measure (len fn-lst)
-    :hints (("Goal" :in-theory (enable func-alist-fix)))
-    (b* ((fn-lst (func-alist-fix fn-lst))
+    (b* ((fn-lst (smt-function-list-fix fn-lst))
          ((unless (consp fn-lst)) nil)
          ((cons first rest) fn-lst)
-         ((func f) (cdr first)))
+         ((smt-function f) first))
       (cons (cons f.name f.expansion-depth) (initialize-fn-lvls rest))))
 
-  (local
-   (defthm func-p-of-cdr-assoc-equal-of-func-alistp
-     (implies (and (func-alistp fn-lst)
-                   (cdr (assoc-equal key fn-lst)))
-              (func-p (cdr (assoc-equal key fn-lst))))))
+  ;; (local
+  ;;  (defthm func-p-of-cdr-assoc-equal-of-func-alistp
+  ;;    (implies (and (func-alistp fn-lst)
+  ;;                  (cdr (assoc-equal key fn-lst)))
+  ;;             (func-p (cdr (assoc-equal key fn-lst))))))
 
   (define generate-type ((term pseudo-termp)
-                         (fn-lst func-alistp)
+                         (fn-lst smt-function-list-p)
                          state)
     :returns (new-term pseudo-termp)
+    :guard-debug t
     (b* ((term (pseudo-term-fix term))
-         (fn-lst (func-alist-fix fn-lst))
+         (fn-lst (smt-function-list-fix fn-lst))
          ((unless (consp term))
           (er hard? 'expand-cp=>generate-type "Term is not a consp: ~q0"
               term))
          (fn (acl2::ffn-symb term))
-         ((unless fn)
+         ((unless (and fn (symbolp fn)))
           (er hard? 'expand-cp=>generate-type "Term is not a function call: ~q0"
               term))
-         (fc (cdr (assoc-equal fn fn-lst)))
+         (fc (is-function fn fn-lst))
          ((unless fc)
           (er hard? 'expand-cp=>generate-type "Function doesn't exist in the
                        hint: ~q0" fn)))
@@ -756,8 +756,8 @@ definition fact of that term.</p>
              :use ((:instance
                     type-thm-full-correct-extract
                     (term term)
-                    (func (cdr (assoc-equal (car term)
-                                            (func-alist-fix fn-lst))))
+                    (func (is-function (car term)
+                                       (smt-function-list-fix fn-lst)))
                     (state state)
                     ))
              ))
@@ -765,7 +765,7 @@ definition fact of that term.</p>
 
   (define compose-goal ((cl pseudo-term-listp)
                         (to-be-learnt pseudo-term-listp)
-                        (fn-lst func-alistp)
+                        (fn-lst smt-function-list-p)
                         state)
     :returns (new-goal pseudo-term-listp)
     :measure (len (pseudo-term-list-fix to-be-learnt))
@@ -841,29 +841,21 @@ definition fact of that term.</p>
       (b* (((unless (pseudo-term-listp cl)) (mv nil nil))
            ((unless (smtlink-hint-p smtlink-hint))
             (mv cl nil))
-           ;; generate all fty related stuff
-           (flextypes-table (table-alist 'fty::flextypes-table (w state)))
-           ((unless (alistp flextypes-table)) (mv cl nil))
-           (h1 (generate-fty-info-alist smtlink-hint flextypes-table))
-           (h2 (generate-fty-types-top h1 flextypes-table))
-           ((smtlink-hint h) h2)
-           ;; Make an alist version of fn-lst
-           (fn-lst (make-alist-fn-lst h.functions))
+           ((smtlink-hint h) smtlink-hint)
+           (fn-lst h.functions)
            (fn-lvls (initialize-fn-lvls fn-lst))
            (wrld-fn-len h.wrld-fn-len)
            (transformed-cl (transform-list cl))
            ;; Do function expansion
-           (facts nil)
            (to-be-learnt
-            (with-fast-alists (facts fn-lvls fn-lst)
-              (expand (disjoin transformed-cl)
-                      (make-ex-args
-                       :fn-lvls fn-lvls
-                       :fn-lst fn-lst
-                       :facts facts
-                       :fty-info h.fty-info
-                       :wrld-fn-len wrld-fn-len)
-                      state)))
+            (expand (disjoin transformed-cl)
+                    (make-ex-args
+                     :fn-lvls fn-lvls
+                     :fn-lst fn-lst
+                     :facts nil
+                     :fixtypes h.types
+                     :wrld-fn-len wrld-fn-len)
+                    state))
            (expanded-goal (compose-goal transformed-cl
                                         (strip-cars to-be-learnt) fn-lst
                                         state))

@@ -94,6 +94,7 @@
       fty::deffixtype
       fty::defalist
       fty::defoption
+      fty::deftagsum
 
       sv::def-saved-event
       sv::deftutorial

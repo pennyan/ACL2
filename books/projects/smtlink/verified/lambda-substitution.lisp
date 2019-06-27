@@ -20,7 +20,6 @@
 (include-book "clause-processors/just-expand" :dir :system)
 
 ;; Include SMT books
-(include-book "pseudo-lambda-lemmas")
 (include-book "hint-interface")
 
 (acl2::defevaluator-fast lambdaev lambdaev-lst
