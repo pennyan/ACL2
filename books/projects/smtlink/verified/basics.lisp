@@ -51,6 +51,23 @@
     ;; (booleanp      . ("_SMT_.booleanp"   . 1))
     ))
 
+(define is-basic-function ((opr symbolp))
+  :returns (is? stringp)
+  (if (assoc-equal opr *SMT-functions*)
+      (cadr (assoc-equal opr *SMT-functions*))
+    ""))
+
+(defval *SMT-types*
+  :parents (SMT-basics)
+  :short "ACL2 type functions and their corresponding Z3 type declarations."
+  ;;(ACL2 type      .  SMT type)
+  `((realp          . "_SMT_.RealSort()")
+    (rationalp      . "_SMT_.RealSort()")
+    (real/rationalp . "_SMT_.RealSort()")
+    (integerp       . "_SMT_.IntSort()")
+    (booleanp       . "_SMT_.BoolSort()")
+    (symbolp        . "Symbol_z3.z3Sym")))
+
 (defval *SMT-fixers*
   :parents (SMT-basics)
   :short "Fixing functions for basic types that are not in user-defined FTY types."
@@ -98,28 +115,6 @@
 (defthm symbol-fix-when-symbolp
   (implies (symbolp x)
            (equal (symbol-fix x) x)))
-
-(defval *SMT-types*
-  :parents (SMT-basics)
-  :short "ACL2 type functions and their corresponding Z3 type declarations."
-  ;;(ACL2 type      .  SMT type)
-  `((realp          . "_SMT_.RealSort()")
-    (rationalp      . "_SMT_.RealSort()")
-    (real/rationalp . "_SMT_.RealSort()")
-    (integerp       . "_SMT_.IntSort()")
-    (booleanp       . "_SMT_.BoolSort()")
-    (symbolp        . "Symbol_z3.z3Sym")))
-
-(defval *SMT-uninterpreted-types*
-  :parents (SMT-basics)
-  :short "ACL2 type functions and their corresponding Z3 uninterpreted function
-    type declarations."
-  `((realp          . "_SMT_.RealSort()")
-    (rationalp      . "_SMT_.RealSort()")
-    (real/rationalp . "_SMT_.RealSort()")
-    (integerp       . "_SMT_.IntSort()")
-    (booleanp       . "_SMT_.BoolSort()")
-    (symbolp        . "Symbol_z3.z3Sym")))
 
 ;; current tag . next computed-hint
 (defval *SMT-architecture*
@@ -198,21 +193,4 @@
       :short "SMT types"
 
       :long ,(talist-to-xdoc)))
-
-  (local (defun ualist-to-xdoc ()
-           (declare (xargs :mode :program))
-           (str::string-append-lst
-            `("<p></p>
-<table>
-<tr><th>ACL2 type functions</th><th>Z3 uninterpreted function type declarations</th></tr>
-"
-              ,@(reverse (alist-to-xdoc-aux *SMT-uninterpreted-types* nil))
-              "</table>"))))
-
-  (make-event
-   `(defxdoc SMT-uninterpreted-types
-      :parents (SMT-basics)
-      :short "SMT uninterpreted function types"
-
-      :long ,(ualist-to-xdoc)))
   )

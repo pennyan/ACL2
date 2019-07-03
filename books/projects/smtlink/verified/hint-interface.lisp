@@ -78,36 +78,32 @@
      (none-prod prod-p :default (make-prod))))
 
   (deftagsum smt-type
-    (:default ((constructor smt-function-p :default (make-smt-function))
-               (destructors smt-function-list-p :default nil)
-               (theorems hint-pair-list-p :default nil)))
+    (:abstract ())
     (:list ((cons smt-function-p :default (make-smt-function))
             (car smt-function-p :default (make-smt-function))
             (cdr smt-function-p :default (make-smt-function))
-            (elt-type decl-p :default (decl))
+            (empty smt-function-p :default (make-smt-function))
+            (elt-type symbolp :default nil)
             (theorems hint-pair-list-p :default nil)))
     (:array ((store smt-function-p :default (make-smt-function))
              (select smt-function-p :default (make-smt-function))
-             (key-type decl-p :default (make-decl))
-             (val-type decl-p :default (make-decl))
+             (key-type symbolp :default nil)
+             (val-type symbolp :default nil)
              (theorems hint-pair-list-p :default nil)))
     (:prod ((prod prod-p :default (make-prod))))
     (:option ((option option-p :default (make-option))))
     ;; A prod and an option are all sums,
     ;; we use sum here to denote more general sums
     (:sum ((prods prod-list-p :default nil)))
-    (:uninterpreted ((constructor smt-function-p :default (make-smt-function))
-                     (destructors smt-function-list-p :default nil)
-                     (theorems hint-pair-list-p :default nil)))
     )
 
   (defprod smt-fixtype
     :parents (smtlink-hint)
-    ((name symbolp)
-     (recognizer symbolp)
-     (fixer symbolp)
-     (fixer-when-recognizer-thm symbolp)
-     (type smt-type-p)))
+    ((name symbolp :default nil)
+     (recognizer symbolp :default nil)
+     (fixer symbolp :default nil)
+     (fixer-when-recognizer-thm symbolp :default nil)
+     (kind smt-type-p :default (make-smt-type-abstract))))
 
   (defoption maybe-smt-fixtype smt-fixtype-p)
 

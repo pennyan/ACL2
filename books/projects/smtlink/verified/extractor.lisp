@@ -11,19 +11,12 @@
 (include-book "std/util/define" :dir :system)
 
 (include-book "hint-interface")
+(include-book "type-hyp")
 (include-book "basics")
 
 (defsection SMT-extract
   :parents (verified)
   :short "SMT-extract extracts type hypotheses from the clause. The SMT solver requires knowing type declarations."
-
-  ;; (define is-type-hyp-decl ((expr pseudo-termp))
-  ;;   :returns (is-type-hyp? booleanp)
-  ;;   (b* (((unless (equal (len expr) 3))
-  ;;         nil)
-  ;;        (fn-name (car expr))
-  ;;        ((unless (equal fn-name 'type-hyp)) nil))
-  ;;     t))
 
   (defthm pseudo-term-listp-of-append-of-pseudo-term-listp
     (implies (and (pseudo-term-listp x) (pseudo-term-listp y))
@@ -89,7 +82,7 @@
                      (cond ((equal term0 ''nil) ''t)
                            ((equal term0 ''t)   ''nil)
                            (t `(not ,term0))))))
-              ((type-decl-p term fixtypes)
+              ((or (type-decl-p term fixtypes) (is-type-hyp term))
                (mv (list term) ''t))
               (t (mv nil term)))))
     )
@@ -99,7 +92,8 @@
 
   (define smt-extract ((term pseudo-termp) (fixtypes smt-fixtype-list-p))
     :returns (mv (decl-list pseudo-term-listp) (theorem pseudo-termp))
-    (b* (((mv decl-list theorem) (extract-disjunct term fixtypes)))
+    (b* (((mv decl-list theorem) (extract-disjunct term fixtypes))
+         (- (cw "decl-list: ~q0theorem:~q1" decl-list theorem)))
       (mv decl-list theorem)))
 )
 

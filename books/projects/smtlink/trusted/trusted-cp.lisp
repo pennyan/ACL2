@@ -14,7 +14,7 @@
   :parents (trusted)
   :short "The trusted clause processor"
 
-  (defstub SMT-prove-stub (term smtlink-hint state) (mv t nil nil state))
+  (defstub SMT-prove-stub (term smtlink-hint state) (mv t nil state))
 
   (program)
   (defttag :Smtlink)
@@ -37,16 +37,17 @@
                                  state)
       :stobjs state
       :mode :program
-      (b* (((mv res smt-precond uninterpreted-precond state)
+      (b* (((mv res precond state)
             (SMT-prove-stub (disjoin cl) smtlink-hint state))
+           ;; should I return just precond, or precond and precond\or/goal?
            (subgoal-lst `(((hint-please
                             '(:in-theory (enable magic-fix
                                                  hint-please
                                                  type-hyp)
                               :expand ((:free (x) (hide x)))))
-                           ,smt-precond
+                           ,precond
                            ,(disjoin cl))
-                          ,@uninterpreted-precond)))
+                          ,@precond)))
         (if res
             (prog2$ (cw "Proved!~%") (mv nil subgoal-lst state))
           (mv (cons "NOTE: Unable to prove goal with ~

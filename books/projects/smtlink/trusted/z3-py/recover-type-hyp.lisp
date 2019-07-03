@@ -8,8 +8,7 @@
 (include-book "centaur/fty/top" :dir :system)
 (include-book "xdoc/top" :dir :system)
 (include-book "std/util/define" :dir :system)
-(include-book "../../verified/hint-interface")
-(include-book "../../verified/basics")
+(include-book "../../verified/extractor")
 
 (defsection SMT-recover-types
   :parents (z3-py)
@@ -29,9 +28,9 @@
       (cons (make-decl :name var :type (make-hint-pair :thm first))
             (recover-type-decl-list rest fixtypes))))
 
-  (define recover-type-hyp ((decl-list pseudo-term-listp)
-                            (fixtypes smt-fixtype-list-p)
-                            state)
+  (define recover-type-hyp-main ((decl-list pseudo-term-listp)
+                                 (fixtypes smt-fixtype-list-p)
+                                 state)
     ;; :returns (type-decl-list decl-listp)
     :mode :program ;; because of untranslate
     (b* ((decl-list (pseudo-term-list-fix decl-list))
@@ -50,18 +49,32 @@
                       (untranslate hyp-lst nil (w state)))
                      ((unless (and (consp untranslated-hyp-lst)
                                    (equal (car untranslated-hyp-lst) 'list)))
-                      (er hard? 'recover-type-hyp=>recover-type-hyp "untranslate ~
-                          hyp-lst returns something unrecognizable: ~q0"
-                          untranslated-hyp-lst))
+                      (er hard? 'recover-type-hyp=>recover-type-hyp-main
+                          "Missing type declarations: ~q0"
+                          decl-list))
                      (hyp-lst (cdr untranslated-hyp-lst))
                      (first-type-decl (recover-type-decl-list hyp-lst fixtypes))
-                     (rest-type-decl (recover-type-hyp rest fixtypes state)))
+                     (rest-type-decl (recover-type-hyp-main rest fixtypes state)))
                   (append first-type-decl rest-type-decl)))
-               (t (prog2$ (er hard? 'recover-type-hyp=>recover-type-hyp "tag ~
+               (t (prog2$ (er hard? 'recover-type-hyp=>recover-type-hyp-main "tag ~
                           isn't recognized: ~q0" tag)
                           nil))))
-        (& (prog2$ (er hard? 'recover-type-hyp=>recover-type-hyp
-                       "recover-type-hyp found a malformed type-hyp: ~q0"
+        (& (prog2$ (er hard? 'recover-type-hyp=>recover-type-hyp-main
+                       "recover-type-hyp-main found a malformed type-hyp: ~q0"
                        first)
                    nil)))))
+
+  (define recover-type-hyp ((term pseudo-termp)
+                            (smtlink-hint smtlink-hint-p)
+                            state)
+    ;; :returns (mv (type-decl-list decl-listp)
+    ;;              (untyped-theorem pseudo-termp))
+    :mode :program
+    (b* ((term (pseudo-term-fix term))
+         (smtlink-hint (smtlink-hint-fix smtlink-hint))
+         ((smtlink-hint h) smtlink-hint)
+         ((mv type-hyp-lst untyped-theorem)
+          (smt-extract term h.types)))
+      (mv (recover-type-hyp-main type-hyp-lst h.types state)
+          untyped-theorem)))
   )

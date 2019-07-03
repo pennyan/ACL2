@@ -32,10 +32,4 @@
 (include-book "trusted/z3-py/header")
 (include-book "trusted/z3-py/names")
 (include-book "trusted/z3-py/translator")
-(include-book "trusted/z3-py/magic-fix")
 
-(in-theory (disable consp-when-member-equal-of-sym-nat-alistp
-                    symbol-listp-of-formals-of-pseudo-lambdap
-                    consp-of-pseudo-lambdap
-                    consp-of-cddr-of-pseudo-lambdap
-                    not-stringp-of-cadr-of-pseudo-lambdap))

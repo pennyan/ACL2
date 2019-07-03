@@ -70,8 +70,7 @@
 
   (define SMT-prove ((term pseudo-termp) (smtlink-hint smtlink-hint-p) (state))
     ;; :returns (mv (proved? booleanp)
-    ;;              (smt-precond pseudo-termp)
-    ;;              (uninterpreted-precond pseudo-term-list-listp)
+    ;;              (precond pseudo-termp)
     ;;              (state))
     :mode :program
     (b* ((term (pseudo-term-fix term))
@@ -79,11 +78,11 @@
          ((smtlink-hint h) smtlink-hint)
          ((smt-config c) h.configurations)
          (smt-file (make-fname c.smt-dir c.smt-fname))
-         ((mv smt-term smt-precond uninterpreted-precond)
+         ((mv smt-term precond)
           (SMT-translation term h state))
          (sc (smt-config->smt-cnf c))
          ((mv head import) (SMT-head sc))
          (state (SMT-write-file smt-file head import smt-term state))
          ((mv result state) (SMT-interpret smt-file c.rm-file sc state)))
-      (mv result smt-precond uninterpreted-precond state)))
+      (mv result precond state)))
   )
