@@ -24,6 +24,8 @@
 ;;   :parents (z3-py)
 ;;   :short "SMT-translator does the LISP to Python translation."
 
+(local (in-theory (disable natp nfix)))
+
 (define map-translated-actuals ((actuals paragraph-p))
   :returns (mapped paragraph-p)
   (b* ((actuals (paragraph-fix actuals))
@@ -33,32 +35,58 @@
        (mapped-rest (map-translated-actuals rest)))
     (cons first (cons #\, mapped-rest))))
 
-(local (in-theory (enable word-p)))
-
 (define translate-fixtype-fncall ((fn-call symbolp)
                                   (fixinfo smt-fixtype-info-p))
-  :returns (translated word-p)
-  :irrelevant-formals-ok t
-  :ignore-ok t
-  (translate-symbol (symbol-fix fn-call))
+  :returns (mv (translated word-p
+                           :hints (("Goal"
+                                    :in-theory (enable word-p))))
+               (constructor? booleanp))
+  (b* ((fn-call (symbol-fix fn-call))
+       (fixinfo (smt-fixtype-info-fix fixinfo))
+       (item (assoc-equal fn-call fixinfo))
+       ((unless item)
+        (mv (er hard? 'translator=>translate-fixtype-fncall
+                "~p0 fn-call is a function call, but it's not a fixtype call, a
+       uninterpreted function, or a basic function. Therefore we are stuck.~%"
+                fn-call)
+            nil))
+       ((info-pair p) (cdr item)))
+    (case p.fn-type
+      (:store (mv (translate-symbol 'store) nil))
+      (:select (mv (translate-symbol 'select) nil))
+      (:fixer (mv nil nil))
+      (:destructor
+       (mv (concatenate 'string
+                        (translate-symbol p.name) "."
+                        (translate-symbol fn-call))
+           nil))
+      (:constructor
+       (mv (concatenate 'string
+                        (translate-symbol p.name) "."
+                        (translate-symbol fn-call))
+           t))
+      (t (mv (er hard? 'translator=>translate-fixtype-fncall
+                 "~p0 is not one of the translatable function type. Possibly a
+       recognizer that still exits in the theorem body.~%"
+                 p.fn-type)
+             nil)))))
 
-  ;; (b* ((fn-call (symbol-fix fn-call))
-  ;;      (fixinfo (smt-fixtype-info-fix fixinfo))
-  ;;      ()
-  ;;      )
-  ;;   ())
-  )
+(defthm stringp-implies-word-p
+  (implies (stringp x) (word-p x))
+  :hints (("Goal"
+           :in-theory (enable word-p))))
 
 (define translate-fncall-cases ((fn-call symbolp)
                                 (fn-lst smt-function-list-p)
                                 (fixinfo smt-fixtype-info-p))
-  :returns (translated word-p)
+  :returns (mv (translated word-p)
+               (constructor? booleanp))
   :guard-hints (("Goal"
                  :expand (is-basic-function fn-call)))
   (cond ((is-function fn-call fn-lst)
-         (translate-symbol fn-call))
+         (mv (translate-symbol fn-call) nil))
         ((not (equal (is-basic-function fn-call) ""))
-         (is-basic-function fn-call))
+         (mv (is-basic-function fn-call) nil))
         (t (translate-fixtype-fncall fn-call fixinfo))))
 
 (defines translate
@@ -109,7 +137,14 @@
          ((mv translated-actuals index-actuals syms-actuals)
           (translate-term-list fn-actuals fn-lst fixinfo sym-index sym-acc
                                avoid))
-         (translated-fn-call (translate-fncall-cases fn-call fn-lst fixinfo)))
+         ((mv translated-fn-call constructor?)
+          (translate-fncall-cases fn-call fn-lst fixinfo))
+         ;; if it's a constructor with 0 arguments
+         ((if (and constructor? (null translated-actuals)))
+          (mv translated-fn-call index-actuals syms-actuals))
+         ;; if it's a fixing function
+         ((if (and (null translated-fn-call) (not (atom translated-actuals))))
+          (mv (car translated-actuals) index-actuals syms-actuals)))
       (mv `(,translated-fn-call
             #\( ,(map-translated-actuals translated-actuals) #\) )
           index-actuals
@@ -139,7 +174,7 @@
           syms-rest)))
   )
 
-(verify-guards translate-term)
+(verify-guards translate-term :guard-debug t)
 
 (define translate-theorem ((theorem pseudo-termp)
                            (fn-decl-list smt-function-list-p)

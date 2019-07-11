@@ -375,7 +375,7 @@
            (equal (ifix x) x)))
 (defsmtabstract integer
   :rec integerp
-  :fix integer-fix
+  :fix ifix
   :fix-thm ifix-when-integerp
   :basicp t)
 

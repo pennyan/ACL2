@@ -61,7 +61,7 @@
   (if b "True" "False"))
 
 (define translate-symbol ((sym symbolp))
-  :returns (translated paragraph-p)
+  :returns (translated word-p)
   (str::downcase-string (lisp-to-python-names sym))
   ///
   (more-returns

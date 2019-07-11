@@ -128,7 +128,7 @@
   (b* ((name (paragraph-fix name))
        (constructor (paragraph-fix constructor))
        (destructor-list (paragraph-fix destructor-list)))
-    `(,name ".declare('" ,constructor "', " ,destructor-list ")" #\Newline)))
+    `(,name ".declare('" ,constructor "'" ,destructor-list ")" #\Newline)))
 
 (define translate-sum-template ((name paragraph-p)
                                 (prod-list-line paragraph-p))
@@ -178,11 +178,6 @@
        (int-to-rat (int-to-rat-fix int-to-rat))
        ((unless (consp destructors)) nil)
        ((cons first rest) destructors)
-       ((unless (consp rest))
-        (translate-destructor-template
-         (translate-symbol (smt-function->name first))
-         (translate-type (return-type-of-function first fixinfo)
-                         name int-to-rat fixinfo)))
        (destructor (translate-symbol (smt-function->name first)))
        (return-type
         (translate-type (return-type-of-function first fixinfo)
@@ -191,7 +186,7 @@
         (translate-destructor-template destructor return-type))
        (translated-destructor-list
         (translate-destructor-list name rest fixinfo int-to-rat)))
-    `(,translated-destructor ", " ,translated-destructor-list)))
+    `(", " ,translated-destructor ,translated-destructor-list)))
 
 (define translate-prod ((name symbolp)
                         (prod prod-p)
@@ -204,10 +199,11 @@
        (fixinfo (smt-fixtype-info-fix fixinfo))
        (prod (prod-fix prod))
        ((prod p) prod)
+       (name-str (translate-symbol name))
        (constructor (translate-constructor p.constructor))
        (destructor-list
         (translate-destructor-list name p.destructors fixinfo int-to-rat))
-       (translated (translate-prod-template name constructor destructor-list))
+       (translated (translate-prod-template name-str constructor destructor-list))
        (new-precond (precond-prod name prod int-to-rat precond)))
     (mv translated new-precond)))
 
