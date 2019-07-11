@@ -91,7 +91,8 @@
   (define smt-extract ((term pseudo-termp) (fixinfo smt-fixtype-info-p))
     :returns (mv (decl-list pseudo-term-listp) (theorem pseudo-termp))
     (b* (((mv decl-list theorem) (extract-disjunct term fixinfo))
-         (- (cw "decl-list: ~q0theorem:~q1" decl-list theorem)))
+         ;; (- (cw "decl-list: ~q0theorem:~q1" decl-list theorem))
+         )
       (mv decl-list theorem)))
 )
 

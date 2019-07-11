@@ -197,10 +197,10 @@
           (pretty-print-theorem translated-theorem 160))
          ;; translate uninterpreted function declarations
          (translated-uninterpreted-decls
-          (translate-uninterpreted-decl-lst fn-decl-list h.types h.int-to-rat))
+          (translate-uninterpreted-decl-lst fn-decl-list h.types-info h.int-to-rat))
          ;; translate type declarations
          (translated-type-decls
-          (translate-type-decl-list type-decl-list h.types h.int-to-rat))
+          (translate-type-decl-list type-decl-list h.types-info h.int-to-rat))
          ;; translate type definitions
          ((mv translated-fixtypes fixtype-precond)
           (translate-fixtype-list h.types h.types-info h.int-to-rat nil nil))

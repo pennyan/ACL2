@@ -29,8 +29,7 @@
                  (lines string-listp))
     (b* ((cmd (concatenate 'string
                            (smtlink-config->smt-cmd smt-conf)
-                           " " fname))
-         (- (cw "cmd: ~q0" cmd)))
+                           " " fname)))
       (time$ (tshell-call cmd
                           :print nil
                           :save t)
