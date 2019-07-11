@@ -435,11 +435,20 @@ finds out @('integerp') is not a supported function.</p>
                                         :expansion-depth 1)) )))
   :rule-classes nil)
 )
-stop
+
 (def-saved-event sandwich-example
   (defprod sandwich
     ((bread integerp)
      (fillings symbolp)))
+  )
+
+(defsmtprod sandwich
+  :rec sandwich-p
+  :fix sandwich-fix
+  :fix-thm sandwich-fix-when-sandwich-p
+  :constructor sandwich
+  :destructors ((sandwich->bread$inline . integerp)
+                (sandwich->filings$inline . symbolp))
   )
 
 (def-saved-event fty-defprod-theorem-example
@@ -452,14 +461,12 @@ stop
                  0))
     :hints(("Goal"
             :smtlink
-            (:fty (sandwich)
-                  :functions ((x^2+y^2-integer :formals ((x integerp)
-                                                         (y integerp))
-                                               :returns ((f integerp
-                                                            :meta-extract-thms
-                                                            (integerp-of-x^2+y^2-integer
-                                                             ifix-when-integerp)))
-                                               :level 1)))))
+            (:functions ((x^2+y^2-integer :formals ((x integerp)
+                                                    (y integerp))
+                                          :returns ((f integerp
+                                                       :name
+                                                       integerp-of-x^2+y^2-integer))
+                                          :expansion-depth 1)))))
     :rule-classes nil)
   )
 
@@ -468,21 +475,29 @@ stop
   (implies (and (sandwich-p s1)
                 (sandwich-p s2))
            (>= (x^2+y^2-integer
-                (sandwich->bread (sandwich-fix s1))
-                (sandwich->bread (sandwich-fix s2)))
+                (sandwich->bread s1)
+                (sandwich->bread s2))
                1))
   :hints(("Goal"
           :smtlink
-          (:fty (sandwich)
-                :functions ((x^2+y^2-integer :formals ((x integerp)
-                                                       (y integerp))
-                                             :returns ((f integerp
-                                                          :meta-extract-thms
-                                                          (integerp-of-x^2+y^2-integer
-                                                           ifix-when-integerp)))
-                                             :level 1)))))
+          (:functions ((x^2+y^2-integer :formals ((x integerp)
+                                                  (y integerp))
+                                        :returns ((f integerp
+                                                     :name
+                                                     integerp-of-x^2+y^2-integer))
+                                        :expansion-depth 1)))))
   :rule-classes nil)
 )
+
+(defsmtoption maybe-integer
+  :rec maybe-integer-p
+  :fix maybe-integer-fix$inline
+  :fix-thm maybe-integer-fix-when-maybe-integer-p
+  :some-constructor maybe-integer-some
+  :some-destructor maybe-integer-some->val$inline
+  :nil-constructor maybe-integer-none
+  :some-type integerp
+  )
 
 (def-saved-event x^2+y^2-fixed-example
   (define x^2+y^2-fixed ((x maybe-integer-p)
@@ -490,10 +505,10 @@ stop
     :returns (res maybe-integer-p)
     (b* ((x (maybe-integer-fix x))
          (y (maybe-integer-fix y))
-         ((if (equal x (maybe-integer-fix nil)))
-          (maybe-integer-fix nil))
-         ((if (equal y (maybe-integer-fix nil)))
-          (maybe-integer-fix nil)))
+         ((if (equal x (maybe-integer-none)))
+          (maybe-integer-none))
+         ((if (equal y (maybe-integer-none)))
+          (maybe-integer-none)))
       (maybe-integer-some
        (+ (* (maybe-integer-some->val x)
              (maybe-integer-some->val x))
@@ -505,20 +520,18 @@ stop
   (defthm fty-defoption-theorem
     (implies (and (maybe-integer-p m1)
                   (maybe-integer-p m2)
-                  (not (equal m1 (maybe-integer-fix nil)))
-                  (not (equal m2 (maybe-integer-fix nil))))
+                  (not (equal m1 (maybe-integer-none)))
+                  (not (equal m2 (maybe-integer-none))))
              (>= (maybe-integer-some->val (x^2+y^2-fixed m1 m2))
                0))
     :hints(("Goal"
             :smtlink
-            (:fty (maybe-integer)
-                  :functions ((x^2+y^2-fixed :formals ((x maybe-integer-p)
-                                                       (y maybe-integer-p))
-                                             :returns ((res maybe-integer-p
-                                                            :meta-extract-thms
-                                                            (maybe-integer-p-of-x^2+y^2-fixed
-                                                             maybe-integer-fix-when-maybe-integer-p)))
-                                             :level 1)))))
+            (:functions ((x^2+y^2-fixed :formals ((x maybe-integer-p)
+                                                  (y maybe-integer-p))
+                                        :returns ((res maybe-integer-p
+                                                       :name
+                                                       maybe-integer-p-of-x^2+y^2-fixed))
+                                        :expansion-depth 1)))))
     :rule-classes nil)
   )
 
@@ -526,20 +539,18 @@ stop
 (defthm fty-defoption-theorem-fail
   (implies (and (maybe-integer-p m1)
                 (maybe-integer-p m2)
-                (not (equal m1 (maybe-integer-fix nil)))
-                (not (equal m2 (maybe-integer-fix nil))))
+                (not (equal m1 (maybe-integer-none)))
+                (not (equal m2 (maybe-integer-none))))
            (>= (maybe-integer-some->val (x^2+y^2-fixed m1 m2))
                1))
   :hints(("Goal"
           :smtlink
-          (:fty (maybe-integer)
-                :functions ((x^2+y^2-fixed :formals ((x maybe-integer-p)
-                                                     (y maybe-integer-p))
-                                           :returns ((res maybe-integer-p
-                                                          :meta-extract-thms
-                                                          (maybe-integer-p-of-x^2+y^2-fixed
-                                                           maybe-integer-fix-when-maybe-integer-p)))
-                                           :level 1)))))
+          (:functions ((x^2+y^2-fixed :formals ((x maybe-integer-p)
+                                                (y maybe-integer-p))
+                                      :returns ((res maybe-integer-p
+                                                     :name
+                                                     maybe-integer-p-of-x^2+y^2-fixed))
+                                      :expansion-depth 1)))))
   :rule-classes nil)
 )
 
