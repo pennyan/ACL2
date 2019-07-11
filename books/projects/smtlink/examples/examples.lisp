@@ -209,18 +209,16 @@ clause-processors. They help ensure the soundness of Smtlink.</p>
                                              :formals ((r real/rationalp)
                                                        (i real/rationalp))
                                              :returns ((ex real/rationalp
-                                                           :meta-extract-thms
-                                                           (real/rationalp-of-expt-rationalp
-                                                            realfix-when-real/rationalp)))
-                                             :level 0)
+                                                           :name
+                                                           real/rationalp-of-expt-rationalp))
+                                             :expansion-depth 0)
                                             (x^2+y^2 :formals ((x real/rationalp)
                                                                (y real/rationalp))
                                                      :returns ((f
                                                                 real/rationalp
-                                                                :meta-extract-thms
-                                                                (real/rationalp-of-x^2+y^2
-                                                                 realfix-when-real/rationalp)))
-                                                     :level 1))
+                                                                :name
+                                                                real/rationalp-of-x^2+y^2))
+                                                     :expansion-depth 1))
                                            :hypotheses (((< (expt-rationalp z n)
                                                             (expt-rationalp z m))
                                                          :hints (:in-theory
@@ -359,10 +357,9 @@ finds out @('integerp') is not a supported function.</p>
           :smtlink
           (:functions ((foo :formals ((x real/rationalp))
                             :returns ((rx real/rationalp
-                                          :meta-extract-thms
-                                          (real/rationalp-of-foo
-                                           realfix-when-real/rationalp)))
-                            :level 0))
+                                          :name
+                                          real/rationalp-of-foo))
+                            :expansion-depth 0))
            :hypotheses (((<= 1 (foo x))
                          :hints (:in-theory (enable foo))))
           ))))
@@ -374,7 +371,7 @@ finds out @('integerp') is not a supported function.</p>
     (b* ((x (ifix x))
          (y (ifix y)))
       (+ (* x x) (* y y)))))
-
+here
 (def-saved-event fty-deflist-theorem-example
   (defthm fty-deflist-theorem
     (implies (and (integer-listp l)
@@ -386,14 +383,13 @@ finds out @('integerp') is not a supported function.</p>
                  0))
     :hints(("Goal"
             :smtlink
-            (:fty (acl2::integer-list)
+            (;; :fty (acl2::integer-list)
                   :functions ((x^2+y^2-integer :formals ((x integerp)
                                                          (y integerp))
                                                :returns ((f integerp
-                                                            :meta-extract-thms
-                                                            (integerp-of-x^2+y^2-integer
-                                                             ifix-when-integerp)))
-                                               :level 1)) )))
+                                                            :name
+                                                            integerp-of-x^2+y^2-integer))
+                                               :expansion-depth 1)) )))
     :rule-classes nil))
 
 (acl2::must-fail

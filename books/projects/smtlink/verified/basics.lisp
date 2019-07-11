@@ -20,7 +20,6 @@
   :parents (SMT-basics)
   :short "Basic ACL2 functions supported in Smtlink."
   (append
-   '(magic-fix)
    '(real/rationalp rationalp realp booleanp integerp symbolp)
    '(binary-+ binary-* unary-/ unary--
               equal <
@@ -61,60 +60,12 @@
   :parents (SMT-basics)
   :short "ACL2 type functions and their corresponding Z3 type declarations."
   ;;(ACL2 type      .  SMT type)
-  `((realp          . "_SMT_.RealSort()")
-    (rationalp      . "_SMT_.RealSort()")
-    (real/rationalp . "_SMT_.RealSort()")
-    (integerp       . "_SMT_.IntSort()")
-    (booleanp       . "_SMT_.BoolSort()")
-    (symbolp        . "Symbol_z3.z3Sym")))
-
-(defval *SMT-fixers*
-  :parents (SMT-basics)
-  :short "Fixing functions for basic types that are not in user-defined FTY types."
-  ;;(ACL2 type      .  The fixer)
-  `((real/rationalp . realfix)
-    (realp          . realfix)
-    (rationalp      . rfix)
-    (integerp       . ifix)
-    (booleanp       . bool-fix$inline)
-    (symbolp        . symbol-fix)))
-
-(defalist symbol-symbol-alist
-  :key-type symbolp
-  :val-type symbolp
-  :pred symbol-symbol-alistp
-  :true-listp t)
-
-(define fixing-of-basetype ((fn-name symbolp)
-                            (smt-fixer symbol-symbol-alistp))
-  :returns (recog symbolp)
-  :measure (len (symbol-symbol-alist-fix smt-fixer))
-  (b* ((fn-name (symbol-fix fn-name))
-       (smt-fixer (symbol-symbol-alist-fix smt-fixer))
-       ((unless (consp smt-fixer)) nil)
-       ((cons (cons typep fixer) rest) smt-fixer)
-       ((if (equal fixer fn-name)) typep))
-    (fixing-of-basetype fn-name rest)))
-
-(defthm rfix-when-rationalp
-  (implies (rationalp x)
-           (equal (rfix x) x)))
-
-(defthm realfix-when-real/rationalp
-  (implies (real/rationalp x)
-           (equal (realfix x) x)))
-
-(defthm ifix-when-integerp
-  (implies (integerp x)
-           (equal (ifix x) x)))
-
-(defthm bool-fix-when-booleanp
-  (implies (booleanp x)
-           (equal (bool-fix$inline x) x)))
-
-(defthm symbol-fix-when-symbolp
-  (implies (symbolp x)
-           (equal (symbol-fix x) x)))
+  `((real          . "_SMT_.RealSort()")
+    (rational      . "_SMT_.RealSort()")
+    (real/rational . "_SMT_.RealSort()")
+    (integer       . "_SMT_.IntSort()")
+    (boolean       . "_SMT_.BoolSort()")
+    (symbol        . "Symbol_z3.z3Sym")))
 
 ;; current tag . next computed-hint
 (defval *SMT-architecture*

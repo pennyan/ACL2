@@ -101,7 +101,7 @@
       function expansion." :default nil)
      (facts fact-alistp "An alist of current learnt equivalence facts."
             :default nil)
-     (fixtypes smt-fixtype-list-p "FTY information." :default nil)
+     (fixinfo smt-fixtype-info-p "FTY information." :default nil)
      (wrld-fn-len natp "Number of function definitions in curent world."
                   :default 0)))
 
@@ -168,7 +168,7 @@
          ((unless (pseudo-termp formula))
           (prog2$
            (er hard? 'expand-cp=>function-substitution "expand-cp: formula got by
-       meta-extract is not a pseudo-termp.")
+       meta-extract ~p0 is not a pseudo-termp." fn-call)
            nil))
          ((mv ok lhs rhs)
           (case-match formula
@@ -177,7 +177,7 @@
             (& (mv nil nil nil))))
          ((unless (and ok (pseudo-termp lhs)))
           (prog2$ (er hard? 'expand-cp=>function-substitution "expand-cp: formula got by
-       meta-extract is not an equality.")
+       meta-extract ~p0 is not an equality." fn-call)
                   nil))
          ((mv match-ok subst)
           (acl2::simple-one-way-unify lhs term nil))
@@ -260,9 +260,8 @@ definition fact of that term.</p>
            ;; 3. otherwise, fn will be expanded once -- fn-lvls decrease by 1, fn
            ;; is expanded, one fact generated
            (basic-function (member-equal fn *SMT-basics*))
-           (flex? (fncall-of-fixtypes fn a.fixtypes))
-           (basic-fix (member-equal fn (strip-cdrs *SMT-fixers*)))
-           ((if (or basic-function flex? basic-fix))
+           (flex? (fncall-of-fixtypes fn a.fixinfo))
+           ((if (or basic-function flex?))
             (mv nil a))
            (lvl (assoc-equal fn a.fn-lvls))
            (user-defined (is-function fn a.fn-lst))
@@ -279,14 +278,14 @@ definition fact of that term.</p>
                 (make-ex-args :fn-lvls (update-fn-lvls fn a.fn-lvls)
                               :fn-lst a.fn-lst
                               :facts (acons term fact a.facts)
-                              :fixtypes a.fixtypes
+                              :fixinfo a.fixinfo
                               :wrld-fn-len a.wrld-fn-len))))
         ;; if not in fn-lvls
         (mv fact
             (make-ex-args :fn-lst a.fn-lst
                           :fn-lvls (cons `(,fn . 0) a.fn-lvls)
                           :facts (acons term fact a.facts)
-                          :fixtypes a.fixtypes
+                          :fixinfo a.fixinfo
                           :wrld-fn-len (1- a.wrld-fn-len))))
       ///
       (more-returns
@@ -837,7 +836,6 @@ definition fact of that term.</p>
                               (smtlink-hint t)
                               state)
       ;; :returns (new-goal pseudo-term-listp)
-      :ignore-ok t
       (b* (((unless (pseudo-term-listp cl)) (mv nil nil))
            ((unless (smtlink-hint-p smtlink-hint))
             (mv cl nil))
@@ -853,7 +851,7 @@ definition fact of that term.</p>
                      :fn-lvls fn-lvls
                      :fn-lst fn-lst
                      :facts nil
-                     :fixtypes h.types
+                     :fixinfo h.types-info
                      :wrld-fn-len wrld-fn-len)
                     state))
            (expanded-goal (compose-goal transformed-cl

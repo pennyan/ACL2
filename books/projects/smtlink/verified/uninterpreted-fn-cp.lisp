@@ -100,26 +100,20 @@
 
   (define fix-thm-meta-extract ((func smt-function-p)
                                 (fixtypes smt-fixtype-list-p)
+                                (fixinfo smt-fixtype-info-p)
                                 state)
     :returns (new-term pseudo-termp)
     (b* ((func (smt-function-fix func))
          (fixtypes (smt-fixtype-list-fix fixtypes))
-         (returns (smt-function->returns func))
-         ((unless (and (car returns) (null (cdr returns))))
-          (er hard? 'uninterpreted-fn-cp=>fix-thm-meta-extract "Smtlink requires
-                                exactly one returns~%" returns))
-         (type (decl->type (car returns)))
-         (type-term (hint-pair->thm type))
-         ((unless (type-decl-p type-term fixtypes))
-          (er hard? 'uninterpreted-fn-cp=>fix-thm-meta-extract "Not a
-                              type-decl-p: ~p0~%" type-term))
-         (return-type (car type-term))
+         (fixinfo (smt-fixtype-info-fix fixinfo))
+         (return-type (return-type-of-function func fixinfo))
          (fixtype (is-type return-type fixtypes))
          ((unless fixtype)
           (er hard? 'uninterpreted-fn-cp=>fix-thm-meta-extract "~p0 is not a
                               fixtype.~%" return-type))
          (type-fix-when-type
-          (smt-fixtype->fixer-when-recognizer-thm fixtype))
+          (hint-pair->name
+           (smt-fixtype->fixer-when-recognizer-thm fixtype)))
          (fix-thm (acl2::meta-extract-formula-w type-fix-when-type
                                                 (w state)))
          ((unless (and (pseudo-termp fix-thm) (not (equal fix-thm ''t))))
@@ -131,8 +125,8 @@
   (defthm fix-thm-meta-extract-correct
     (implies (and (unev-meta-extract-global-facts)
                   (alistp a))
-             (or (null (fix-thm-meta-extract func fixtypes state))
-                 (unev (fix-thm-meta-extract func fixtypes state) a)))
+             (or (null (fix-thm-meta-extract func fixtypes fixinfo state))
+                 (unev (fix-thm-meta-extract func fixtypes fixinfo state) a)))
     :hints (("Goal"
              :do-not-induct t
              :in-theory (e/d (fix-thm-meta-extract
@@ -146,11 +140,12 @@
   (define fix-thm-full ((term pseudo-termp)
                         (func smt-function-p)
                         (fixtypes smt-fixtype-list-p)
+                        (fixinfo smt-fixtype-info-p)
                         state)
     :returns (new-term pseudo-termp)
     :guard-debug t
     (b* ((term (pseudo-term-fix term))
-         (fix-thm (fix-thm-meta-extract func fixtypes state))
+         (fix-thm (fix-thm-meta-extract func fixtypes fixinfo state))
          ((unless fix-thm)
           (er hard? 'uninterpreted-fn-cp=>fix-thm-full
               "Something is wrong with fix-thm-meta-extract."))
@@ -164,8 +159,8 @@
     (implies (and (unev-meta-extract-global-facts)
                   (alistp a)
                   (pseudo-termp term))
-             (or (null (fix-thm-full term func fixtypes state))
-                 (unev (fix-thm-full term func fixtypes state) a)))
+             (or (null (fix-thm-full term func fixtypes fixinfo state))
+                 (unev (fix-thm-full term func fixtypes fixinfo state) a)))
     :hints (("Goal"
              :do-not-induct t
              :in-theory (e/d (fix-thm-full)
@@ -173,24 +168,26 @@
              :use ((:instance fix-thm-meta-extract-correct
                               (func func)
                               (fixtypes fixtypes)
+                              (fixinfo fixinfo)
                               (a (list
                                   (cons (car (reverse
                                               (acl2::simple-term-vars
                                                (fix-thm-meta-extract
-                                                func fixtypes state))))
+                                                func fixtypes fixinfo state))))
                                         (unev term a))))))
              )))
 
   (define find-fixer ((term pseudo-termp)
                       (func smt-function-p)
                       (fixtypes smt-fixtype-list-p)
+                      (fixinfo smt-fixtype-info-p)
                       state)
     :returns (fixer pseudo-termp)
     (b* ((type-thm (type-thm-full term func state))
          ((unless type-thm)
           (er hard? 'uninterpreted-fn-cp=>find-fixer
               "Something is wrong with type-thm-full."))
-         (fix-thm (fix-thm-full term func fixtypes state))
+         (fix-thm (fix-thm-full term func fixtypes fixinfo state))
          ((unless fix-thm)
           (er hard? 'uninterpreted-fn-cp=>find-fixer
               "Something is wrong with fix-thm-full."))
@@ -209,8 +206,8 @@
     (implies (and (unev-meta-extract-global-facts)
                   (alistp a)
                   (pseudo-termp term))
-             (or (null (find-fixer term func fixtypes state))
-                 (equal (unev (find-fixer term func fixtypes state) a)
+             (or (null (find-fixer term func fixtypes fixinfo state))
+                 (equal (unev (find-fixer term func fixtypes fixinfo state) a)
                         (unev term a))))
     :hints (("Goal"
              :in-theory (e/d (find-fixer
@@ -240,6 +237,7 @@
     (define uninterpreted-list ((term-lst pseudo-term-listp)
                                 (fn-lst smt-function-list-p)
                                 (fixtypes smt-fixtype-list-p)
+                                (fixinfo smt-fixtype-info-p)
                                 state)
       :returns (new-term-lst pseudo-term-listp)
       :measure (acl2-count (pseudo-term-list-fix term-lst))
@@ -248,13 +246,14 @@
       (b* ((term-lst (pseudo-term-list-fix term-lst))
            ((unless (consp term-lst)) term-lst)
            ((cons first rest) term-lst)
-           (first-term (uninterpreted first fn-lst fixtypes state)))
+           (first-term (uninterpreted first fn-lst fixtypes fixinfo state)))
         (cons first-term
-              (uninterpreted-list rest fn-lst fixtypes state))))
+              (uninterpreted-list rest fn-lst fixtypes fixinfo state))))
 
     (define uninterpreted ((term pseudo-termp)
                            (fn-lst smt-function-list-p)
                            (fixtypes smt-fixtype-list-p)
+                           (fixinfo smt-fixtype-info-p)
                            state)
       :returns (new-term pseudo-termp)
       :measure (acl2-count (pseudo-term-fix term))
@@ -276,18 +275,17 @@
            ;; -----------------------------------------------------------
            ;; Now the term is a function call
            (basic-function (member-equal fn-call *SMT-basics*))
-           (flex? (fncall-of-fixtypes fn-call fixtypes))
-           (basic-fix (member-equal fn-call (strip-cdrs *SMT-fixers*)))
-           ((if (or basic-function flex? basic-fix))
+           (flex? (fncall-of-fixtypes fn-call fixinfo))
+           ((if (or basic-function flex?))
             (cons fn-call
-                  (uninterpreted-list fn-actuals fn-lst fixtypes state)))
+                  (uninterpreted-list fn-actuals fn-lst fixtypes fixinfo state)))
            ;; fn-call is not a basic function nor a flex function
            (user-defined (is-function fn-call fn-lst))
            ((unless user-defined)
             (prog2$ (er hard? 'uninterpreted-fn-cp=>uninterpreted "User hasn't
 defined the uninterpreted function: ~q0" fn-call)
                     term))
-           (fixed (find-fixer term user-defined fixtypes state))
+           (fixed (find-fixer term user-defined fixtypes fixinfo state))
            ((mv ok fixer)
             (case-match fixed
               ((fixer (!fn-call . !fn-actuals))
@@ -299,7 +297,7 @@ defined the uninterpreted function: ~q0" fn-call)
                     term)))
         (list fixer
               (cons fn-call (uninterpreted-list fn-actuals fn-lst
-                                                fixtypes state)))))
+                                                fixtypes fixinfo state)))))
     )
 
   (verify-guards uninterpreted)
@@ -310,9 +308,9 @@ defined the uninterpreted function: ~q0" fn-call)
                     (alistp a)
                     (pseudo-termp term))
                (equal (unev
-                       (uninterpreted term fn-lst fixtypes state) a)
+                       (uninterpreted term fn-lst fixtypes fixinfo state) a)
                       (unev term a)))
-      :hints ('(:expand ((uninterpreted term fn-lst fixtypes state))
+      :hints ('(:expand ((uninterpreted term fn-lst fixtypes fixinfo state))
                         :in-theory (e/d (unev-of-fncall-args)
                                         (find-fixer-correct
                                          member-equal
@@ -329,11 +327,11 @@ defined the uninterpreted function: ~q0" fn-call)
                     (alistp a)
                     (pseudo-term-listp term-lst))
                (equal (unev-lst
-                       (uninterpreted-list term-lst fn-lst fixtypes state)
+                       (uninterpreted-list term-lst fn-lst fixtypes fixinfo state)
                        a)
                       (unev-lst term-lst a)))
-      :hints ('(:expand ((uninterpreted-list term-lst fn-lst fixtypes state)
-                         (uninterpreted-list nil fn-lst fixtypes state))))
+      :hints ('(:expand ((uninterpreted-list term-lst fn-lst fixtypes fixinfo state)
+                         (uninterpreted-list nil fn-lst fixtypes fixinfo state))))
       :flag uninterpreted-list))
 
   (define uninterpreted-fn ((cl pseudo-term-listp)
@@ -345,7 +343,8 @@ defined the uninterpreted function: ~q0" fn-call)
          ((smtlink-hint h) smtlink-hint)
          (fn-lst h.functions)
          (fixtypes h.types)
-         (new-term (uninterpreted (disjoin cl) fn-lst fixtypes state))
+         (fixinfo h.types-info)
+         (new-term (uninterpreted (disjoin cl) fn-lst fixtypes fixinfo state))
          (next-cp (if h.custom-p
                       (cdr (assoc-equal 'uninterpreted-custom
                                         *SMT-architecture*))

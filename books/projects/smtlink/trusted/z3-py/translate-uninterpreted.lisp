@@ -16,7 +16,7 @@
 (local (in-theory (enable paragraph-fix paragraph-p word-p)))
 
 (define translate-uninterpreted-arguments ((args decl-list-p)
-                                           (fixtypes smt-fixtype-list-p)
+                                           (fixinfo smt-fixtype-info-p)
                                            (int-to-rat int-to-rat-p))
   :returns (translated paragraph-p)
   :measure (len args)
@@ -25,35 +25,35 @@
        ((cons first rest) args)
        ((decl d) first)
        ((hint-pair h) d.type)
-       ((unless (type-decl-p h.thm fixtypes))
+       ((unless (type-decl-p h.thm fixinfo))
         (er hard? 'translator=>translate-uninterpreted-arguments
             "Type theorem is not a type-decl-p: ~q0"
             h.thm))
-       (type-name (name-of-recognizer (car h.thm) fixtypes))
-       (translated-type (translate-type type-name (cadr h.thm) int-to-rat)))
+       (translated-type (translate-type (car h.thm) (cadr h.thm)
+                                        int-to-rat fixinfo)))
     (cons `(#\, #\Space ,translated-type)
-          (translate-uninterpreted-arguments rest fixtypes int-to-rat))))
+          (translate-uninterpreted-arguments rest fixinfo int-to-rat))))
 
 (define translate-uninterpreted-decl ((fn smt-function-p)
-                                      (fixtypes smt-fixtype-list-p)
+                                      (fixinfo smt-fixtype-info-p)
                                       (int-to-rat int-to-rat-p))
   :returns (translated paragraph-p)
   (b* ((fn (smt-function-fix fn))
        ((smt-function f) fn)
        (name f.name)
        (translated-formals
-        (translate-uninterpreted-arguments f.formals fixtypes int-to-rat))
+        (translate-uninterpreted-arguments f.formals fixinfo int-to-rat))
        ((if (> (len f.returns) 1))
         (er hard? 'SMT-translator=>translate-uninterpreted-decl "Multiple
               returns are not supported: ~q0" f.returns))
        (translated-returns
-        (translate-uninterpreted-arguments f.returns fixtypes int-to-rat)))
+        (translate-uninterpreted-arguments f.returns fixinfo int-to-rat)))
     `(,(translate-symbol name) "= z3.Function("
       #\' ,name #\' ,translated-formals ,translated-returns
       ")" #\Newline)))
 
 (define translate-uninterpreted-decl-lst ((fn-lst smt-function-list-p)
-                                          (fixtypes smt-fixtype-list-p)
+                                          (fixinfo smt-fixtype-info-p)
                                           (int-to-rat int-to-rat-p))
   :returns (translated paragraph-p)
   :measure (len fn-lst)
@@ -61,7 +61,7 @@
        ((unless (consp fn-lst)) nil)
        ((cons first rest) fn-lst)
        (first-decl
-        (translate-uninterpreted-decl first fixtypes int-to-rat)))
+        (translate-uninterpreted-decl first fixinfo int-to-rat)))
     (cons first-decl
-          (translate-uninterpreted-decl-lst rest fixtypes int-to-rat))))
+          (translate-uninterpreted-decl-lst rest fixinfo int-to-rat))))
 

@@ -53,6 +53,7 @@
     (define recover-uninterpreted-list ((term-lst pseudo-term-listp)
                                         (fn-lst smt-function-list-p)
                                         (fixtypes smt-fixtype-list-p)
+                                        (fixinfo smt-fixtype-info-p)
                                         (fn-acc smt-function-list-p)
                                         (fix-alst fn-fix-alist-p))
       :returns (mv (new-term-lst pseudo-term-listp)
@@ -67,9 +68,9 @@
            ((unless (consp term-lst)) (mv term-lst fn-acc fix-alst))
            ((cons first rest) term-lst)
            ((mv first-term first-fn-acc first-fix-alst)
-            (recover-uninterpreted first fn-lst fixtypes fn-acc fix-alst))
+            (recover-uninterpreted first fn-lst fixtypes fixinfo fn-acc fix-alst))
            ((mv rest-term-lst rest-fn-acc rest-fix-alst)
-            (recover-uninterpreted-list rest fn-lst fixtypes
+            (recover-uninterpreted-list rest fn-lst fixtypes fixinfo
                                         first-fn-acc first-fix-alst)))
         (mv (cons first-term rest-term-lst)
             rest-fn-acc
@@ -78,6 +79,7 @@
     (define recover-uninterpreted ((term pseudo-termp)
                                    (fn-lst smt-function-list-p)
                                    (fixtypes smt-fixtype-list-p)
+                                   (fixinfo smt-fixtype-info-p)
                                    (fn-acc smt-function-list-p)
                                    (fix-alst fn-fix-alist-p))
       :returns (mv (new-term pseudo-termp)
@@ -115,8 +117,8 @@
            (guard (recognizer-of-fixer fn-call fixtypes))
            ((unless guard)
             (b* (((mv rest-term-lst rest-fn-acc rest-fix-alst)
-                  (recover-uninterpreted-list fn-actuals fn-lst fixtypes fn-acc
-                                              fix-alst)))
+                  (recover-uninterpreted-list fn-actuals fn-lst fixtypes
+                                              fixinfo fn-acc fix-alst)))
               (mv (cons fn-call rest-term-lst)
                   rest-fn-acc
                   rest-fix-alst)))
@@ -126,8 +128,8 @@
                          (symbolp (caar fn-actuals))
                          (is-function (caar fn-actuals) fn-lst)))
             (b* (((mv rest-term-lst rest-fn-acc rest-fix-alst)
-                  (recover-uninterpreted-list fn-actuals fn-lst fixtypes fn-acc
-                                              fix-alst)))
+                  (recover-uninterpreted-list fn-actuals fn-lst fixtypes
+                                              fixinfo fn-acc fix-alst)))
               (mv (cons fn-call rest-term-lst)
                   rest-fn-acc
                   rest-fix-alst)))
@@ -138,18 +140,11 @@
                         (caar fn-actuals) (fix-guard->fixer (cdr exist?)) fn-call)
                     (mv nil nil nil)))
            ((if exist?)
-            (recover-uninterpreted (car fn-actuals) fn-lst fixtypes fn-acc
+            (recover-uninterpreted (car fn-actuals) fn-lst fixtypes fixinfo fn-acc
                                    fix-alst))
            (func (is-function (caar fn-actuals) fn-lst))
-           (returns (smt-function->returns func))
-           ((unless (and (consp returns)
-                         (null (cdr returns))))
-            (prog2$ (er hard? 'recover-uninterpreted=>recover-uninterpreted
-                        "Uninterpreted function returns wrong: ~q0" func)
-                    (mv nil nil nil)))
-           (typep (hint-pair->thm (decl->type (car returns))))
-           ((unless (and (type-decl-p typep fixtypes)
-                         (ambiguous-equal guard (car typep))))
+           (typep (return-type-of-function func fixinfo))
+           ((unless (ambiguous-equal guard typep))
             (prog2$ (er hard? 'recover-uninterpreted=>recover-uninterpreted
                         "Guard for fixing function ~p0 is ~p1, but user defined
 function ~p2 returns ~p3~%" fn-call guard (caar fn-actuals) typep)
@@ -160,8 +155,8 @@ function ~p2 returns ~p3~%" fn-call guard (caar fn-actuals) typep)
                                                 :guard guard)
                                 fix-alst))
            ((mv rest-term rest-fn-acc rest-fix-alst)
-            (recover-uninterpreted (car fn-actuals) fn-lst fixtypes new-fn-acc
-                                   new-fix-alst)))
+            (recover-uninterpreted (car fn-actuals) fn-lst fixtypes fixinfo
+                                   new-fn-acc new-fix-alst)))
         (mv rest-term rest-fn-acc rest-fix-alst)))
     )
 
@@ -203,7 +198,7 @@ function ~p2 returns ~p3~%" fn-call guard (caar fn-actuals) typep)
     (b* ((smtlink-hint (smtlink-hint-fix smtlink-hint))
          ((smtlink-hint h) smtlink-hint)
          ((mv new-term new-fn-lst new-fix-alst)
-          (recover-uninterpreted term h.functions h.types nil nil))
+          (recover-uninterpreted term h.functions h.types h.types-info nil nil))
          (uninterpreted-precond
           (construct-uninterpreted-precond new-fix-alst nil state)))
       (mv new-term new-fn-lst uninterpreted-precond)))

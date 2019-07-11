@@ -40,14 +40,14 @@
       (b* (((mv res precond state)
             (SMT-prove-stub (disjoin cl) smtlink-hint state))
            ;; should I return just precond, or precond and precond\or/goal?
-           (subgoal-lst `(((hint-please
-                            '(:in-theory (enable magic-fix
-                                                 hint-please
-                                                 type-hyp)
-                              :expand ((:free (x) (hide x)))))
-                           ,precond
-                           ,(disjoin cl))
-                          ,@precond)))
+           (subgoal-lst `(,@precond
+                          ;; ((hint-please
+                          ;;   '(:in-theory (enable hint-please
+                          ;;                        type-hyp)
+                          ;;     :expand ((:free (x) (hide x)))))
+                          ;;  ,@precond
+                          ;;  ,(disjoin cl))
+                          )))
         (if res
             (prog2$ (cw "Proved!~%") (mv nil subgoal-lst state))
           (mv (cons "NOTE: Unable to prove goal with ~

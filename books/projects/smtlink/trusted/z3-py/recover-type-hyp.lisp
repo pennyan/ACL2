@@ -15,46 +15,39 @@
   :short "Recovering types from type-hyp"
 
   (define recover-type-decl-list ((hyp-lst pseudo-term-listp)
-                                  (fixtypes smt-fixtype-list-p))
+                                  (fixinfo smt-fixtype-info-p))
     :returns (type-decl-list decl-list-p)
-    (b* ((fixtypes (smt-fixtype-list-fix fixtypes))
+    (b* ((fixinfo (smt-fixtype-info-fix fixinfo))
          (hyp-lst (pseudo-term-list-fix hyp-lst))
          ((unless (consp hyp-lst)) nil)
          ((cons first rest) hyp-lst)
-         ((unless (type-decl-p first fixtypes))
+         ((unless (type-decl-p first fixinfo))
           (er hard? 'recover-type-hype=>recover-type-decl-list "ill-formed ~
                           type term: ~q0" first))
          (var (cadr first)))
       (cons (make-decl :name var :type (make-hint-pair :thm first))
-            (recover-type-decl-list rest fixtypes))))
+            (recover-type-decl-list rest fixinfo))))
 
   (define recover-type-hyp-main ((decl-list pseudo-term-listp)
-                                 (fixtypes smt-fixtype-list-p)
-                                 state)
-    ;; :returns (type-decl-list decl-listp)
-    :mode :program ;; because of untranslate
+                                 (fixinfo smt-fixtype-info-p))
+    :returns (type-decl-list decl-list-p)
     (b* ((decl-list (pseudo-term-list-fix decl-list))
          ((unless (consp decl-list)) nil)
          ((cons first rest) decl-list))
       (case-match first
         (('type-hyp ('hide hyp-lst) tag)
          (cond ((equal tag '':type)
-                (b* (;; The reason I need to untranslate is that, a list will
-                     ;; be represented as (cons sth (cons sth1 ...)). I don't
-                     ;; want to walk through this tree structure.
-                     ;; But essentially, :program mode can be avoided if I
-                     ;; avoid using untranslate, which means walking through
-                     ;; the consed version might be worthwhile.
-                     (untranslated-hyp-lst
-                      (untranslate hyp-lst nil (w state)))
-                     ((unless (and (consp untranslated-hyp-lst)
-                                   (equal (car untranslated-hyp-lst) 'list)))
+                (b* (((unless (and (consp hyp-lst)
+                                   (equal (car hyp-lst) 'quote)
+                                   (consp (cdr hyp-lst))))
                       (er hard? 'recover-type-hyp=>recover-type-hyp-main
-                          "Missing type declarations: ~q0"
-                          decl-list))
-                     (hyp-lst (cdr untranslated-hyp-lst))
-                     (first-type-decl (recover-type-decl-list hyp-lst fixtypes))
-                     (rest-type-decl (recover-type-hyp-main rest fixtypes state)))
+                          "Wrong form of decl-list: ~q0" decl-list))
+                     (hyp-lst (cadr hyp-lst))
+                     ((unless (pseudo-term-listp hyp-lst))
+                      (er hard? 'recover-type-hyp=>recover-type-hyp-main
+                          "Not a pseudo-term-listp: ~q0" hyp-lst))
+                     (first-type-decl (recover-type-decl-list hyp-lst fixinfo))
+                     (rest-type-decl (recover-type-hyp-main rest fixinfo)))
                   (append first-type-decl rest-type-decl)))
                (t (prog2$ (er hard? 'recover-type-hyp=>recover-type-hyp-main "tag ~
                           isn't recognized: ~q0" tag)
@@ -65,16 +58,14 @@
                    nil)))))
 
   (define recover-type-hyp ((term pseudo-termp)
-                            (smtlink-hint smtlink-hint-p)
-                            state)
-    ;; :returns (mv (type-decl-list decl-listp)
-    ;;              (untyped-theorem pseudo-termp))
-    :mode :program
+                            (smtlink-hint smtlink-hint-p))
+    :returns (mv (type-decl-list decl-list-p)
+                 (untyped-theorem pseudo-termp))
     (b* ((term (pseudo-term-fix term))
          (smtlink-hint (smtlink-hint-fix smtlink-hint))
          ((smtlink-hint h) smtlink-hint)
          ((mv type-hyp-lst untyped-theorem)
-          (smt-extract term h.types)))
-      (mv (recover-type-hyp-main type-hyp-lst h.types state)
+          (smt-extract term h.types-info)))
+      (mv (recover-type-hyp-main type-hyp-lst h.types-info)
           untyped-theorem)))
   )

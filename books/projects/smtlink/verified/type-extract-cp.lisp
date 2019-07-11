@@ -41,7 +41,7 @@
          ((smtlink-hint h) smtlink-hint)
          (G (disjoin cl))
          ((mv type-decl-term G/type)
-          (SMT-extract G h.types))
+          (SMT-extract G h.types-info))
          (next-cp (cdr (assoc-equal 'type-extract *SMT-architecture*)))
          ((if (null next-cp)) (list cl))
          (the-hint

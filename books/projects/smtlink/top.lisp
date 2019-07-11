@@ -21,6 +21,7 @@
 (include-book "verified/expand-cp")
 (include-book "verified/type-extract-cp")
 (include-book "verified/uninterpreted-fn-cp")
+(include-book "verified/fixtypes")
 
 ;; trusted
 (include-book "trusted/prove")
