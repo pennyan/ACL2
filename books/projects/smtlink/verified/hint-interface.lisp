@@ -91,8 +91,16 @@
              (val-type symbolp :default nil)
              (theorems symbol-hint-pair-alist-p :default nil)))
     ;; prod, list and option are all sums
-    (:sum ((prods prod-list-p :default nil)))
+    (:sum ((kind-fn symbolp :default nil)
+           (prods prod-list-p :default nil)))
     )
+
+  (define smt-type-kind-fn ((smt-type smt-type-p))
+    :guard (equal (smt-type-kind smt-type) :sum)
+    (b* ((smt-type (smt-type-fix smt-type))
+         (kind-fn (smt-type-sum->kind-fn smt-type))
+         ((if (null kind-fn)) 'kind))
+      kind-fn))
 
   (defprod smt-fixtype
     :parents (smtlink-hint)
@@ -112,7 +120,9 @@
 
   (defprod info-pair
     ((name symbolp)
-     (fn-type symbolp))) ;; :store, :select, :recognizer, :fixer, :constructor, :destructor
+     (fn-type symbolp)
+     (kind symbolp))) ;; :store, :select, :recognizer, :fixer, :constructor,
+  ;; :destructor, :kind-fn
 
   (defalist smt-fixtype-info
     :key-type symbolp ;; function name
@@ -189,15 +199,18 @@
   (define generate-info-pair ((fn symbolp)
                               (name symbolp)
                               (fn-type symbolp)
+                              (kind symbolp)
                               (acc smt-fixtype-info-p))
     :returns (info smt-fixtype-info-p)
     (b* ((fn (symbol-fix fn))
          (name (symbol-fix name))
+         (kind (symbol-fix kind))
          (fn-type (symbol-fix fn-type))
          (acc (smt-fixtype-info-fix acc)))
       (acons fn
              (make-info-pair :name name
-                             :fn-type fn-type)
+                             :fn-type fn-type
+                             :kind kind)
              acc)))
 
   (define generate-fixtype-info-array ((name symbolp)
@@ -209,22 +222,25 @@
          (type (smt-type-fix type))
          (acc (smt-fixtype-info-fix acc))
          ((smt-type-array a) type)
-         (store-acc (generate-info-pair (smt-function->name a.store) name :store acc)))
-      (generate-info-pair (smt-function->name a.select) name :select store-acc)))
+         (store-acc (generate-info-pair (smt-function->name a.store)
+                                        name :store nil acc)))
+      (generate-info-pair (smt-function->name a.select) name :select nil store-acc)))
 
   (define generate-fixtype-info-destructors ((name symbolp)
+                                             (kind symbolp)
                                              (destructors smt-function-list-p)
                                              (acc smt-fixtype-info-p))
     :returns (info smt-fixtype-info-p)
     :measure (len destructors)
     (b* ((name (symbol-fix name))
+         (kind (symbol-fix kind))
          (destructors (smt-function-list-fix destructors))
          (acc (smt-fixtype-info-fix acc))
          ((unless (consp destructors)) acc)
          ((cons first rest) destructors)
          ((smt-function f) first)
-         (first-acc (generate-info-pair f.name name :destructor acc)))
-      (generate-fixtype-info-destructors name rest first-acc)))
+         (first-acc (generate-info-pair f.name name :destructor kind acc)))
+      (generate-fixtype-info-destructors name kind rest first-acc)))
 
   (define generate-fixtype-info-prod ((name symbolp)
                                       (prod prod-p)
@@ -235,8 +251,10 @@
          ((prod p) prod)
          (acc (smt-fixtype-info-fix acc))
          (constructor-acc
-          (generate-info-pair (smt-function->name p.constructor) name :constructor acc)))
-      (generate-fixtype-info-destructors name p.destructors constructor-acc)))
+          (generate-info-pair (smt-function->name p.constructor)
+                              name :constructor p.kind acc)))
+      (generate-fixtype-info-destructors name p.kind p.destructors
+                                         constructor-acc)))
 
   (define generate-fixtype-info-prod-list ((name symbolp)
                                            (prods prod-list-p)
@@ -258,8 +276,11 @@
     :guard (equal (smt-type-kind type) :sum)
     (b* ((type (smt-type-fix type))
          (acc (smt-fixtype-info-fix acc))
-         ((smt-type-sum s) type))
-      (generate-fixtype-info-prod-list name s.prods acc)))
+         ((smt-type-sum s) type)
+         ((if (null s.kind-fn))
+          (generate-fixtype-info-prod-list name s.prods acc))
+         (new-acc (generate-info-pair s.kind-fn name :kind-fn nil acc)))
+      (generate-fixtype-info-prod-list name s.prods new-acc)))
 
   (define generate-fixtype-info-kind ((name symbolp)
                                       (type smt-type-p)
@@ -279,8 +300,8 @@
     (b* ((type (smt-fixtype-fix type))
          (acc (smt-fixtype-info-fix acc))
          ((smt-fixtype f) type)
-         (rec-acc (generate-info-pair f.recognizer f.name :recognizer acc))
-         (fix-acc (generate-info-pair f.fixer f.name :fixer rec-acc)))
+         (rec-acc (generate-info-pair f.recognizer f.name :recognizer nil acc))
+         (fix-acc (generate-info-pair f.fixer f.name :fixer nil rec-acc)))
       (generate-fixtype-info-kind f.name f.kind fix-acc)))
 
   (define generate-fixtype-info ((types smt-fixtype-list-p)

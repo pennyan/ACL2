@@ -554,6 +554,42 @@ finds out @('integerp') is not a supported function.</p>
   :rule-classes nil)
 )
 
+(deftagsum arithtm
+  (:num ((val integerp)))
+  (:plus ((left arithtm-p)
+          (right arithtm-p)))
+  (:minus ((arg arithtm-p))))
+
+(defsmtsum arithtm
+  :rec arithtm-p
+  :fix arithtm-fix
+  :fix-thm arithtm-fix-when-arithtm-p
+  :kind-function arithtm-kind$inline
+  :prods ((:num :constructor arithtm-num
+                :destructors ((arithtm-num->val$inline . integerp)))
+          (:plus :constructor arithtm-plus
+                 :destructors ((arithtm-plus->left$inline . arithtm-p)
+                               (arithtm-plus->right$inline . arithtm-p)))
+          (:minus :constructor arithtm-minus
+                  :destructors ((arithtm-minus->arg$inline . arithtm-p))))
+  )
+
+(defthm fty-deftagsum-theorem
+  (implies (and (arithtm-p x)
+                (equal (arithtm-kind x) :num))
+           (>= (x^2+y^2-integer (arithtm-num->val x)
+                                (arithtm-num->val x))
+               0))
+  :hints(("Goal"
+          :smtlink
+          (:functions ((x^2+y^2-integer :formals ((x integerp)
+                                                  (y integerp))
+                                        :returns ((f integerp
+                                                     :name
+                                                     integerp-of-x^2+y^2-integer))
+                                        :expansion-depth 1)))))
+  :rule-classes nil)
+
 stop
 (def-saved-event symbol-integer-example
   (defalist symbol-integer-alist

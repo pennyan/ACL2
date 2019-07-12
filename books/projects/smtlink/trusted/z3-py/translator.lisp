@@ -40,7 +40,7 @@
   :returns (mv (translated word-p
                            :hints (("Goal"
                                     :in-theory (enable word-p))))
-               (constructor? booleanp))
+               (which symbolp))
   (b* ((fn-call (symbol-fix fn-call))
        (fixinfo (smt-fixtype-info-fix fixinfo))
        (item (assoc-equal fn-call fixinfo))
@@ -50,21 +50,29 @@
        uninterpreted function, or a basic function. Therefore we are stuck.~%"
                 fn-call)
             nil))
-       ((info-pair p) (cdr item)))
+       ((info-pair p) (cdr item))
+       (name-val (symbol-append p.name '-val)))
     (case p.fn-type
-      (:store (mv (translate-symbol 'store) nil))
-      (:select (mv (translate-symbol 'select) nil))
-      (:fixer (mv nil nil))
+      (:store (mv (translate-symbol 'store) :store))
+      (:select (mv (translate-symbol 'select) :select))
+      (:fixer (mv nil :fixer))
+      (:kind-fn (mv (concatenate 'string
+                                 (translate-symbol p.name) "."
+                                 (translate-symbol fn-call))
+                    :kind-fn))
       (:destructor
        (mv (concatenate 'string
-                        (translate-symbol p.name) "."
-                        (translate-symbol fn-call))
-           nil))
+                        (translate-symbol name-val) "."
+                        (translate-symbol fn-call) "("
+                        (translate-symbol p.name) ".value")
+           :destructor))
       (:constructor
        (mv (concatenate 'string
-                        (translate-symbol p.name) "."
+                        (translate-symbol p.name) ".make("
+                        (translate-symbol p.kind) ", "
+                        (translate-symbol name-val) "."
                         (translate-symbol fn-call))
-           t))
+           :constructor))
       (t (mv (er hard? 'translator=>translate-fixtype-fncall
                  "~p0 is not one of the translatable function type. Possibly a
        recognizer that still exits in the theorem body.~%"
@@ -80,7 +88,7 @@
                                 (fn-lst smt-function-list-p)
                                 (fixinfo smt-fixtype-info-p))
   :returns (mv (translated word-p)
-               (constructor? booleanp))
+               (which symbolp))
   :guard-hints (("Goal"
                  :expand (is-basic-function fn-call)))
   (cond ((is-function fn-call fn-lst)
@@ -137,14 +145,20 @@
          ((mv translated-actuals index-actuals syms-actuals)
           (translate-term-list fn-actuals fn-lst fixinfo sym-index sym-acc
                                avoid))
-         ((mv translated-fn-call constructor?)
+         ((mv translated-fn-call which)
           (translate-fncall-cases fn-call fn-lst fixinfo))
          ;; if it's a constructor with 0 arguments
-         ((if (and constructor? (null translated-actuals)))
-          (mv translated-fn-call index-actuals syms-actuals))
+         ((if (and (equal which :constructor) (null translated-actuals)))
+          (mv `(,translated-fn-call ")") index-actuals syms-actuals))
          ;; if it's a fixing function
          ((if (and (null translated-fn-call) (not (atom translated-actuals))))
-          (mv (car translated-actuals) index-actuals syms-actuals)))
+          (mv (car translated-actuals) index-actuals syms-actuals))
+         ;; if it's a destructor function
+         ((if (or (equal which :destructor) (equal which :constructor)))
+          (mv `(,translated-fn-call
+                #\( ,(map-translated-actuals translated-actuals) #\) ")")
+              index-actuals
+              syms-actuals)))
       (mv `(,translated-fn-call
             #\( ,(map-translated-actuals translated-actuals) #\) )
           index-actuals
@@ -181,17 +195,18 @@
                            (fixinfo smt-fixtype-info-p)
                            (avoid symbol-listp))
   :returns (mv (translated-term paragraph-p)
-               (syms string-listp))
+               (index natp)
+               (syms-alst symbol-string-alistp))
   (b* ((theorem (pseudo-term-fix theorem))
        (fn-decl-list (smt-function-list-fix fn-decl-list))
        (fixinfo (smt-fixtype-info-fix fixinfo))
        (avoid (symbol-list-fix avoid))
-       ((mv translated-theorem-body & symbols)
+       ((mv translated-theorem-body index symbols)
         (translate-term theorem fn-decl-list fixinfo 0 nil avoid))
        (theorem-assign `("theorem = " ,translated-theorem-body #\Newline))
        (prove-theorem `("_SMT_.prove(theorem)" #\Newline)))
     (mv `(,theorem-assign ,prove-theorem)
-        (strip-cdrs symbols))))
+        index symbols)))
 
 (define SMT-translation ((term pseudo-termp) (smtlink-hint smtlink-hint-p)
                          state)
@@ -223,7 +238,7 @@
     acl2::all-vars1 is not of type symbol-listp!~%")
               nil))
          ;; translate the main theorem
-         ((mv translated-theorem symbols)
+         ((mv translated-theorem index sym-alst)
           (translate-theorem unfixed-theorem fn-decl-list h.types-info avoid))
          ;; Pretty-translated-theorem is the theorem with change lines at 160
          ;; characters. We did this because apparently super long code is
@@ -237,8 +252,11 @@
          (translated-type-decls
           (translate-type-decl-list type-decl-list h.types-info h.int-to-rat))
          ;; translate type definitions
-         ((mv translated-fixtypes fixtype-precond)
-          (translate-fixtype-list h.types h.types-info h.int-to-rat nil nil))
+         ((mv translated-fixtypes fixtype-precond new-sym-alst &)
+          (translate-fixtype-list h.types h.types-info sym-alst index avoid
+                                  h.int-to-rat nil nil))
+         (symbols (strip-cdrs new-sym-alst))
+         (- (cw "symbols: ~q0" symbols))
          ;; translate symbols
          (translated-symbol (translate-symbol-enumeration symbols))
          (translated-theorem-all

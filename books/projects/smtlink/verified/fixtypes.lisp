@@ -36,6 +36,7 @@
    (rec symbolp)
    (fix symbolp)
    (fix-thm symbolp)
+   (kind-fn symbolp)
    (basicp symbolp)
    (prods prodkeywords-list-p)))
 
@@ -94,9 +95,13 @@
     (cons (def-prod first)
           (def-prod-list rest))))
 
-(define def-sum-kind ((prod-lst prodkeywords-list-p))
+(define def-sum-kind ((kind-fn symbolp)
+                      (prod-lst prodkeywords-list-p))
   :returns (sum smt-type-p)
-  (make-smt-type-sum :prods (def-prod-list prod-lst)))
+  (b* ((kind-fn (symbol-fix kind-fn))
+       (prod-lst (prodkeywords-list-fix prod-lst)))
+    (make-smt-type-sum :kind-fn kind-fn
+                       :prods (def-prod-list prod-lst))))
 
 (define def-sum-fixtype ((keywords sumkeywords-p))
   (b* ((keywords (sumkeywords-fix keywords))
@@ -108,7 +113,7 @@
                     ',s.fix-thm))
        (type-event
         `(smt-fixtype ',s.name ',s.rec ',s.fix ,fix-thm-hint-pair ',s.basicp
-                      (def-sum-kind ',s.prods)))
+                      (def-sum-kind ',s.kind-fn ',s.prods)))
        (update-table
         `((add-type :default ,type-event (w state)))))
     `(with-output
@@ -138,8 +143,8 @@
          (cons-prod-fns '((,car . ,elt-type)
                           (,cdr . ,rec)))
          (cons-prod (prodkeywords 'cons ',cons cons-prod-fns))
-         (nil-prod (prodkeywords 'nil ',nil-fn nil)))
-    (def-sum-fixtype (sumkeywords ',name ',rec ',fix ',fix-thm ',basicp
+         (nil-prod (prodkeywords 'nil-kind ',nil-fn nil)))
+    (def-sum-fixtype (sumkeywords ',name ',rec ',fix ',fix-thm nil ',basicp
                                   (list cons-prod nil-prod))))))
 
 ;; this is a test
@@ -173,7 +178,8 @@
          (prod-list `(,(make-prodkeywords :name ',name
                                           :constructor ',constructor
                                           :destructors ',destructors))))
-      (def-sum-fixtype (sumkeywords ',name ',rec ',fix ',fix-thm ',basicp prod-list)))))
+      (def-sum-fixtype (sumkeywords ',name ',rec ',fix ',fix-thm nil ',basicp
+                                    prod-list)))))
 
 ;; this is a test
 (must-succeed
@@ -214,7 +220,7 @@
                      :name 'none
                      :constructor ',nil-constructor
                      :destructors nil)))
-      (def-sum-fixtype (sumkeywords ',name ',rec ',fix ',fix-thm ',basicp
+      (def-sum-fixtype (sumkeywords ',name ',rec ',fix ',fix-thm nil ',basicp
                                     (list some-prod none-prod))))))
 
 ;; this is a test
@@ -244,19 +250,21 @@
     (cons (prodkeywords name constructor destructors)
           (input-prods-to-keywords rest))))
 
-(defmacro defsmtsum (name &key (rec 'nil) (fix 'nil) (fix-thm 'nil) (basicp 'nil)
-                          (prods 'nil))
+(defmacro defsmtsum (name &key (rec 'nil) (fix 'nil) (fix-thm 'nil)
+                          (kind-function 'nil) (basicp 'nil) (prods 'nil))
   (declare (xargs :guard (and (symbolp name)
                               (symbolp rec)
                               (symbolp fix)
                               (symbolp fix-thm)
+                              (symbolp kind-function)
                               (symbolp basicp))))
   `(make-event
-    (b* (((if (or (null ',rec) (null ',fix) (null ',fix-thm)))
+    (b* (((if (or (null ',rec) (null ',fix) (null ',fix-thm) (null ',kind-function)))
           (er hard? 'fixtypes=>defsmtsum "Keywords for defsmtsum are :rec,
-  :fix, :fix-thm, :basicp and :prods.~%"))
+  :fix, :fix-thm, :kind-function, :basicp and :prods.~%"))
          (prodkeyword-lst (input-prods-to-keywords ',prods)))
-      (def-sum-fixtype (sumkeywords ',name ',rec ',fix ',fix-thm ',basicp
+      (def-sum-fixtype (sumkeywords ',name ',rec ',fix ',fix-thm
+                                    ',kind-function ',basicp
                                     prodkeyword-lst)))))
 
 (must-succeed
@@ -264,6 +272,7 @@
    :rec arithtm-p
    :fix arithtm-fix
    :fix-thm arithtm-fix-when-arithtm-p
+   :kind-function arithtm-kind
    :prods ((:num :constructor arithtm-num
                  :destructors ((val . integerp)))
            (:plus :constructor arithtm-plus

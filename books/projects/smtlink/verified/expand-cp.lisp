@@ -259,12 +259,8 @@ definition fact of that term.</p>
            ;; expanded, one fact generated
            ;; 3. otherwise, fn will be expanded once -- fn-lvls decrease by 1, fn
            ;; is expanded, one fact generated
-           (- (cw "fn: ~q0" fn))
            (basic-function (member-equal fn *SMT-basics*))
-           (- (cw "basic-function: ~q0" basic-function))
            (flex? (fncall-of-fixtypes fn a.fixinfo))
-           (- (cw "flex?: ~q0" flex?))
-           (- (cw "a.fixinfo: ~q0~%" a.fixinfo))
            ((if (or basic-function flex?))
             (mv nil a))
            (lvl (assoc-equal fn a.fn-lvls))
@@ -275,7 +271,6 @@ definition fact of that term.</p>
                        encountered recursive functions that are not
                        user-defined: ~q0" term)
                     (mv nil a)))
-           (- (cw "term: ~q0" term))
            (fact (function-substitution term state))
            ((if (null fact)) (mv nil a))
            ((if lvl)
@@ -778,7 +773,6 @@ definition fact of that term.</p>
     (b* ((cl (pseudo-term-list-fix cl))
          (to-be-learnt (pseudo-term-list-fix to-be-learnt))
          ((unless (consp to-be-learnt)) cl)
-         (- (cw "to-be-learnt: ~q0" to-be-learnt))
          ((cons first-fact rest-facts) to-be-learnt)
          ((unless (and (not (acl2::variablep first-fact))
                        (not (acl2::fquotep first-fact))
@@ -851,7 +845,6 @@ definition fact of that term.</p>
            (fn-lst h.functions)
            (fn-lvls (initialize-fn-lvls fn-lst))
            (wrld-fn-len h.wrld-fn-len)
-           (- (cw "cl: ~q0" cl))
            (transformed-cl (transform-list cl))
            ;; Do function expansion
            (to-be-learnt

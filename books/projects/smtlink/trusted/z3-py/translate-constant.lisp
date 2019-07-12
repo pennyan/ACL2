@@ -13,6 +13,15 @@
 (include-book "../../verified/basics")
 (include-book "./datatypes")
 
+(define symbol-append ((asym symbolp) (bsym symbolp))
+  :returns (new-sym symbolp)
+  (b* ((asym (symbol-fix asym))
+       (bsym (symbol-fix bsym))
+       (asym-str (string asym))
+       (bsym-str (string bsym))
+       (new-str (concatenate 'string asym-str bsym-str)))
+    (intern-in-package-of-symbol new-str 'SMT)))
+
 (defalist symbol-string-alist
   :key-type symbolp
   :val-type stringp
