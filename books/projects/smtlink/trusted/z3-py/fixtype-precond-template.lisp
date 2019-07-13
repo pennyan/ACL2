@@ -33,6 +33,13 @@
    :hints (("Goal" :in-theory (enable symbol-symbol-alist-fix))))
  )
 
+(local
+ (defthm symbol-listp-of-strip-cdrs-of-symbol-symbol-alistp
+   (implies (symbol-symbol-alistp x)
+            (symbol-listp (strip-cdrs x)))
+   :hints (("Goal" :in-theory (enable symbol-symbol-alist-fix))))
+ )
+
 (define precond-type-list ((destructor-alst symbol-symbol-alistp))
   :returns (term pseudo-term-listp)
   :measure (len destructor-alst)
@@ -54,39 +61,67 @@
                                           (constructor symbolp)
                                           (destructor-alst
                                            symbol-symbol-alistp)
+                                          (hypo pseudo-term-listp)
                                           (precond pseudo-term-list-listp))
   :returns (term pseudo-term-list-listp)
   (b* ((rec (symbol-fix rec))
        (precond (pseudo-term-list-list-fix precond))
        (constructor (symbol-fix constructor))
+       (hypo (pseudo-term-list-fix hypo))
        ((if (or (equal constructor 'quote) (equal rec 'quote)))
         (er hard? 'fixtype-precond-template=>precond-prod-type-of-constructor
             "A constructor named 'quote?~%"))
        (destructor-alst (symbol-symbol-alist-fix destructor-alst))
        (var-lst (strip-cdrs destructor-alst)))
-    (cons `(,@(precond-type-list destructor-alst)
+    (cons `(,@hypo
             (,rec (,constructor ,@var-lst)))
           precond)))
 
 (define precond-prod-type-of-destructor-list ((rec symbolp)
-                                              (constructor symbolp)
                                               (destructor-alst
                                                symbol-symbol-alistp)
                                               (precond pseudo-term-list-listp))
   :returns (term pseudo-term-list-listp)
-  :ignore-ok t
-  :irrelevant-formals-ok t
-  (pseudo-term-list-list-fix precond))
+  :measure (len destructor-alst)
+  :hints (("Goal"
+           :in-theory (enable symbol-symbol-alist-fix)))
+  (b* ((rec (symbol-fix rec))
+       (precond (pseudo-term-list-list-fix precond))
+       (destructor-alst (symbol-symbol-alist-fix destructor-alst))
+       ((if (equal rec 'quote))
+        (er hard? 'fixtype-precond-template=>precond-prod-type-of-constructor
+            "A constructor named 'quote?~%"))
+       ((unless (consp destructor-alst)) precond)
+       ((cons (cons type destructor) rest) destructor-alst)
+       (first-precond `((not (,rec x))
+                        (,type (,destructor x)))))
+    (precond-prod-type-of-destructor-list rec rest
+                                          (cons first-precond precond))))
 
 (define precond-prod-destructor-of-constructors ((rec symbolp)
                                                  (constructor symbolp)
-                                                 (destructor-alst
-                                                  symbol-symbol-alistp)
+                                                 (hypo pseudo-term-listp)
+                                                 (var-lst symbol-listp)
+                                                 (var-lst-total symbol-listp)
                                                  (precond pseudo-term-list-listp))
   :returns (term pseudo-term-list-listp)
-  :ignore-ok t
-  :irrelevant-formals-ok t
-  (pseudo-term-list-list-fix precond))
+  :measure (len var-lst)
+  (b* ((rec (symbol-fix rec))
+       (precond (pseudo-term-list-list-fix precond))
+       (constructor (symbol-fix constructor))
+       (var-lst (symbol-list-fix var-lst))
+       ((if (or (equal constructor 'quote) (equal rec 'quote)))
+        (er hard? 'fixtype-precond-template=>precond-prod-type-of-constructor
+            "A constructor named 'quote?~%"))
+       (hypo (pseudo-term-list-fix hypo))
+       ((unless (consp var-lst)) precond)
+       ((cons first-var rest-var) var-lst)
+       (first-precond `(,@hypo
+                        (equal (,first-var (,constructor ,@var-lst-total))
+                               ,first-var))))
+    (precond-prod-destructor-of-constructors rec constructor hypo
+                                             rest-var var-lst-total
+                                             (cons first-precond precond))))
 
 (define precond-destructor-alist ((destructors smt-function-list-p)
                                   (fixinfo smt-fixtype-info-p))
@@ -110,14 +145,17 @@
        ((prod p) prod)
        (constructor (smt-function->name p.constructor))
        (destructor-alst (precond-destructor-alist p.destructors fixinfo))
+       (hypo (precond-type-list destructor-alst))
        (type-of-constructor
         (precond-prod-type-of-constructor rec constructor destructor-alst
-                                          precond))
+                                          hypo precond))
        (type-of-destructors
-        (precond-prod-type-of-destructor-list rec constructor destructor-alst
+        (precond-prod-type-of-destructor-list rec destructor-alst
                                               type-of-constructor))
+       (var-lst (strip-cdrs destructor-alst))
        (destructor-of-constructors
-        (precond-prod-destructor-of-constructors rec constructor destructor-alst
+        (precond-prod-destructor-of-constructors rec constructor hypo
+                                                 var-lst var-lst
                                                  type-of-destructors))
-       (- (cw "destructor-of-constructors: ~q0" destructor-of-constructors)))
+       (- (cw "preconds: ~q0" destructor-of-constructors)))
     destructor-of-constructors))

@@ -448,7 +448,7 @@ finds out @('integerp') is not a supported function.</p>
   :fix-thm sandwich-fix-when-sandwich-p
   :constructor sandwich
   :destructors ((sandwich->bread$inline . integerp)
-                (sandwich->filings$inline . symbolp))
+                (sandwich->fillings$inline . symbolp))
   )
 
 (def-saved-event fty-defprod-theorem-example
