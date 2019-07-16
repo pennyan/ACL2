@@ -254,7 +254,7 @@
          ;; translate type definitions
          ((mv translated-fixtypes fixtype-precond new-sym-alst &)
           (translate-fixtype-list h.types h.types-info sym-alst index avoid
-                                  h.int-to-rat nil nil))
+                                  h.int-to-rat nil nil state))
          (symbols (strip-cdrs new-sym-alst))
          (- (cw "symbols: ~q0" symbols))
          ;; translate symbols

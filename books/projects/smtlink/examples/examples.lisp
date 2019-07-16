@@ -565,9 +565,9 @@ finds out @('integerp') is not a supported function.</p>
   :fix arithtm-fix
   :fix-thm arithtm-fix-when-arithtm-p
   :kind-function arithtm-kind$inline
-  :prods ((:num :constructor (arithtm-num arithtm-p)
+  :prods ((:num :constructor (arithtm-num arithtm-p return-type-of-arithtm-num)
                 :destructors ((arithtm-num->val$inline integerp)))
-          (:plus :constructor (arithtm-plus arithtm-p)
+          (:plus :constructor (arithtm-plus arithtm-p return-type-of-arithtm-plus)
                  :destructors ((arithtm-plus->left$inline arithtm-p)
                                (arithtm-plus->right$inline arithtm-p)))
           (:minus :constructor (arithtm-minus arithtm-p)

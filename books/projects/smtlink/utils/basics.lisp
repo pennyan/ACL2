@@ -61,6 +61,9 @@
   :forward t
   :topic pseudo-termp)
 
+(defthm pseudo-term-listp-of-symbol-listp
+  (implies (symbol-listp x) (pseudo-term-listp x)))
+
 (define pseudo-term-list-fix ((x pseudo-term-listp))
   :returns (new-x pseudo-term-listp)
   (mbe :logic (if (consp x)

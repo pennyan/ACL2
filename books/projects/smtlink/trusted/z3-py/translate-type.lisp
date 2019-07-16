@@ -243,7 +243,8 @@
                         (index natp)
                         (avoid symbol-listp)
                         (int-to-rat int-to-rat-p)
-                        (precond pseudo-term-list-listp))
+                        (precond pseudo-term-list-listp)
+                        state)
   :returns (mv (translated-fixtypes paragraph-p)
                (fixtype-precond pseudo-term-list-listp)
                (new-symbols symbol-string-alistp)
@@ -261,7 +262,7 @@
         (translate-destructor-list name name-origin p.destructors fixinfo
                                    int-to-rat))
        (translated (translate-prod-template name-str constructor destructor-list))
-       (new-precond (precond-prod prod precond)))
+       (new-precond (precond-prod prod precond state)))
     (mv translated new-precond new-symbols new-index)))
 
 (define translate-prod-list ((name symbolp)
@@ -272,7 +273,8 @@
                              (index natp)
                              (avoid symbol-listp)
                              (int-to-rat int-to-rat-p)
-                             (precond pseudo-term-list-listp))
+                             (precond pseudo-term-list-listp)
+                             state)
   :returns (mv (translated-fixtypes paragraph-p)
                (fixtype-precond pseudo-term-list-listp)
                (new-symbols symbol-string-alistp)
@@ -288,11 +290,11 @@
        ((cons first rest) prod-list)
        ((mv first-translated first-precond first-symbols first-index)
         (translate-prod name name-origin first fixinfo symbols index avoid
-                        int-to-rat precond))
+                        int-to-rat precond state))
        ((mv rest-translated rest-precond rest-symbols rest-index)
         (translate-prod-list name name-origin rest fixinfo
                              first-symbols first-index avoid int-to-rat
-                             first-precond)))
+                             first-precond state)))
     (mv (cons first-translated rest-translated)
         rest-precond rest-symbols rest-index)))
 
@@ -304,7 +306,8 @@
                            (index natp)
                            (avoid symbol-listp)
                            (int-to-rat int-to-rat-p)
-                           (precond pseudo-term-list-listp))
+                           (precond pseudo-term-list-listp)
+                           state)
   :returns (mv (translated-fixtypes paragraph-p)
                (fixtype-precond pseudo-term-list-listp)
                (new-symbols symbol-string-alistp)
@@ -317,7 +320,7 @@
        (name-str (translate-symbol name))
        ((mv prod-list-line precond-prods new-symbols new-index)
         (translate-prod-list name name-origin s.prods fixinfo
-                             symbols index avoid int-to-rat precond))
+                             symbols index avoid int-to-rat precond state))
        ;; (kind-name (symbol-append name-origin '-kind))
        ;; (kind-name-str (translate-symbol kind-name))
        (kind-fn-str (translate-symbol (smt-type-kind-fn smt-type)))
@@ -368,7 +371,8 @@
                        (index natp)
                        (avoid symbol-listp)
                        (int-to-rat int-to-rat-p)
-                       (precond pseudo-term-list-listp))
+                       (precond pseudo-term-list-listp)
+                       state)
   :returns (mv (translated-fixtypes paragraph-p)
                (fixtype-precond pseudo-term-list-listp)
                (symbols symbol-string-alistp)
@@ -382,7 +386,7 @@
        (smt-type (smt-type-fix smt-type))
        ((mv translated-sum-val precond-sum-val new-symbols new-index)
         (translate-sum-val name-val-sym name smt-type fixinfo symbols index
-                           avoid int-to-rat precond))
+                           avoid int-to-rat precond state))
        (translated-sum-top
         (translate-sum-top-template name-str name-val translated-sum-val)))
     (mv translated-sum-top precond-sum-val new-symbols new-index)))
@@ -393,7 +397,8 @@
                            (index natp)
                            (avoid symbol-listp)
                            (int-to-rat int-to-rat-p)
-                           (precond-acc pseudo-term-list-listp))
+                           (precond-acc pseudo-term-list-listp)
+                           state)
   :returns (mv (translated-fixtypes paragraph-p)
                (fixtype-precond pseudo-term-list-listp)
                (new-symbols symbol-string-alistp)
@@ -414,7 +419,7 @@
                                      precond-acc fixinfo)))
                 (mv translated new-precond symbols index)))
       (:sum (translate-sum f.name f.kind fixinfo
-                           symbols index avoid int-to-rat precond-acc))
+                           symbols index avoid int-to-rat precond-acc state))
       (t (mv nil precond-acc symbols index)))))
 
 (define translate-fixtype-list ((fixtypes smt-fixtype-list-p)
@@ -424,7 +429,8 @@
                                 (avoid symbol-listp)
                                 (int-to-rat int-to-rat-p)
                                 (precond-acc pseudo-term-list-listp)
-                                (seen symbol-listp))
+                                (seen symbol-listp)
+                                state)
   :returns (mv (translated-fixtypes paragraph-p)
                (fixtype-precond pseudo-term-list-listp)
                (new-symbols symbol-string-alistp)
@@ -441,14 +447,16 @@
        ((smt-fixtype f) first)
        ((if (member-equal f.name seen))
         (translate-fixtype-list rest fixinfo symbols index avoid int-to-rat
-                                precond-acc seen))
+                                precond-acc seen state))
        ((if (equal f.basicp t))
         (translate-fixtype-list rest fixinfo symbols index avoid int-to-rat
-                                precond-acc seen))
+                                precond-acc seen state))
        ((mv first-translated first-precond first-symbols first-index)
-        (translate-fixtype first fixinfo symbols index avoid int-to-rat precond-acc))
+        (translate-fixtype first fixinfo symbols index avoid int-to-rat
+                           precond-acc state))
        ((mv rest-translated rest-precond rest-symbols rest-index)
         (translate-fixtype-list rest fixinfo first-symbols first-index avoid
-                                int-to-rat first-precond (cons f.name seen))))
+                                int-to-rat first-precond (cons f.name seen)
+                                state)))
     (mv (cons first-translated rest-translated) rest-precond
         rest-symbols rest-index)))
