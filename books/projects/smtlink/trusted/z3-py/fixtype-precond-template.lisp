@@ -10,7 +10,7 @@
 (include-book "std/util/define" :dir :system)
 
 (include-book "../../verified/hint-interface")
-(include-book "../../verified/fixtypes")
+(include-book "../../utils/basics")
 
 (define precond-array ((rec symbolp)
                        (smt-type smt-type-p)
@@ -123,28 +123,25 @@
                                              rest-var var-lst-total
                                              (cons first-precond precond))))
 
-(define precond-destructor-alist ((destructors smt-function-list-p)
-                                  (fixinfo smt-fixtype-info-p))
+(define precond-destructor-alist ((destructors type-function-list-p))
   :returns (destructor-alst symbol-symbol-alistp)
   :measure (len destructors)
-  (b* ((destructors (smt-function-list-fix destructors))
+  (b* ((destructors (type-function-list-fix destructors))
        ((unless (consp destructors)) nil)
        ((cons first rest) destructors)
-       ((smt-function f) first)
-       (return-type (return-type-of-function f fixinfo)))
-    (acons return-type f.name (precond-destructor-alist rest fixinfo))))
+       ((type-function f) first)
+       (return-type (type-function->return-type f)))
+    (acons return-type f.name (precond-destructor-alist rest))))
 
-(define precond-prod ((rec symbolp)
-                      (prod prod-p)
-                      (fixinfo smt-fixtype-info-p)
+(define precond-prod ((prod prod-p)
                       (precond pseudo-term-list-listp))
   :returns (term pseudo-term-list-listp)
-  (b* ((rec (symbol-fix rec))
-       (prod (prod-fix prod))
+  (b* ((prod (prod-fix prod))
        (precond (pseudo-term-list-list-fix precond))
        ((prod p) prod)
-       (constructor (smt-function->name p.constructor))
-       (destructor-alst (precond-destructor-alist p.destructors fixinfo))
+       (constructor (type-function->name p.constructor))
+       (rec (type-function->return-type p.constructor))
+       (destructor-alst (precond-destructor-alist p.destructors))
        (hypo (precond-type-list destructor-alst))
        (type-of-constructor
         (precond-prod-type-of-constructor rec constructor destructor-alst

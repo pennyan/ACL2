@@ -206,27 +206,27 @@
        (precond (precond-array rec smt-type precond)))
     (mv translated precond)))
 
-(define translate-constructor ((constructor smt-function-p))
+(define translate-constructor ((constructor type-function-p))
   :returns (translated paragraph-p)
-  (b* ((constructor (smt-function-fix constructor))
-       ((smt-function f) constructor))
+  (b* ((constructor (type-function-fix constructor))
+       ((type-function f) constructor))
     (translate-symbol f.name)))
 
 (define translate-destructor-list ((name symbolp)
                                    (name-origin symbolp)
-                                   (destructors smt-function-list-p)
+                                   (destructors type-function-list-p)
                                    (fixinfo smt-fixtype-info-p)
                                    (int-to-rat int-to-rat-p))
   :returns (translated paragraph-p)
   :measure (len destructors)
   (b* ((name (symbol-fix name))
-       (destructors (smt-function-list-fix destructors))
+       (destructors (type-function-list-fix destructors))
        (fixinfo (smt-fixtype-info-fix fixinfo))
        (int-to-rat (int-to-rat-fix int-to-rat))
        ((unless (consp destructors)) nil)
        ((cons first rest) destructors)
-       (destructor (translate-symbol (smt-function->name first)))
-       (return-type-sym (return-type-of-function first fixinfo))
+       (destructor (translate-symbol (type-function->name first)))
+       (return-type-sym (type-function->return-type first))
        (return-type (translate-type return-type-sym name int-to-rat
                                     fixinfo))
        (translated-destructor
@@ -237,7 +237,6 @@
 
 (define translate-prod ((name symbolp)
                         (name-origin symbolp)
-                        (rec symbolp)
                         (prod prod-p)
                         (fixinfo smt-fixtype-info-p)
                         (symbols symbol-string-alistp)
@@ -262,12 +261,11 @@
         (translate-destructor-list name name-origin p.destructors fixinfo
                                    int-to-rat))
        (translated (translate-prod-template name-str constructor destructor-list))
-       (new-precond (precond-prod rec prod fixinfo precond)))
+       (new-precond (precond-prod prod precond)))
     (mv translated new-precond new-symbols new-index)))
 
 (define translate-prod-list ((name symbolp)
                              (name-origin symbolp)
-                             (rec symbolp)
                              (prod-list prod-list-p)
                              (fixinfo smt-fixtype-info-p)
                              (symbols symbol-string-alistp)
@@ -289,10 +287,10 @@
        ((unless (consp prod-list)) (mv nil precond symbols index))
        ((cons first rest) prod-list)
        ((mv first-translated first-precond first-symbols first-index)
-        (translate-prod name name-origin rec first fixinfo symbols index avoid
+        (translate-prod name name-origin first fixinfo symbols index avoid
                         int-to-rat precond))
        ((mv rest-translated rest-precond rest-symbols rest-index)
-        (translate-prod-list name name-origin rec rest fixinfo
+        (translate-prod-list name name-origin rest fixinfo
                              first-symbols first-index avoid int-to-rat
                              first-precond)))
     (mv (cons first-translated rest-translated)
@@ -300,7 +298,6 @@
 
 (define translate-sum-val ((name symbolp)
                            (name-origin symbolp)
-                           (rec symbolp)
                            (smt-type smt-type-p)
                            (fixinfo smt-fixtype-info-p)
                            (symbols symbol-string-alistp)
@@ -319,7 +316,7 @@
        ((smt-type-sum s) smt-type)
        (name-str (translate-symbol name))
        ((mv prod-list-line precond-prods new-symbols new-index)
-        (translate-prod-list name name-origin rec s.prods fixinfo
+        (translate-prod-list name name-origin s.prods fixinfo
                              symbols index avoid int-to-rat precond))
        ;; (kind-name (symbol-append name-origin '-kind))
        ;; (kind-name-str (translate-symbol kind-name))
@@ -365,7 +362,6 @@
     translated))
 
 (define translate-sum ((name symbolp)
-                       (rec symbolp)
                        (smt-type smt-type-p)
                        (fixinfo smt-fixtype-info-p)
                        (symbols symbol-string-alistp)
@@ -385,7 +381,7 @@
        (fixinfo (smt-fixtype-info-fix fixinfo))
        (smt-type (smt-type-fix smt-type))
        ((mv translated-sum-val precond-sum-val new-symbols new-index)
-        (translate-sum-val name-val-sym name rec smt-type fixinfo symbols index
+        (translate-sum-val name-val-sym name smt-type fixinfo symbols index
                            avoid int-to-rat precond))
        (translated-sum-top
         (translate-sum-top-template name-str name-val translated-sum-val)))
@@ -417,7 +413,7 @@
                     (translate-array f.name f.recognizer f.kind int-to-rat
                                      precond-acc fixinfo)))
                 (mv translated new-precond symbols index)))
-      (:sum (translate-sum f.name f.recognizer f.kind fixinfo
+      (:sum (translate-sum f.name f.kind fixinfo
                            symbols index avoid int-to-rat precond-acc))
       (t (mv nil precond-acc symbols index)))))
 

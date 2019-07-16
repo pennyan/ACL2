@@ -446,9 +446,9 @@ finds out @('integerp') is not a supported function.</p>
   :rec sandwich-p
   :fix sandwich-fix
   :fix-thm sandwich-fix-when-sandwich-p
-  :constructor sandwich
-  :destructors ((sandwich->bread$inline . integerp)
-                (sandwich->fillings$inline . symbolp))
+  :constructor (sandwich sandwich-p)
+  :destructors ((sandwich->bread$inline integerp)
+                (sandwich->fillings$inline symbolp))
   )
 
 (def-saved-event fty-defprod-theorem-example
@@ -495,7 +495,7 @@ finds out @('integerp') is not a supported function.</p>
   :fix-thm maybe-integer-fix-when-maybe-integer-p
   :some-constructor maybe-integer-some
   :some-destructor maybe-integer-some->val$inline
-  :nil-constructor maybe-integer-none
+  :none-constructor maybe-integer-none
   :some-type integerp
   )
 
@@ -565,13 +565,13 @@ finds out @('integerp') is not a supported function.</p>
   :fix arithtm-fix
   :fix-thm arithtm-fix-when-arithtm-p
   :kind-function arithtm-kind$inline
-  :prods ((:num :constructor arithtm-num
-                :destructors ((arithtm-num->val$inline . integerp)))
-          (:plus :constructor arithtm-plus
-                 :destructors ((arithtm-plus->left$inline . arithtm-p)
-                               (arithtm-plus->right$inline . arithtm-p)))
-          (:minus :constructor arithtm-minus
-                  :destructors ((arithtm-minus->arg$inline . arithtm-p))))
+  :prods ((:num :constructor (arithtm-num arithtm-p)
+                :destructors ((arithtm-num->val$inline integerp)))
+          (:plus :constructor (arithtm-plus arithtm-p)
+                 :destructors ((arithtm-plus->left$inline arithtm-p)
+                               (arithtm-plus->right$inline arithtm-p)))
+          (:minus :constructor (arithtm-minus arithtm-p)
+                  :destructors ((arithtm-minus->arg$inline arithtm-p))))
   )
 
 (defthm fty-deftagsum-theorem

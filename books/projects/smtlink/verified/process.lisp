@@ -12,7 +12,7 @@
 (include-book "std/basic/defs" :dir :system)
 (include-book "centaur/fty/top" :dir :system)
 
-(include-book "fixtypes")
+(include-book "smt-hint-table")
 (include-book "hint-please")
 (include-book "basics")
 (include-book "../config")
@@ -45,17 +45,12 @@
   ;;            :fixer integer-list-fix
   ;;            :fixer-when-recognizer-thm integer-list-fix-when-integer-listp
   ;;            :kind (:list
-  ;;                         :cons integer-list-cons
-  ;;                         :car integer-list-car
-  ;;                         :cdr integer-list-cdr
-  ;;                         :elt-type integerp
-  ;;                         :theorems (((> r0 0)
-  ;;                                     :name r0->-0 <or>
-  ;;                                     :hints (:use ((:instance more-lemma))))
-  ;;                                    ((> r0 0)
-  ;;                                     :name r0->-0 <or>
-  ;;                                     :hints (:use ((:instance
-  ;;                                                    more-lemma)))))))
+  ;;                   :cons (integer-list-cons :return-type integer-list-p
+  ;;                                            :type-thm (:name ... :hints ...))
+  ;;                   :car (integer-list-car :return-type integerp
+  ;;                                          :type-thm (:name ...)
+  ;;                                          :destructor-thm (:name ...))
+  ;;                   :cdr integer-list-cdr))
   ;;            (...)
   ;;            ...)
   ;;           :hypotheses (((> a b) :hints (:use ((:instance lemma)))))
@@ -70,7 +65,7 @@
   ;;           :custom-p nil
   ;;           )))
 
-  ;; A few note:
+  ;; A few note for :name of hint-pair:
   ;; A :name represents the name of the theorem. This theorem when
   ;; instantiated can be used as a conjunction of the hypotheses and this can
   ;; be proved using meta-extract, so no additional subgoals will be generated.
@@ -81,8 +76,11 @@
   ;; :name should be in most cases the only one that's useful. I'm keeping
   ;; :hints in case we do need it in some cases.
   ;;
-  ;; Syntactically, :name and :hints can't coexist. And in most cases, it
-  ;; should just be a :name.
+  ;; When both :name and :hints exist, :name is preferred.
+  ;;
+
+  ;; TODO: implement use-uninterpreted and under-induct options
+  ;; TODO: I will write macros for this file if I've got time.
   )
 
 (defsection hints-syntax
@@ -355,6 +353,7 @@
           (case first
             (:store (symbolp second))
             (:select (symbolp second))
+            (:k (symbolp second))
             (:key-type (symbolp second))
             (:val-type (symbolp second))
             (:theorems (hypothesis-lst-syntax-p second))
@@ -406,6 +405,72 @@
     :elt-type prod-kind-syntax-p
     :true-listp t)
 
+  ;; list-kind
+  (define list-kind-syntax-p-helper ((term t) (used symbol-listp))
+    :returns (ok booleanp)
+    :short "Helper function for list-kind-syntax."
+    (b* ((used (symbol-list-fix used))
+         ((unless (consp term)) t)
+         ((unless (and (consp term) (consp (cdr term)))) nil)
+         ((list* first second rest) term)
+         ((if (member-equal first used))
+          (er hard? 'process=>list-kind-syntax-p-helper
+              "~p0 option is already defined in the hint.~%" first))
+         (first-ok
+          (case first
+            (:cons (symbolp second))
+            (:car (symbolp second))
+            (:cdr (symbolp second))
+            (:nil-fn (symbolp second))
+            (:elt-type (symbolp second))
+            (:theorems (hypothesis-lst-syntax-p second))
+            (t (er hard? 'process=>list-kind-syntax-p-helper
+                   "Smtlink-hint list-kind option doesn't include: ~p0.
+                       They are :cons, :car, :cdr :nil-fn, :elt-type and
+                       :theorems.~%" first)))))
+      (and first-ok
+           (list-kind-syntax-p-helper rest (cons first used)))))
+
+  (define list-kind-syntax-p ((term t))
+    :returns (ok booleanp)
+    :short "Recoginizer for list-kind-syntax."
+    (list-kind-syntax-p-helper term nil))
+
+  (easy-fix list-kind-syntax nil)
+
+  ;; option-kind
+  (define option-kind-syntax-p-helper ((term t) (used symbol-listp))
+    :returns (ok booleanp)
+    :short "Helper function for option-kind-syntax."
+    (b* ((used (symbol-list-fix used))
+         ((unless (consp term)) t)
+         ((unless (and (consp term) (consp (cdr term)))) nil)
+         ((list* first second rest) term)
+         ((if (member-equal first used))
+          (er hard? 'process=>option-kind-syntax-p-helper
+              "~p0 option is already defined in the hint.~%" first))
+         (first-ok
+          (case first
+            (:some-constructor (symbolp second))
+            (:some-destructor (symbolp second))
+            (:nil-constructor (symbolp second))
+            (:some-type (symbolp second))
+            (:theorems (hypothesis-lst-syntax-p second))
+            (t (er hard? 'process=>option-kind-syntax-p-helper
+                   "Smtlink-hint option-kind option doesn't include: ~p0.
+                       They are :some-constructor, :some-destructor,
+                       :nil-constructor, :some-type, and :theorems.~%"
+                   first)))))
+      (and first-ok
+           (option-kind-syntax-p-helper rest (cons first used)))))
+
+  (define option-kind-syntax-p ((term t))
+    :returns (ok booleanp)
+    :short "Recoginizer for option-kind-syntax."
+    (option-kind-syntax-p-helper term nil))
+
+  (easy-fix option-kind-syntax nil)
+
   ;; sum-kind
   (define sum-kind-syntax-p ((term t))
     :returns (ok booleanp)
@@ -423,6 +488,8 @@
         (:array (array-kind-syntax-p options))
         (:prod (prod-kind-syntax-p options))
         (:sum (sum-kind-syntax-p options))
+        (:list (list-kind-syntax-p options))
+        (:option (option-kind-syntax-p options))
         (t (er hard? 'process=>kind-syntax-p
                "Smtlink-hint kind-syntax option doesn't include: ~p0.
                        They are :abstract, :list, :array, :prod, :option, and
@@ -439,12 +506,18 @@
                     (implies (equal (car term) :prod)
                              (prod-kind-syntax-p (cdr term)))
                     (implies (equal (car term) :sum)
-                             (sum-kind-syntax-p (cdr term)))))
+                             (sum-kind-syntax-p (cdr term)))
+                    (implies (equal (car term) :list)
+                             (list-kind-syntax-p (cdr term)))
+                    (implies (equal (car term) :option)
+                             (option-kind-syntax-p (cdr term)))))
       :name definition-of-kind-syntax-p)
      (ok (implies (and ok
                        (not (equal (car term) :abstract))
                        (not (equal (car term) :array))
-                       (not (equal (car term) :prod)))
+                       (not (equal (car term) :prod))
+                       (not (equal (car term) :list))
+                       (not (equal (car term) :option)))
                   (equal (car term) :sum))
          :name option-of-kind-syntax-p))
     )
@@ -469,7 +542,7 @@
           (case first
             (:recognizer (symbolp second))
             (:fixer (symbolp second))
-            (:fixer-when-recognizer-thm (hypothesis-syntax-p second))
+            (:fixer-when-recognizer-thm (symbolp second))
             (:kind (kind-syntax-p second))
             (t (er hard? 'process=>type-option-syntax-p-helper
                    "Smtlink-hint type option doesn't include: ~p0.
@@ -486,7 +559,7 @@
                        (implies (equal (car term) :fixer)
                                 (symbolp (cadr term)))
                        (implies (equal (car term) :fixer-when-recognizer-thm)
-                                (hypothesis-syntax-p (cadr term)))
+                                (symbolp (cadr term)))
                        (implies (equal (car term) :kind)
                                 (kind-syntax-p (cadr term)))))
          :hints (("Goal"
@@ -527,7 +600,7 @@
                        (implies (equal (car term) :fixer)
                                 (symbolp (cadr term)))
                        (implies (equal (car term) :fixer-when-recognizer-thm)
-                                (hypothesis-syntax-p (cadr term)))
+                                (symbolp (cadr term)))
                        (implies (equal (car term) :kind)
                                 (kind-syntax-p (cadr term)))))
          :name definition-of-type-option-syntax-p)
@@ -545,6 +618,9 @@
 
   (easy-fix type-option-syntax nil)
   )
+
+(defsection type-theorems-syntax
+  :parents (type-syntax))
 
 (defsection type-syntax
   :parents (Smtlink-process-user-hint)
@@ -784,7 +860,7 @@
     :hints (("Goal" :in-theory (enable function-option-syntax-fix)))
     (b* ((fun-opt-lst (function-option-syntax-fix fun-opt-lst))
          (smt-func (smt-function-fix smt-func))
-         ((unless (and (consp fun-opt-lst) (consp (cdr fun-opt-lst)))) smt-func)
+         ((unless (consp fun-opt-lst)) smt-func)
          ((list* option content rest) fun-opt-lst)
          (new-smt-func
           (case option
@@ -834,6 +910,7 @@
   (define construct-array-kind ((content array-kind-syntax-p)
                                 (smt-type-array smt-type-p))
     :returns (new-array smt-type-p)
+    :guard (equal (smt-type-kind smt-type-array) :array)
     :irrelevant-formals-ok t
     :ignore-ok t
     (smt-type-fix smt-type-array))
@@ -841,6 +918,7 @@
   (define construct-prod-kind ((content prod-kind-syntax-p)
                                (smt-type-prod smt-type-p))
     :returns (new-prod smt-type-p)
+    :guard (equal (smt-type-kind smt-type-prod) :sum)
     :irrelevant-formals-ok t
     :ignore-ok t
     (smt-type-fix smt-type-prod))
@@ -848,19 +926,57 @@
   (define construct-sum-kind ((content sum-kind-syntax-p)
                               (smt-type-sum smt-type-p))
     :returns (new-sum smt-type-p)
+    :guard (equal (smt-type-kind smt-type-sum) :sum)
     :irrelevant-formals-ok t
     :ignore-ok t
     (smt-type-fix smt-type-sum))
 
+(define construct-list-kind ((content list-kind-syntax-p)
+                             (smt-type-list smt-type-p))
+  :returns (new-list smt-type-p)
+  :guard (equal (smt-type-kind smt-type-list) :sum)
+  :irrelevant-formals-ok t
+  :ignore-ok t
+  ;; :measure (len content)
+  ;; :hints (("Goal" :in-theory (enable list-kind-syntax-fix)))
+  ;; (b* ((content (list-kind-syntax-fix content))
+  ;;      (smt-type-list (smt-type-fix smt-type-list))
+  ;;      ((unless (consp content)) smt-type-list)
+  ;;      ((list* first second rest) content)
+  ;;      (case first
+  ;;        (:cons)
+  ;;        (:car)
+  ;;        (:cdr)
+  ;;        (:nil-fn)
+  ;;        (:theorems (change-smt-function
+  ;;                    smt-func
+  ;;                    :more-returns (construct-hypothesis-list content))))
+  ;;      )
+  ;;   ())
+  ;;  )
+
+  (smt-type-fix smt-type-list))
+
+(define construct-option-kind ((content option-kind-syntax-p)
+                               (smt-type-option smt-type-p))
+  :returns (new-option smt-type-p)
+  :guard (equal (smt-type-kind smt-type-option) :sum)
+  :irrelevant-formals-ok t
+  :ignore-ok t
+  (smt-type-fix smt-type-option))
+
   (define construct-kind ((content kind-syntax-p))
     :returns (new-kind smt-type-p)
+    :guard-debug t
     (b* ((content (kind-syntax-fix content))
          ((cons kind options) content))
       (case kind
         (:abstract (make-smt-type-abstract))
         (:array (construct-array-kind options (make-smt-type-array)))
         (:prod (construct-prod-kind options (make-smt-type-sum)))
-        (:sum (construct-sum-kind options (make-smt-type-sum))))))
+        (:sum (construct-sum-kind options (make-smt-type-sum)))
+        (:list (construct-list-kind options (make-smt-type-sum)))
+        (:option (construct-option-kind options (make-smt-type-sum))))))
 
   (define construct-type-option-lst ((type-opt-lst type-option-syntax-p)
                                      (smt-type smt-fixtype-p))
@@ -879,7 +995,7 @@
             (:fixer-when-recognizer-thm
              (change-smt-fixtype
               smt-type :fixer-when-recognizer-thm
-              (construct-hypothesis content)))
+              (make-type-thm :name content)))
             (:kind (change-smt-fixtype
                     smt-type
                     :kind (construct-kind content))))))
@@ -889,7 +1005,6 @@
     :returns (new-type smt-fixtype-p)
     :guard-hints (("Goal"
                    :in-theory (enable type-syntax-p)))
-    :guard-debug t
     (b* ((type (type-syntax-fix type))
          ((cons name type-opt-lst) type))
       (construct-type-option-lst type-opt-lst
@@ -1038,27 +1153,43 @@
                      (:wrld-fn-len (set-wrld-len second hint)))))
       (combine-hints rest new-hint)))
 
-  (define find-global-hint ((user-hint smtlink-hint-syntax-p))
-    :returns (name symbolp)
-    :ignore-ok t
-    :irrelevant-formals-ok t
-    (b* ((user-hint (smtlink-hint-syntax-fix user-hint)))
-      :default))
+(define find-global-hint-helper ((user-hint smtlink-hint-syntax-p))
+  :returns (name symbolp)
+  :hints (("Goal" :in-theory (enable smtlink-hint-syntax-fix)))
+  :measure (len user-hint)
+  (b* ((user-hint (smtlink-hint-syntax-fix user-hint))
+       ((unless (consp user-hint)) nil)
+       ((list* option second rest) user-hint))
+    (case option
+      (:global-hint second)
+      (t (find-global-hint-helper rest)))))
 
-  ;; Not finished
-  (define find-hint ((name symbolp) state)
-    :returns (hint smtlink-hint-p)
-    (b* ((smt-hint-tb (get-smt-hint-table (w state)))
-         ((unless (smtlink-hint-alist-p smt-hint-tb))
-          (prog2$ (er hard? 'Smtlink=>find-hint "Wrong type of hint:~q0"
-                      smt-hint-tb)
-                  (make-smtlink-hint)))
-         (the-hint-cons (assoc-equal name smt-hint-tb))
-         ((unless (consp the-hint-cons))
-          (prog2$ (cw "Using (make-smtlink-hint) because we failed to find the
+(define find-hint ((name symbolp) state)
+  :returns (hint smtlink-hint-p)
+  (b* ((smt-hint-tb (get-smt-hint-table (w state)))
+       ((unless (smtlink-hint-alist-p smt-hint-tb))
+        (prog2$ (er hard? 'Smtlink=>find-hint "Wrong type of hint:~q0"
+                    smt-hint-tb)
+                (make-smtlink-hint)))
+       (the-hint-cons (assoc-equal name smt-hint-tb))
+       ((unless (consp the-hint-cons))
+        (prog2$ (cw "Using (make-smtlink-hint) because we failed to find the
   smtlink-hint ~p0 from state table ~p1~%" name smt-hint-tb)
-                  (make-smtlink-hint))))
-      (cdr the-hint-cons)))
+                (make-smtlink-hint))))
+    (cdr the-hint-cons)))
+
+(define find-global-hint ((user-hint smtlink-hint-syntax-p)
+                          state)
+    :returns (name smtlink-hint-p)
+    (b* ((user-hint (smtlink-hint-syntax-fix user-hint))
+         (the-hint (find-global-hint-helper user-hint))
+         ((if (null the-hint))
+          (prog2$ (cw "Using :default smtlink-hint from state table ~p0~%"
+                      'smt-hint-table)
+                  (find-hint :default state))))
+      (prog2$ (cw "Using ~p0 smtlink-hint as requested by the user.~%"
+                  the-hint)
+              (find-hint the-hint state))))
 
   (define process-hint ((cl pseudo-term-listp) (user-hint t) state)
     :returns (subgoal-lst pseudo-term-list-listp)
@@ -1070,8 +1201,7 @@
                   (list cl)))
          ;; Need to find global-hint first so that we know which hint to
          ;; combine onto.
-         (hint-name (find-global-hint user-hint))
-         (the-hint (find-hint hint-name state))
+         (the-hint (find-global-hint user-hint state))
          ((unless (smtlink-hint-p the-hint))
           (prog2$ (cw "The hint ~p0 from state is not smtlink-hint-p:
     ~p1~%Therefore proceed without Smtlink...~%" the-hint user-hint)

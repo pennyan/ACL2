@@ -13,9 +13,9 @@
 (include-book "../config")
 (include-book "../utils/basics")
 
-(defsection SMT-hint-interface
-  :parents (verified)
-  :short "Define default Smtlink hint interface"
+;; (defsection SMT-hint-interface
+;;   :parents (verified)
+;;   :short "Define default Smtlink hint interface"
 
   (defprod hint-pair
     :parents (smtlink-hint)
@@ -69,27 +69,40 @@
     :elt-type smt-function-p
     :true-listp t)
 
+  (defprod type-thm
+    ((name symbolp :default nil)
+     (hints true-listp :default nil)))
+
+  (defprod type-function
+    ((name symbolp :default nil)
+     (return-type symbolp :default nil)
+     (type-of-function-thm type-thm-p :default (make-type-thm))
+     (destructor-of-constructor-thm type-thm-p :default (make-type-thm))
+     ;; constructor doesn't use this field
+     ))
+
+(deflist type-function-list
+  :parents (type-function)
+  :elt-type type-function-p
+  :true-listp t)
+
   (defprod prod
     ((kind symbolp :default nil)
-     (constructor smt-function-p :default (make-smt-function))
-     (destructors smt-function-list-p :default nil)
-     (theorems symbol-hint-pair-alist-p :default nil)))
+     (constructor type-function-p :default (make-type-function))
+     (destructors type-function-list-p :default nil)))
 
   (deflist prod-list
     :elt-type prod-p
     :true-listp t)
 
-  ;; (defprod option
-  ;;   ((some-prod prod-p :default (make-prod))
-  ;;    (none-prod prod-p :default (make-prod))))
-
   (deftagsum smt-type
     (:abstract ())
-    (:array ((store smt-function-p :default (make-smt-function))
-             (select smt-function-p :default (make-smt-function))
-             (key-type symbolp :default nil)
-             (val-type symbolp :default nil)
-             (theorems symbol-hint-pair-alist-p :default nil)))
+    (:array ((store type-function-p :default (make-type-function))
+             (select type-function-p :default (make-type-function))
+             (k type-function-p :default (make-type-function))
+             (key-type symbolp)
+             (val-type symbolp)
+             (array-thm type-thm-p :default (make-type-thm))))
     ;; prod, list and option are all sums
     (:sum ((kind-fn symbolp :default nil)
            (prods prod-list-p :default nil)))
@@ -107,7 +120,7 @@
     ((name symbolp :default nil)
      (recognizer symbolp :default nil)
      (fixer symbolp :default nil)
-     (fixer-when-recognizer-thm hint-pair-p :default (make-hint-pair))
+     (fixer-when-recognizer-thm type-thm-p :default (make-type-thm))
      (basicp symbolp :default nil)
      (kind smt-type-p :default (make-smt-type-abstract))))
 
@@ -222,23 +235,23 @@
          (type (smt-type-fix type))
          (acc (smt-fixtype-info-fix acc))
          ((smt-type-array a) type)
-         (store-acc (generate-info-pair (smt-function->name a.store)
+         (store-acc (generate-info-pair (type-function->name a.store)
                                         name :store nil acc)))
-      (generate-info-pair (smt-function->name a.select) name :select nil store-acc)))
+      (generate-info-pair (type-function->name a.select) name :select nil store-acc)))
 
   (define generate-fixtype-info-destructors ((name symbolp)
                                              (kind symbolp)
-                                             (destructors smt-function-list-p)
+                                             (destructors type-function-list-p)
                                              (acc smt-fixtype-info-p))
     :returns (info smt-fixtype-info-p)
     :measure (len destructors)
     (b* ((name (symbol-fix name))
          (kind (symbol-fix kind))
-         (destructors (smt-function-list-fix destructors))
+         (destructors (type-function-list-fix destructors))
          (acc (smt-fixtype-info-fix acc))
          ((unless (consp destructors)) acc)
          ((cons first rest) destructors)
-         ((smt-function f) first)
+         ((type-function f) first)
          (first-acc (generate-info-pair f.name name :destructor kind acc)))
       (generate-fixtype-info-destructors name kind rest first-acc)))
 
@@ -251,7 +264,7 @@
          ((prod p) prod)
          (acc (smt-fixtype-info-fix acc))
          (constructor-acc
-          (generate-info-pair (smt-function->name p.constructor)
+          (generate-info-pair (type-function->name p.constructor)
                               name :constructor p.kind acc)))
       (generate-fixtype-info-destructors name p.kind p.destructors
                                          constructor-acc)))
@@ -418,4 +431,4 @@
           (er hard? 'hint-interface=>return-type-of-function
               "Not a type declaration: ~p0~%" type-thm)))
       (car type-thm)))
-  )
+;;  )

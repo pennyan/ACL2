@@ -164,3 +164,18 @@
   :define t
   :forward t
   :topic true-listp)
+
+(defalist symbol-symbol-alist
+  :key-type symbolp
+  :val-type symbolp
+  :pred symbol-symbol-alistp
+  :true-listp t)
+
+(defthm cdr-of-symbol-symbol-alistp
+  (implies (symbol-symbol-alistp x)
+           (symbol-symbol-alistp (cdr x))))
+
+(deflist symbol-list-list
+  :elt-type symbol-listp
+  :pred symbol-list-listp
+  :true-listp t)

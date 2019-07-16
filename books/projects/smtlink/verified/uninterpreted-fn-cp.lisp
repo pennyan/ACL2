@@ -103,6 +103,7 @@
                                 (fixinfo smt-fixtype-info-p)
                                 state)
     :returns (new-term pseudo-termp)
+    :guard-debug t
     (b* ((func (smt-function-fix func))
          (fixtypes (smt-fixtype-list-fix fixtypes))
          (fixinfo (smt-fixtype-info-fix fixinfo))
@@ -112,7 +113,7 @@
           (er hard? 'uninterpreted-fn-cp=>fix-thm-meta-extract "~p0 is not a
                               fixtype.~%" return-type))
          (type-fix-when-type
-          (hint-pair->name
+          (type-thm->name
            (smt-fixtype->fixer-when-recognizer-thm fixtype)))
          (fix-thm (acl2::meta-extract-formula-w type-fix-when-type
                                                 (w state)))
