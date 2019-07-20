@@ -24,46 +24,71 @@
 
   ;; --------------------------------------------------------
 
-  ;; Example:
-  ;; :hints (("Goal"
-  ;;          :smtlink
-  ;;          (:functions
-  ;;           ((f0 :formals ((a0 rationalp))
-  ;;                :returns
-  ;;                ((r0 rationalp
-  ;;                     :name rationalp-of-f0))
-  ;;                :expansion-depth 1
-  ;;                :guard ((> a0 0)
-  ;;                        :name a0->-0 <or>
-  ;;                        :hints (:use ((:instance guard-lemma))))
-  ;;                :more-returns
-  ;;                (((> r0 0)
-  ;;                  :name r0->-0 <or> :hints (:use ((:instance more-lemma)))))))
-  ;;           :types
-  ;;           ((integer-list
-  ;;            :recognizer integer-listp
-  ;;            :fixer integer-list-fix
-  ;;            :fixer-when-recognizer-thm integer-list-fix-when-integer-listp
-  ;;            :kind (:list
-  ;;                   :cons (integer-list-cons :return-type integer-list-p
-  ;;                                            :type-thm (:name ... :hints ...))
-  ;;                   :car (integer-list-car :return-type integerp
-  ;;                                          :type-thm (:name ...)
-  ;;                                          :destructor-thm (:name ...))
-  ;;                   :cdr integer-list-cdr))
-  ;;            (...)
-  ;;            ...)
-  ;;           :hypotheses (((> a b) :hints (:use ((:instance lemma)))))
-  ;;           :rm-file t
-  ;;           :smt-dir ""
-  ;;           :smt-fname ""
-  ;;           :int-to-rat nil
-  ;;           :use-uninterpreted t
-  ;;           :under-induct nil
-  ;;           :global-hint nil
-  ;;           :wrld-fn-len 0
-  ;;           :custom-p nil
-  ;;           )))
+;; Example:
+;; :hints (("Goal"
+;;          :smtlink
+;;          (:functions
+;;           ((f0 :formals ((a0 rationalp))
+;;                :returns
+;;                ((r0 rationalp
+;;                     :name rationalp-of-f0))
+;;                :expansion-depth 1
+;;                :guard ((> a0 0)
+;;                        :name a0->-0 <or>
+;;                        :hints (:use ((:instance guard-lemma))))
+;;                :more-returns
+;;                (((> r0 0)
+;;                  :name r0->-0 <or> :hints (:use ((:instance more-lemma)))))))
+;;           :types
+;;           ((integer-list
+;;             :recognizer integer-listp
+;;             :fixer integer-list-fix
+;;             :fixer-when-recognizer-thm integer-list-fix-when-integer-listp
+;;             :kind (:list
+;;                    :cons
+;;                    (:constructor
+;;                     (integer-list-cons :return-type integer-list-p
+;;                                        :type-thm (:name ... :hints ...))
+;;                     :destructors
+;;                     ((integer-list-car :return-type integerp
+;;                                        :type-thm (:name ...)
+;;                                        :destructor-thm (:name ...))
+;;                      (integer-list-cdr ...)))
+;;                    :nil
+;;                    (:constructor
+;;                     (integer-list-nil :return-type ...
+;;                                       :type-thm (:name ... :hints ...))))
+;;             (:abstract)
+;;             (:prod
+;;              :constructor ()
+;;              :destructors (() () ...))
+;;             (:sum
+;;              :kind-fn integer-list-kind
+;;              :kind1
+;;              (:constructor (...)
+;;               :destructors (() () ...))
+;;              :kind2
+;;               (:constructor (...)
+;;                :destructors (() () ...)))
+;;             (:option
+;;              :some
+;;              (:constructor ()
+;;               :destructor ())
+;;              :none
+;;              (:constructor ()))
+;;            (...)
+;;            ...)
+;;           :hypotheses (((> a b) :hints (:use ((:instance lemma)))))
+;;           :rm-file t
+;;           :smt-dir ""
+;;           :smt-fname ""
+;;           :int-to-rat nil
+;;           :use-uninterpreted t
+;;           :under-induct nil
+;;           :global-hint nil
+;;           :wrld-fn-len 0
+;;           :custom-p nil
+;;           )))
 
   ;; A few note for :name of hint-pair:
   ;; A :name represents the name of the theorem. This theorem when
@@ -89,7 +114,12 @@
   (define hints-syntax-p ((term t))
     :returns (syntax-good? booleanp)
     :short "Recognizer for hints-syntax."
-    (true-listp term))
+    (true-listp term)
+    ///
+    (more-returns
+     (syntax-good?
+      (implies syntax-good? (true-listp term))
+      :name true-listp-of-hints-syntax-p)))
 
   (easy-fix hints-syntax nil)
   )
@@ -212,6 +242,7 @@
               "~p0 option is already defined in the hint.~%" first))
          (first-ok
           (case first
+            ;; TODO: I didn't check for distinct formals.
             (:formals (argument-lst-syntax-p second))
             (:returns (argument-lst-syntax-p second))
             (:expansion-depth (natp second))
@@ -327,6 +358,208 @@
     :true-listp t)
   )
 
+(defsection type-function-syntax
+  :parents (kind-syntax)
+
+  (define type-thm-syntax-p-helper ((term t)
+                                    (used symbol-listp))
+    :returns (ok booleanp)
+    :short "Helper function for type-thm-syntax."
+    (b* ((used (symbol-list-fix used))
+         ((unless (consp term)) t)
+         ((unless (and (consp term) (consp (cdr term)))) nil)
+         ((list* first second rest) term)
+         ((if (member-equal first used))
+          (er hard? 'process=>type-thm-syntax-p-helper
+              "~p0 option is already defined in the hint.~%" first))
+         (first-ok
+          (case first
+            (:name (symbolp second))
+            (:hints (hints-syntax-p second))
+            (t (er hard? 'process=>type-thm-syntax-p-helper
+                   "Smtlink-hint type-thm-syntax option doesn't include:
+                    ~p0. They are :name, and :hints~%" first)))))
+      (and first-ok
+           (type-thm-syntax-p-helper rest (cons first used))))
+    ///
+    (more-returns
+     (ok (implies (and ok (consp term) (symbol-listp used))
+                  (and (consp (cdr term))
+                       (not (member-equal (car term) used))
+                       (implies (equal (car term) :name)
+                                (symbolp (cadr term)))
+                       (implies (equal (car term) :hints)
+                                (hints-syntax-p (cadr term)))))
+         :name definition-of-type-thm-syntax-p-helper
+         :hints (("Goal"
+                  :expand (type-thm-syntax-p-helper term used))))
+     (ok (implies (and ok (consp term) (symbol-listp used)
+                       (not (equal (car term) :name)))
+                  (equal (car term) :hints))
+         :name option-of-type-thm-syntax-p-helper
+         :hints (("Goal"
+                  :expand (type-thm-syntax-p-helper term used)))))
+     (defthm monotonicity-of-type-thm-syntax-p-helper
+       (implies (and (subsetp used-1 used :test 'equal)
+                     (type-thm-syntax-p-helper term used))
+                (type-thm-syntax-p-helper term used-1)))
+     )
+
+  (defthm monotonicity-of-type-thm-syntax-p-helper-corollary
+    (implies (type-thm-syntax-p-helper term used)
+             (type-thm-syntax-p-helper term nil))
+    :hints (("Goal"
+             :in-theory (disable monotonicity-of-type-thm-syntax-p-helper)
+             :use ((:instance monotonicity-of-type-thm-syntax-p-helper
+                              (used used)
+                              (used-1 nil))))))
+
+  (define type-thm-syntax-p ((term t))
+    :returns (ok booleanp)
+    :short "Recognizer for type-thm-syntax-p."
+    (type-thm-syntax-p-helper term nil)
+    ///
+    (more-returns
+     (ok (implies (and ok (consp term))
+                  (and (consp (cdr term))
+                       (implies (equal (car term) :name)
+                                (symbolp (cadr term)))
+                       (implies (equal (car term) :hints)
+                                (hints-syntax-p (cadr term)))))
+         :name definition-of-type-thm-syntax-p
+         :hints (("Goal"
+                  :in-theory (disable definition-of-type-thm-syntax-p-helper)
+                  :use ((:instance
+                         definition-of-type-thm-syntax-p-helper
+                         (used nil))))))
+     (ok (implies (and ok (consp term)
+                       (not (equal (car term) :name)))
+                  (equal (car term) :hints))
+         :name option-of-type-thm-syntax-p
+         :hints (("Goal"
+                  :in-theory (disable option-of-type-thm-syntax-p-helper)
+                  :use ((:instance
+                         option-of-type-thm-syntax-p-helper
+                         (used nil))))))
+     (ok (implies (and ok (consp term))
+                  (type-thm-syntax-p (cddr term)))
+         :hints (("Goal"
+                  :expand (type-thm-syntax-p-helper term nil)))
+         :name monotonicity-of-type-thm-syntax-p)
+     ))
+
+  (easy-fix type-thm-syntax nil)
+
+  (define type-function-option-syntax-p-helper ((term t)
+                                                (used symbol-listp))
+    :returns (ok booleanp)
+    :short "Helper function for type-function-option-syntax."
+    (b* ((used (symbol-list-fix used))
+         ((unless (consp term)) t)
+         ((unless (and (consp term) (consp (cdr term)))) nil)
+         ((list* first second rest) term)
+         ((if (member-equal first used))
+          (er hard? 'process=>type-function-option-syntax-p-helper
+              "~p0 option is already defined in the hint.~%" first))
+         (first-ok
+          (case first
+            (:return-type (symbolp second))
+            (:type-thm (type-thm-syntax-p second))
+            (:destructor-thm (type-thm-syntax-p second))
+            (t (er hard? 'process=>type-function-option-syntax-p-helper
+                   "Smtlink-hint type-function-option-syntax option doesn't
+                    include: ~p0. They are :return-type, :type-thm, and
+                    :destructor-thm.~%" first)))))
+      (and first-ok
+           (type-function-option-syntax-p-helper rest (cons first used))))
+    ///
+    (more-returns
+     (ok (implies (and ok (consp term) (symbol-listp used))
+                  (and (consp (cdr term))
+                       (not (member-equal (car term) used))
+                       (implies (equal (car term) :return-type)
+                                (symbolp (cadr term)))
+                       (implies (equal (car term) :type-thm)
+                                (type-thm-syntax-p (cadr term)))
+                       (implies (equal (car term) :destructor-thm)
+                                (type-thm-syntax-p (cadr term)))))
+         :name definition-of-type-function-option-syntax-p-helper
+         :hints (("Goal"
+                  :expand (type-function-option-syntax-p-helper term used))))
+     (ok (implies (and ok (consp term) (symbol-listp used)
+                       (not (equal (car term) :return-type))
+                       (not (equal (car term) :type-thm)))
+                  (equal (car term) :destructor-thm))
+         :name option-of-type-function-option-syntax-p-helper
+         :hints (("Goal"
+                  :expand (type-function-option-syntax-p-helper term used)))))
+    (defthm monotonicity-of-type-function-option-syntax-p-helper
+      (implies (and (subsetp used-1 used :test 'equal)
+                    (type-function-option-syntax-p-helper term used))
+               (type-function-option-syntax-p-helper term used-1))))
+
+  (defthm monotonicity-of-type-function-option-syntax-p-helper-corollary
+    (implies (type-function-option-syntax-p-helper term used)
+             (type-function-option-syntax-p-helper term nil))
+    :hints (("Goal"
+             :in-theory (disable monotonicity-of-type-function-option-syntax-p-helper)
+             :use ((:instance monotonicity-of-type-function-option-syntax-p-helper
+                              (used used)
+                              (used-1 nil))))))
+
+  (define type-function-option-syntax-p ((term t))
+    :returns (ok booleanp)
+    :short "Recognizer for type-function-option-syntax-p."
+    (type-function-option-syntax-p-helper term nil)
+    ///
+    (more-returns
+     (ok (implies (and ok (consp term))
+                  (and (consp (cdr term))
+                       (implies (equal (car term) :return-type)
+                                (symbolp (cadr term)))
+                       (implies (equal (car term) :type-thm)
+                                (type-thm-syntax-p (cadr term)))
+                       (implies (equal (car term) :destructor-thm)
+                                (type-thm-syntax-p (cadr term)))))
+         :name definition-of-type-function-option-syntax-p
+         :hints (("Goal"
+                  :in-theory (disable definition-of-type-function-option-syntax-p-helper)
+                  :use ((:instance
+                         definition-of-type-function-option-syntax-p-helper
+                         (used nil))))))
+     (ok (implies (and ok (consp term)
+                       (not (equal (car term) :return-type))
+                       (not (equal (car term) :type-thm)))
+                  (equal (car term) :destructor-thm))
+         :name option-of-type-function-option-syntax-p
+         :hints (("Goal"
+                  :in-theory (disable option-of-type-function-option-syntax-p-helper)
+                  :use ((:instance
+                         option-of-type-function-option-syntax-p-helper
+                         (used nil))))))
+     (ok (implies (and ok (consp term))
+                  (type-function-option-syntax-p (cddr term)))
+         :hints (("Goal"
+                  :expand (type-function-option-syntax-p-helper term nil)))
+         :name monotonicity-of-type-function-option-syntax-p)))
+
+  (easy-fix type-function-option-syntax nil)
+
+  (define type-function-syntax-p ((term t))
+    :returns (ok booleanp)
+    :short "Recognizer for type-function-syntax-p."
+    (b* (((unless (consp term)) nil)
+         ((cons name options) term))
+      (and (symbolp name)
+           (type-function-option-syntax-p options))))
+
+  (easy-fix type-function-syntax '(:abstract))
+
+  (deflist type-function-list-syntax
+    :elt-type type-function-syntax-p
+    :true-listp t)
+  )
+
 (defsection kind-syntax
   :parents (type-syntax)
 
@@ -356,11 +589,11 @@
             (:k (symbolp second))
             (:key-type (symbolp second))
             (:val-type (symbolp second))
-            (:theorems (hypothesis-lst-syntax-p second))
+            (:array-thm (type-thm-syntax-p second))
             (t (er hard? 'process=>array-kind-syntax-p-helper
                    "Smtlink-hint array-kind option doesn't include: ~p0.
-                       They are :store, :select, :key-type, :val-type, and
-                       :theorems.~%" first)))))
+                       They are :store, :select, :k, :key-type, :val-type, and
+                       :array-thm.~%" first)))))
       (and first-ok
            (array-kind-syntax-p-helper rest (cons first used)))))
 
@@ -371,39 +604,93 @@
 
   (easy-fix array-kind-syntax nil)
 
-  ;; prod-kind
-  (define prod-kind-syntax-p-helper ((term t) (used symbol-listp))
+  ;; prod-option
+  (define prod-option-syntax-p-helper ((term t) (used symbol-listp))
     :returns (ok booleanp)
-    :short "Helper function for prod-kind-syntax."
+    :short "Helper function for prod-option-syntax."
     (b* ((used (symbol-list-fix used))
          ((unless (consp term)) t)
          ((unless (and (consp term) (consp (cdr term)))) nil)
          ((list* first second rest) term)
          ((if (member-equal first used))
-          (er hard? 'process=>prod-kind-syntax-p-helper
+          (er hard? 'process=>prod-option-syntax-p-helper
               "~p0 option is already defined in the hint.~%" first))
          (first-ok
           (case first
-            (:constructor (symbolp second))
-            (:field-accessors (symbol-symbol-alistp second))
-            (:theorems (hypothesis-lst-syntax-p second))
-            (t (er hard? 'process=>prod-kind-syntax-p-helper
-                   "Smtlink-hint prod-kind option doesn't include: ~p0.
-                       They are :constructor, :field-accessors, and
-                       :theorems.~%" first)))))
+            (:constructor (type-function-syntax-p second))
+            (:destructors (type-function-list-syntax-p second))
+            (t (er hard? 'process=>prod-option-syntax-p-helper
+                   "Smtlink-hint prod-option doesn't include: ~p0.
+                       They are :constructor, and :field-accessors.~%"
+                   first)))))
       (and first-ok
-           (prod-kind-syntax-p-helper rest (cons first used)))))
+           (prod-option-syntax-p-helper rest (cons first used))))
+    ///
+    (more-returns
+     (ok (implies (and ok (consp term) (symbol-listp used))
+                  (and (consp (cdr term))
+                       (not (member-equal (car term) used))
+                       (implies (equal (car term) :constructor)
+                                (type-function-syntax-p (cadr term)))
+                       (implies (equal (car term) :destructors)
+                                (type-function-list-syntax-p (cadr term)))))
+         :name definition-of-prod-option-syntax-p-helper
+         :hints (("Goal"
+                  :expand (prod-option-syntax-p-helper term used))))
+     (ok (implies (and ok (consp term) (symbol-listp used)
+                       (not (equal (car term) :constructor)))
+                  (equal (car term) :destructors))
+         :name option-of-prod-option-syntax-p-helper
+         :hints (("Goal"
+                  :expand (prod-option-syntax-p-helper term used)))))
+    (defthm monotonicity-of-prod-option-syntax-p-helper
+      (implies (and (subsetp used-1 used :test 'equal)
+                    (prod-option-syntax-p-helper term used))
+               (prod-option-syntax-p-helper term used-1))))
+
+  (defthm monotonicity-of-prod-option-syntax-p-helper-corollary
+    (implies (prod-option-syntax-p-helper term used)
+             (prod-option-syntax-p-helper term nil))
+    :hints (("Goal"
+             :in-theory (disable monotonicity-of-prod-option-syntax-p-helper)
+             :use ((:instance monotonicity-of-prod-option-syntax-p-helper
+                              (used used)
+                              (used-1 nil))))))
 
   (define prod-kind-syntax-p ((term t))
     :returns (ok booleanp)
-    :short "Recoginizer for prod-kind-syntax."
-    (prod-kind-syntax-p-helper term nil))
+    :short "Recognizer for prod-kind-syntax."
+    (prod-option-syntax-p-helper term nil)
+    ///
+    (more-returns
+     (ok (implies (and ok (consp term))
+                  (and (consp (cdr term))
+                       (implies (equal (car term) :constructor)
+                                (type-function-syntax-p (cadr term)))
+                       (implies (equal (car term) :destructors)
+                                (type-function-list-syntax-p (cadr term)))))
+         :name definition-of-prod-kind-syntax-p
+         :hints (("Goal"
+                  :in-theory (disable definition-of-prod-option-syntax-p-helper)
+                  :use ((:instance
+                         definition-of-prod-option-syntax-p-helper
+                         (used nil))))))
+     (ok (implies (and ok (consp term)
+                       (not (equal (car term) :constructor)))
+                  (equal (car term) :destructors))
+         :name option-of-prod-kind-syntax-p
+         :hints (("Goal"
+                  :in-theory (disable option-of-prod-option-syntax-p-helper)
+                  :use ((:instance
+                         option-of-prod-option-syntax-p-helper
+                         (used nil))))))
+     (ok (implies (and ok (consp term))
+                  (prod-kind-syntax-p (cddr term)))
+         :hints (("Goal"
+                  :expand (prod-option-syntax-p-helper term nil)))
+         :name monotonicity-of-prod-kind-syntax-p)))
 
   (easy-fix prod-kind-syntax nil)
-
-  (deflist prod-kind-syntax-list
-    :elt-type prod-kind-syntax-p
-    :true-listp t)
 
   ;; list-kind
   (define list-kind-syntax-p-helper ((term t) (used symbol-listp))
@@ -418,22 +705,18 @@
               "~p0 option is already defined in the hint.~%" first))
          (first-ok
           (case first
-            (:cons (symbolp second))
-            (:car (symbolp second))
-            (:cdr (symbolp second))
-            (:nil-fn (symbolp second))
-            (:elt-type (symbolp second))
-            (:theorems (hypothesis-lst-syntax-p second))
+            (:cons (prod-kind-syntax-p second))
+            (:nil (prod-kind-syntax-p second))
             (t (er hard? 'process=>list-kind-syntax-p-helper
                    "Smtlink-hint list-kind option doesn't include: ~p0.
-                       They are :cons, :car, :cdr :nil-fn, :elt-type and
-                       :theorems.~%" first)))))
+                       They are :cons, and :nil.~%"
+                   first)))))
       (and first-ok
            (list-kind-syntax-p-helper rest (cons first used)))))
 
   (define list-kind-syntax-p ((term t))
     :returns (ok booleanp)
-    :short "Recoginizer for list-kind-syntax."
+    :short "Recognizer for list-kind-syntax."
     (list-kind-syntax-p-helper term nil))
 
   (easy-fix list-kind-syntax nil)
@@ -451,15 +734,11 @@
               "~p0 option is already defined in the hint.~%" first))
          (first-ok
           (case first
-            (:some-constructor (symbolp second))
-            (:some-destructor (symbolp second))
-            (:nil-constructor (symbolp second))
-            (:some-type (symbolp second))
-            (:theorems (hypothesis-lst-syntax-p second))
+            (:some (prod-kind-syntax-p second))
+            (:none (prod-kind-syntax-p second))
             (t (er hard? 'process=>option-kind-syntax-p-helper
                    "Smtlink-hint option-kind option doesn't include: ~p0.
-                       They are :some-constructor, :some-destructor,
-                       :nil-constructor, :some-type, and :theorems.~%"
+                       They are :some, and :none.~%"
                    first)))))
       (and first-ok
            (option-kind-syntax-p-helper rest (cons first used)))))
@@ -472,10 +751,32 @@
   (easy-fix option-kind-syntax nil)
 
   ;; sum-kind
+  (define sum-kind-syntax-p-helper ((term t) (used symbol-listp))
+    :returns (ok booleanp)
+    :short "Helper function for sum-kind-syntax-p."
+    (b* ((used (symbol-list-fix used))
+         ((unless (consp term)) t)
+         ((unless (and (consp term) (consp (cdr term)))) nil)
+         ((list* first second rest) term)
+         ((if (member-equal first used))
+          (er hard? 'process=>sum-kind-syntax-p-helper
+              "~p0 option is already defined in the hint.~%" first))
+         (first-ok
+          (cond ((equal first :kind-fn) (symbolp second))
+                ((symbolp first) (prod-kind-syntax-p second))
+                (t (er hard? 'process=>sum-kind-syntax-p-helper
+                       "Smtlink-hint sum-kind option doesn't include: ~p0.
+                       They are :kind-fn, and tags.~%"
+                       first)))))
+      (and first-ok
+           (sum-kind-syntax-p-helper rest (cons first used)))))
+
   (define sum-kind-syntax-p ((term t))
     :returns (ok booleanp)
     :short "Recognizer for sum-kind-syntax."
-    (prod-kind-syntax-list-p term))
+    (sum-kind-syntax-p-helper term nil))
+
+  (easy-fix sum-kind-syntax nil)
 
   ;; kind syntax
   (define kind-syntax-p ((term t))
@@ -618,9 +919,6 @@
 
   (easy-fix type-option-syntax nil)
   )
-
-(defsection type-theorems-syntax
-  :parents (type-syntax))
 
 (defsection type-syntax
   :parents (Smtlink-process-user-hint)
@@ -907,6 +1205,87 @@
          (new-hint (change-smtlink-hint h :functions new-func-lst)))
       (merge-functions rest new-hint)))
 
+;; construct types
+(define construct-type-thm-options ((content type-thm-syntax-p)
+                                    (tt type-thm-p))
+  :returns (new-tt type-thm-p)
+  :measure (len content)
+  :hints (("Goal" :in-theory (enable type-thm-syntax-fix)))
+  (b* ((content (type-thm-syntax-fix content))
+       (tt (type-thm-fix tt))
+       ((unless (consp content)) tt)
+       ((list* first second rest) content)
+       (new-tt
+        (case first
+          (:name (change-type-thm tt :name second))
+          (:hints (change-type-thm tt :hints second)))))
+    (construct-type-thm-options rest new-tt)))
+
+(define construct-type-thm ((content type-thm-syntax-p))
+  :returns (new-tt type-thm-p)
+  (construct-type-thm-options content (make-type-thm)))
+
+(define construct-type-function-option-list ((content type-function-option-syntax-p)
+                                             (tf type-function-p))
+  :returns (new-tf type-function-p)
+  :measure (len content)
+  :hints (("Goal" :in-theory (enable type-function-option-syntax-fix)))
+  (b* ((content (type-function-option-syntax-fix content))
+       (tf (type-function-fix tf))
+       ((unless (consp content)) tf)
+       ((list* first second rest) content)
+       (new-tf
+        (case first
+          (:return-type (change-type-function tf :return-type second))
+          (:type-thm
+           (change-type-function tf
+                                 :type-of-function-thm
+                                 (construct-type-thm second)))
+          (:destructor-thm
+           (change-type-function tf
+                                 :destructor-of-constructor-thm
+                                 (construct-type-thm second))))))
+    (construct-type-function-option-list rest new-tf)))
+
+(define construct-type-function ((content type-function-syntax-p)
+                                 (acc symbol-listp))
+  :returns (mv (new-tf type-function-p)
+               (new-acc symbol-listp
+                        :hints (("Goal"
+                                 :in-theory (enable type-function-syntax-fix
+                                                    type-function-syntax-p)))))
+  :guard-hints (("Goal"
+                 :in-theory (enable type-function-syntax-p)))
+  (b* ((content (type-function-syntax-fix content))
+       (acc (symbol-list-fix acc))
+       ((cons name options) content)
+       ((if (member-equal name acc))
+        (mv (make-type-function)
+            (er hard? 'process=>construct-type-function
+                "Redefinition of function ~p0" name))))
+    (mv (construct-type-function-option-list
+         options
+         (make-type-function :name name))
+        (cons name acc))))
+
+(define construct-type-function-list ((content type-function-list-syntax-p)
+                                      (acc symbol-listp))
+  :returns (mv (new-lst type-function-list-p)
+               (new-acc symbol-listp))
+  :measure (len content)
+  :guard-hints (("Goal"
+                 :in-theory (enable type-function-syntax-p)))
+  (b* ((content (type-function-list-syntax-fix content))
+       (acc (symbol-list-fix acc))
+       ((unless (consp content)) (mv nil acc))
+       ((cons first rest) content)
+       ((mv first-fn new-acc)
+        (construct-type-function first acc))
+       ((mv rest-fn fin-acc)
+        (construct-type-function-list rest new-acc)))
+    (mv (cons first-fn rest-fn)
+        fin-acc)))
+
   (define construct-array-kind ((content array-kind-syntax-p)
                                 (smt-type-array smt-type-p))
     :returns (new-array smt-type-p)
@@ -916,46 +1295,89 @@
     (smt-type-fix smt-type-array))
 
   (define construct-prod-kind ((content prod-kind-syntax-p)
-                               (smt-type-prod smt-type-p))
-    :returns (new-prod smt-type-p)
-    :guard (equal (smt-type-kind smt-type-prod) :sum)
-    :irrelevant-formals-ok t
-    :ignore-ok t
-    (smt-type-fix smt-type-prod))
+                               (prod prod-p)
+                               (acc symbol-listp))
+    :returns (mv (new-prod prod-p)
+                 (new-acc symbol-listp))
+    :measure (len content)
+    :hints (("Goal"
+             :in-theory (enable prod-kind-syntax-fix)))
+    (b* ((content (prod-kind-syntax-fix content))
+         (acc (symbol-list-fix acc))
+         (prod (prod-fix prod))
+         ((unless (consp content)) (mv prod acc))
+         ((list* first second rest) content)
+         ((mv new-prod new-acc)
+          (case first
+            (:constructor
+             (b* (((mv constructor-fn new-acc)
+                   (construct-type-function second acc)))
+               (mv (change-prod prod :constructor constructor-fn)
+                   new-acc)))
+            (:destructors
+             (b* (((mv destructor-fns new-acc)
+                   (construct-type-function-list second acc)))
+               (mv (change-prod prod :destructors destructor-fns)
+                   new-acc)))
+            (t (mv prod acc)))))
+      (construct-prod-kind rest new-prod new-acc)))
 
+;; difference prods can have the functions of the same name!!!
   (define construct-sum-kind ((content sum-kind-syntax-p)
-                              (smt-type-sum smt-type-p))
-    :returns (new-sum smt-type-p)
+                              (smt-type-sum smt-type-p)
+                              (acc symbol-listp))
+    :returns (mv (new-sum smt-type-p)
+                 (new-acc symbol-listp))
     :guard (equal (smt-type-kind smt-type-sum) :sum)
+    ;; :measure (len content)
+    ;; :hints (("Goal"
+    ;;          :in-theory (enable prod-kind-syntax-fix)))
+    ;; (b* ((content (prod-kind-syntax-fix content))
+    ;;      (acc (symbol-list-fix acc))
+    ;;      (smt-type-sum (smt-type-fix smt-type-sum))
+    ;;      ((unless (consp content)) (mv smt-type-sum acc))
+    ;;      ((list* first second rest) content)
+    ;;      ((if (member-equal first acc))
+    ;;       (prog2$ (er hard? 'process=>construct-sum-kind
+    ;;                   "Redefining kind ~q0" first)
+    ;;               (mv (make-smt-type-abstract) nil)))
+    ;;      ((smt-type-sum s) smt-type-sum)
+    ;;      ((mv new-type new-acc)
+    ;;       (case first
+    ;;         (:kind-fn (mv (change-smt-type-sum s :kind-fn second)
+    ;;                       acc))
+    ;;         (t
+    ;;          (b* (((mv new-prod &)
+    ;;                (construct-prod-kind second (make-prod :kind first) nil)))
+    ;;            (mv (change-smt-type-sum s :prods (cons new-prod s.prods))
+    ;;                (cons first acc)))))))
+    ;;   (construct-sum-kind rest new-type new-acc))
     :irrelevant-formals-ok t
     :ignore-ok t
-    (smt-type-fix smt-type-sum))
+    (mv (smt-type-fix smt-type-sum)
+        nil)
+    )
 
 (define construct-list-kind ((content list-kind-syntax-p)
-                             (smt-type-list smt-type-p))
+                             (smt-type-list smt-type-p)
+                             (acc symbol-listp))
   :returns (new-list smt-type-p)
   :guard (equal (smt-type-kind smt-type-list) :sum)
-  :irrelevant-formals-ok t
-  :ignore-ok t
   ;; :measure (len content)
   ;; :hints (("Goal" :in-theory (enable list-kind-syntax-fix)))
+  :irrelevant-formals-ok t
+  :ignore-ok t
+  (smt-type-fix smt-type-list)
   ;; (b* ((content (list-kind-syntax-fix content))
   ;;      (smt-type-list (smt-type-fix smt-type-list))
   ;;      ((unless (consp content)) smt-type-list)
   ;;      ((list* first second rest) content)
-  ;;      (case first
-  ;;        (:cons)
-  ;;        (:car)
-  ;;        (:cdr)
-  ;;        (:nil-fn)
-  ;;        (:theorems (change-smt-function
-  ;;                    smt-func
-  ;;                    :more-returns (construct-hypothesis-list content))))
+  ;;      (new-type
+  ;;       (case first
+  ;;         (:cons)
+  ;;         (:nil))))
   ;;      )
-  ;;   ())
-  ;;  )
-
-  (smt-type-fix smt-type-list))
+  )
 
 (define construct-option-kind ((content option-kind-syntax-p)
                                (smt-type-option smt-type-p))
@@ -963,20 +1385,47 @@
   :guard (equal (smt-type-kind smt-type-option) :sum)
   :irrelevant-formals-ok t
   :ignore-ok t
+  ;; (b* ((content (option-kind-syntax-fix content))
+  ;;      ((unless (consp content)) prods-acc)
+  ;;      ((list* first second rest) content)
+  ;;      (new-type
+  ;;       (case first
+  ;;         (:some-constructor
+  ;;          (update-prods-acc 'some 'constructor
+  ;;                            (construct-type-function second)
+  ;;                            prods-acc))
+  ;;         (:some-destructor
+  ;;          (update-prods-acc 'some 'destructor
+  ;;                            (construct-type-function second)
+  ;;                            prods-acc))
+  ;;         (:nil-constructor
+  ;;          (update-prods-acc 'none 'destructor
+  ;;                            (construct-type-function second)
+  ;;                            prods-acc)))))
+  ;;   (construct-option-kind rest new-type))
   (smt-type-fix smt-type-option))
 
   (define construct-kind ((content kind-syntax-p))
     :returns (new-kind smt-type-p)
-    :guard-debug t
     (b* ((content (kind-syntax-fix content))
          ((cons kind options) content))
       (case kind
-        (:abstract (make-smt-type-abstract))
-        (:array (construct-array-kind options (make-smt-type-array)))
-        (:prod (construct-prod-kind options (make-smt-type-sum)))
-        (:sum (construct-sum-kind options (make-smt-type-sum)))
-        (:list (construct-list-kind options (make-smt-type-sum)))
-        (:option (construct-option-kind options (make-smt-type-sum))))))
+       (:abstract (make-smt-type-abstract))
+       (:array
+        (construct-array-kind options (make-smt-type-array)))
+       (:prod
+        (b* (((mv new-prod &)
+              (construct-prod-kind options (make-prod) nil)))
+          (make-smt-type-sum :kind-fn nil
+                             :prods (list new-prod))))
+       (:sum
+        (b* (((mv new-type &)
+              (construct-sum-kind options (make-smt-type-sum) nil)))
+          new-type))
+       (:list
+        (construct-list-kind options (make-smt-type-sum) nil))
+       (:option
+        (construct-option-kind options (make-smt-type-sum))))))
 
   (define construct-type-option-lst ((type-opt-lst type-option-syntax-p)
                                      (smt-type smt-fixtype-p))

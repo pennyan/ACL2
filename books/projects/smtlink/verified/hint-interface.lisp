@@ -95,6 +95,11 @@
     :elt-type prod-p
     :true-listp t)
 
+(defalist symbol-prod-alist
+  :key-type symbolp
+  :val-type prod-p
+  :true-listp t)
+
   (deftagsum smt-type
     (:abstract ())
     (:array ((store type-function-p :default (make-type-function))
