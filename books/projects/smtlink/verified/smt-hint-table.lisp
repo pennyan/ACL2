@@ -63,3 +63,15 @@
            default-hint
            :types (cons ,type (smtlink-hint->types default-hint)))))
       (value `(table smt-hint-table ',,name ',new-hint)))))
+
+(define clear-type ((hintname symbolp)
+                    (world plist-worldp))
+  :returns (hint smtlink-hint-p)
+  (b* ((tb (get-smt-hint-table world))
+       (the-hint-cons (assoc-equal hintname tb))
+       ((unless (consp the-hint-cons))
+        (prog2$ (er hard? 'hint-interface=>get-smtlink-hint
+                    "Can't find the hint from smt-hint-table: ~p0. See the
+                     table using (get-smt-hint-table world)~%" hintname)
+                (make-smtlink-hint))))
+    (change-smtlink-hint (cdr the-hint-cons) :types nil)))

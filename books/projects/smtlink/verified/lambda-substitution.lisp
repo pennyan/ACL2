@@ -18,6 +18,7 @@
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 ;; Meta-extract stuff
 (include-book "clause-processors/just-expand" :dir :system)
+(include-book "tools/defevaluator-fast" :dir :system)
 
 ;; Include SMT books
 (include-book "hint-interface")
