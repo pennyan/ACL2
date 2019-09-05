@@ -223,6 +223,5 @@
        (destructor-of-constructors
         (precond-prod-destructor-of-constructors p.constructor p.destructors
                                                  hypo var-lst
-                                                 type-of-destructors state))
-       (- (cw "preconds: ~q0" destructor-of-constructors)))
+                                                 type-of-destructors state)))
     destructor-of-constructors))

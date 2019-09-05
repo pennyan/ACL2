@@ -372,32 +372,68 @@ finds out @('integerp') is not a supported function.</p>
          (y (ifix y)))
       (+ (* x x) (* y y)))))
 
-(deflist integer-list
-  :elt-type integerp
-  :true-listp t)
+(include-book "centaur/fty/baselists" :dir :system)
 
-(defun integer-list-cons (x l)
-  (cons x l))
-(defun integer-list-car (l)
-  (ifix (car l)))
-(defun integer-list-cdr (l)
-  (cdr l))
-(defun integer-list-nil ()
-  nil)
-(defthm integer-list-fix-when-integer-list-p
-  (implies (integer-list-p x)
-           (equal (integer-list-fix x) x)))
+(local (in-theory (enable acl2::integer-list-fix)))
+
+(define integer-list-cons ((x integerp)
+                           (l integer-listp))
+  :returns (nl integer-listp)
+  (b* ((x (ifix x))
+       (l (acl2::integer-list-fix l)))
+    (cons x l)))
+
+(define integer-list-car ((l integer-listp))
+  :returns (x integerp)
+  (b* ((l (acl2::integer-list-fix l)))
+    (ifix (car l))))
+
+(define integer-list-cdr ((l integer-listp))
+  :returns (nl integer-listp)
+  (b* ((l (acl2::integer-list-fix l)))
+    (cdr l)))
+
+(define integer-list-nil ()
+  :returns (nl integer-listp)
+  (acl2::integer-list-fix nil))
+
+(defthm integer-list-fix-when-integer-listp
+  (implies (integer-listp x)
+           (equal (acl2::integer-list-fix x) x)))
 
 (defsmtlist integer-list
-  :rec integer-list-p
-  :fix integer-list-fix
-  :fix-thm integer-list-fix-when-integer-list-p
+  :rec integer-listp
+  :fix acl2::integer-list-fix
+  :fix-thm integer-list-fix-when-integer-listp
   :cons integer-list-cons
   :car integer-list-car
   :cdr integer-list-cdr
   :nil-fn integer-list-nil
   :elt-type integerp
   )
+
+(defthm fty-deflist-theorem
+  (implies (and (integer-listp l)
+                (not (equal l nil))
+                (not (equal (cdr l) nil)))
+           (>= (x^2+y^2-integer (car l)
+                                (cadr l))
+               0))
+  :hints(("Goal"
+          :smtlink
+          (:functions ((x^2+y^2-integer :formals ((x integerp)
+                                                  (y integerp))
+                                        :returns ((f integerp
+                                                     :name
+                                                     integerp-of-x^2+y^2-integer))
+                                        :expansion-depth 1)) )))
+  :rule-classes nil)
+
+stop
+
+(local (in-theory (enable integer-list-fix integer-list-cdr
+                          integer-list-cons integer-list-car
+                          integer-list-nil)))
 
 (def-saved-event fty-deflist-theorem-example
   (defthm fty-deflist-theorem
@@ -590,7 +626,6 @@ finds out @('integerp') is not a supported function.</p>
                                         :expansion-depth 1)))))
   :rule-classes nil)
 
-stop
 (def-saved-event symbol-integer-example
   (defalist symbol-integer-alist
     :key-type symbolp
