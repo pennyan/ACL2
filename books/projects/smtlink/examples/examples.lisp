@@ -18,351 +18,351 @@
 (value-triple (tshell-ensure))
 (add-default-hints '((SMT::SMT-computed-hint clause)))
 
-;; Example 1
-(def-saved-event x^2-y^2
-  (define x^2-y^2 ((x real/rationalp)
-                   (y real/rationalp))
-    :returns (f real/rationalp)
-    (b* ((x (realfix x))
-         (y (realfix y)))
-      (- (* x x) (* y y)))))
+;; ;; Example 1
+;; (def-saved-event x^2-y^2
+;;   (define x^2-y^2 ((x real/rationalp)
+;;                    (y real/rationalp))
+;;     :returns (f real/rationalp)
+;;     (b* ((x (realfix x))
+;;          (y (realfix y)))
+;;       (- (* x x) (* y y)))))
 
-(def-saved-event x^2+y^2
-  (define x^2+y^2 ((x real/rationalp)
-                   (y real/rationalp))
-    :returns (f real/rationalp)
-    (b* ((x (realfix x))
-         (y (realfix y)))
-      (+ (* x x) (* y y)))))
+;; (def-saved-event x^2+y^2
+;;   (define x^2+y^2 ((x real/rationalp)
+;;                    (y real/rationalp))
+;;     :returns (f real/rationalp)
+;;     (b* ((x (realfix x))
+;;          (y (realfix y)))
+;;       (+ (* x x) (* y y)))))
 
-(def-saved-event poly-ineq
-  (defthm poly-ineq-example
-    (implies (and (real/rationalp x) (real/rationalp y)
-                  (<= (+ (* (/ 9 8) x x) (* y y)) 1)
-                  (<=  (x^2-y^2 x y) 1))
-             (< y (- (* 3 (- x (/ 17 8)) (- x (/ 17 8))) 3)))
-    :hints(("Goal"
-            :smtlink
-            (:functions ((x^2-y^2 :formals ((x real/rationalp)
-                                            (y real/rationalp))
-                                  :returns ((f real/rationalp
-                                               :name real/rationalp-of-x^2-y^2))
-                                  :expansion-depth 1))))))
-  )
+;; (def-saved-event poly-ineq
+;;   (defthm poly-ineq-example
+;;     (implies (and (real/rationalp x) (real/rationalp y)
+;;                   (<= (+ (* (/ 9 8) x x) (* y y)) 1)
+;;                   (<=  (x^2-y^2 x y) 1))
+;;              (< y (- (* 3 (- x (/ 17 8)) (- x (/ 17 8))) 3)))
+;;     :hints(("Goal"
+;;             :smtlink
+;;             (:functions ((x^2-y^2 :formals ((x real/rationalp)
+;;                                             (y real/rationalp))
+;;                                   :returns ((f real/rationalp
+;;                                                :name real/rationalp-of-x^2-y^2))
+;;                                   :expansion-depth 1))))))
+;;   )
 
-(deftutorial Example-1
-  :parents (Tutorial)
-  :short "Example 1: the basics"
-  :long "<h3>Example 1</h3>
-<p>Prerequisite read for this tutorial example is @(tsee tutorial).</p>
-<p>The first example is a basic polynomial inequality.  Let's say we want to
-prove below theorem:</p>
+;; (deftutorial Example-1
+;;   :parents (Tutorial)
+;;   :short "Example 1: the basics"
+;;   :long "<h3>Example 1</h3>
+;; <p>Prerequisite read for this tutorial example is @(tsee tutorial).</p>
+;; <p>The first example is a basic polynomial inequality.  Let's say we want to
+;; prove below theorem:</p>
 
-<box>
-<p>
-<b><color rgb='#323cbe'>Theorem 1.</color></b>
-@($\\forall x\\in R$) and @($\\forall y \\in R$), if @($ \\frac{9x^2}{8}+y^2 \\le 1$) and
-@($ x^2-y^2 \\le 1$), then @($ y < 3(x-\\frac{17}{8})^2 - 3$).
-</p>
-</box>
+;; <box>
+;; <p>
+;; <b><color rgb='#323cbe'>Theorem 1.</color></b>
+;; @($\\forall x\\in R$) and @($\\forall y \\in R$), if @($ \\frac{9x^2}{8}+y^2 \\le 1$) and
+;; @($ x^2-y^2 \\le 1$), then @($ y < 3(x-\\frac{17}{8})^2 - 3$).
+;; </p>
+;; </box>
 
-<p>Suppose we've defined a function called @('x^2-y^2') like below:</p>
+;; <p>Suppose we've defined a function called @('x^2-y^2') like below:</p>
 
-@(`(:code ($ x^2-y^2))`)
+;; @(`(:code ($ x^2-y^2))`)
 
-<p>We define our theorem as:</p>
+;; <p>We define our theorem as:</p>
 
-@(`(:code ($ poly-ineq))`)
+;; @(`(:code ($ poly-ineq))`)
 
-<p>Smtlink should just prove this inequality without any problem.</p>
-<p>Like is shown in the example, @(':smtlink') can be provided as a hint in the
-standard @(see acl2::hints) in ACL2.  In the most basic cases where Smtlink
-handles everything, no @(see smt-hint) are required to be provided, Hence
-@(':smtlink nil').</p>
+;; <p>Smtlink should just prove this inequality without any problem.</p>
+;; <p>Like is shown in the example, @(':smtlink') can be provided as a hint in the
+;; standard @(see acl2::hints) in ACL2.  In the most basic cases where Smtlink
+;; handles everything, no @(see smt-hint) are required to be provided, Hence
+;; @(':smtlink nil').</p>
 
-<p>The output of this defthm should look similar to:</p>
+;; <p>The output of this defthm should look similar to:</p>
 
-@({
-Using clause-processor Smtlink
-Goal'
-Goal''
-SMT-goal-generator=>Expanding ... X^2-Y^2
-Subgoal 2
-Subgoal 2.2
-Subgoal 2.2'
-Using default SMT-trusted-cp...
-; SMT solver: `/usr/bin/env python /tmp/py_file/smtlink.w59zR`: 0.52 sec, 7,904 bytes
-Proved!
-Subgoal 2.2''
-Subgoal 2.1
-Subgoal 2.1'
-Subgoal 1
-Subgoal 1'
+;; @({
+;; Using clause-processor Smtlink
+;; Goal'
+;; Goal''
+;; SMT-goal-generator=>Expanding ... X^2-Y^2
+;; Subgoal 2
+;; Subgoal 2.2
+;; Subgoal 2.2'
+;; Using default SMT-trusted-cp...
+;; ; SMT solver: `/usr/bin/env python /tmp/py_file/smtlink.w59zR`: 0.52 sec, 7,904 bytes
+;; Proved!
+;; Subgoal 2.2''
+;; Subgoal 2.1
+;; Subgoal 2.1'
+;; Subgoal 1
+;; Subgoal 1'
 
-Summary
-Form:  ( DEFTHM POLY-INEQ-EXAMPLE ...)
-Rules: ((:DEFINITION HIDE)
-        (:DEFINITION HINT-PLEASE)
-        (:DEFINITION NOT)
-        (:DEFINITION TYPE-HYP)
-        (:DEFINITION X^2-Y^2)
-        (:EXECUTABLE-COUNTERPART BINARY-*)
-        (:EXECUTABLE-COUNTERPART ACL2::BOOLEAN-LIST-FIX$INLINE)
-        (:EXECUTABLE-COUNTERPART CAR)
-        (:EXECUTABLE-COUNTERPART CDR)
-        (:EXECUTABLE-COUNTERPART CONS)
-        (:EXECUTABLE-COUNTERPART CONSP)
-        (:EXECUTABLE-COUNTERPART UNARY--)
-        (:EXECUTABLE-COUNTERPART UNARY-/)
-        (:FAKE-RUNE-FOR-TYPE-SET NIL)
-        (:REWRITE ASSOCIATIVITY-OF-+)
-        (:REWRITE ACL2::COMMUTATIVITY-2-OF-+)
-        (:REWRITE COMMUTATIVITY-OF-*)
-        (:REWRITE COMMUTATIVITY-OF-+)
-        (:REWRITE DISTRIBUTIVITY)
-        (:TYPE-PRESCRIPTION NONNEGATIVE-PRODUCT))
-Hint-events: ((:CLAUSE-PROCESSOR ADD-HYPO-CP)
-              (:CLAUSE-PROCESSOR EXPAND-CP-FN)
-              (:CLAUSE-PROCESSOR PROCESS-HINT)
-              (:CLAUSE-PROCESSOR SMT-TRUSTED-CP)
-              (:CLAUSE-PROCESSOR TYPE-EXTRACT-FN)
-              (:CLAUSE-PROCESSOR UNINTERPRETED-FN-CP))
-Time:  0.60 seconds (prove: 0.60, print: 0.00, other: 0.00)
-Prover steps counted:  1440
-POLY-INEQ-EXAMPLE
+;; Summary
+;; Form:  ( DEFTHM POLY-INEQ-EXAMPLE ...)
+;; Rules: ((:DEFINITION HIDE)
+;;         (:DEFINITION HINT-PLEASE)
+;;         (:DEFINITION NOT)
+;;         (:DEFINITION TYPE-HYP)
+;;         (:DEFINITION X^2-Y^2)
+;;         (:EXECUTABLE-COUNTERPART BINARY-*)
+;;         (:EXECUTABLE-COUNTERPART ACL2::BOOLEAN-LIST-FIX$INLINE)
+;;         (:EXECUTABLE-COUNTERPART CAR)
+;;         (:EXECUTABLE-COUNTERPART CDR)
+;;         (:EXECUTABLE-COUNTERPART CONS)
+;;         (:EXECUTABLE-COUNTERPART CONSP)
+;;         (:EXECUTABLE-COUNTERPART UNARY--)
+;;         (:EXECUTABLE-COUNTERPART UNARY-/)
+;;         (:FAKE-RUNE-FOR-TYPE-SET NIL)
+;;         (:REWRITE ASSOCIATIVITY-OF-+)
+;;         (:REWRITE ACL2::COMMUTATIVITY-2-OF-+)
+;;         (:REWRITE COMMUTATIVITY-OF-*)
+;;         (:REWRITE COMMUTATIVITY-OF-+)
+;;         (:REWRITE DISTRIBUTIVITY)
+;;         (:TYPE-PRESCRIPTION NONNEGATIVE-PRODUCT))
+;; Hint-events: ((:CLAUSE-PROCESSOR ADD-HYPO-CP)
+;;               (:CLAUSE-PROCESSOR EXPAND-CP-FN)
+;;               (:CLAUSE-PROCESSOR PROCESS-HINT)
+;;               (:CLAUSE-PROCESSOR SMT-TRUSTED-CP)
+;;               (:CLAUSE-PROCESSOR TYPE-EXTRACT-FN)
+;;               (:CLAUSE-PROCESSOR UNINTERPRETED-FN-CP))
+;; Time:  0.60 seconds (prove: 0.60, print: 0.00, other: 0.00)
+;; Prover steps counted:  1440
+;; POLY-INEQ-EXAMPLE
 
-})
+;; })
 
-<p>Smtlink is a sequence of clause processors controlled by a computed hint.
-Calling smtlink from the @(':hints') put the theorem clause though a clause
-processor looking for syntax errors in the @(see smt-hint).  If nothing wrong,
-it will generate a term to be recognized by the computed-hint
-@('SMT::SMT-computed-hint').  The computed-hint then installs the next-to-be
-clause processor to work on the clause.  The next is the verified clause
-processor for adding hypotheses. After that is the verified clause processor
-for function expansion.</p>
+;; <p>Smtlink is a sequence of clause processors controlled by a computed hint.
+;; Calling smtlink from the @(':hints') put the theorem clause though a clause
+;; processor looking for syntax errors in the @(see smt-hint).  If nothing wrong,
+;; it will generate a term to be recognized by the computed-hint
+;; @('SMT::SMT-computed-hint').  The computed-hint then installs the next-to-be
+;; clause processor to work on the clause.  The next is the verified clause
+;; processor for adding hypotheses. After that is the verified clause processor
+;; for function expansion.</p>
 
-<p>@('SMT-goal-generator=>Expanding ... X^2-Y^2') shows function expansion is
-being conducted. </p>
+;; <p>@('SMT-goal-generator=>Expanding ... X^2-Y^2') shows function expansion is
+;; being conducted. </p>
 
-<p>In this example, several subgoals are generated as a result of this clause
-processor.  The first subgoal is the goal to be sent to the trusted clause
-processor that transliterates the term into the corresponding SMT form and
-writes it out to a file.  An SMT solver is called upon the file and results are
-read back into ACL2.  Below are the outputs from this clause processor called
-@('SMT-trusted-cp').
-</p>
+;; <p>In this example, several subgoals are generated as a result of this clause
+;; processor.  The first subgoal is the goal to be sent to the trusted clause
+;; processor that transliterates the term into the corresponding SMT form and
+;; writes it out to a file.  An SMT solver is called upon the file and results are
+;; read back into ACL2.  Below are the outputs from this clause processor called
+;; @('SMT-trusted-cp').
+;; </p>
 
-@({
-Using default SMT-trusted-cp...
-; SMT solver: `/usr/bin/env python /tmp/py_file/smtlink.w59zR`: 0.52 sec, 7,904 bytes
-Proved!
-})
+;; @({
+;; Using default SMT-trusted-cp...
+;; ; SMT solver: `/usr/bin/env python /tmp/py_file/smtlink.w59zR`: 0.52 sec, 7,904 bytes
+;; Proved!
+;; })
 
-<p>The second line tells the user what command is run to execute the SMT
-solving.  \"Proved!\" indicates the SMT solver has successfully proved the
-theorem.  When a theorem failed, a possible counter-example might be
-provided in the form:</p>
-@({
-Possible counter-example found: ((X ...) (Y ...))
-One can access it through global variable SMT-cex by doing (@ SMT-
-cex).
-})
+;; <p>The second line tells the user what command is run to execute the SMT
+;; solving.  \"Proved!\" indicates the SMT solver has successfully proved the
+;; theorem.  When a theorem failed, a possible counter-example might be
+;; provided in the form:</p>
+;; @({
+;; Possible counter-example found: ((X ...) (Y ...))
+;; One can access it through global variable SMT-cex by doing (@ SMT-
+;; cex).
+;; })
 
-<p>Other subgoals are auxiliary clauses generated by the verified
-clause-processors. They help ensure the soundness of Smtlink.</p>
-")
+;; <p>Other subgoals are auxiliary clauses generated by the verified
+;; clause-processors. They help ensure the soundness of Smtlink.</p>
+;; ")
 
-(def-saved-event smtconf-expt-tutorial
-  (defun my-smtlink-expt-config ()
-    (declare (xargs :guard t))
-    (change-smtlink-config (default-smt-cnf)
-                           :smt-module    "RewriteExpt"
-                           :smt-class     "to_smt_w_expt"
-                           :smt-cmd       "/usr/bin/env python"
-                           :pythonpath    "")))
+;; (def-saved-event smtconf-expt-tutorial
+;;   (defun my-smtlink-expt-config ()
+;;     (declare (xargs :guard t))
+;;     (change-smtlink-config (default-smt-cnf)
+;;                            :smt-module    "RewriteExpt"
+;;                            :smt-class     "to_smt_w_expt"
+;;                            :smt-cmd       "/usr/bin/env python"
+;;                            :pythonpath    "")))
 
-(def-saved-event smtconf-expt-defattach-tutorial
-  (defattach custom-smt-cnf my-smtlink-expt-config))
+;; (def-saved-event smtconf-expt-defattach-tutorial
+;;   (defattach custom-smt-cnf my-smtlink-expt-config))
 
-;; Example 2
-(def-saved-event poly-of-expt-example
-  (encapsulate ()
-    (local (include-book "arithmetic-5/top" :dir :system))
+;; ;; Example 2
+;; (def-saved-event poly-of-expt-example
+;;   (encapsulate ()
+;;     (local (include-book "arithmetic-5/top" :dir :system))
 
-    (define expt-rationalp ((r real/rationalp)
-                            (i integerp))
-      :returns (ex real/rationalp)
-      :guard (>= i 0)
-      (b* ((r (realfix r))
-           (i (ifix i)))
-        (expt r i)))
+;;     (define expt-rationalp ((r real/rationalp)
+;;                             (i integerp))
+;;       :returns (ex real/rationalp)
+;;       :guard (>= i 0)
+;;       (b* ((r (realfix r))
+;;            (i (ifix i)))
+;;         (expt r i)))
 
-    (defthm poly-of-expt-example
-      (implies (and (real/rationalp x) (real/rationalp y) (real/rationalp z)
-                    (integerp m) (integerp n)
-                    (< 0 z) (< z 1) (< 0 m) (< m n))
-               (<= (* 2 (expt-rationalp z n) x y)
-                   (* (expt-rationalp z m) (x^2+y^2 x y))))
-      :hints (("Goal"
-               :smtlink-custom (:functions ((expt-rationalp
-                                             :formals ((r real/rationalp)
-                                                       (i real/rationalp))
-                                             :returns ((ex real/rationalp
-                                                           :name
-                                                           real/rationalp-of-expt-rationalp))
-                                             :expansion-depth 0)
-                                            (x^2+y^2 :formals ((x real/rationalp)
-                                                               (y real/rationalp))
-                                                     :returns ((f
-                                                                real/rationalp
-                                                                :name
-                                                                real/rationalp-of-x^2+y^2))
-                                                     :expansion-depth 1))
-                                           :hypotheses (((< (expt-rationalp z n)
-                                                            (expt-rationalp z m))
-                                                         :hints (:in-theory
-                                                                 (enable
-                                                                  expt-rationalp))))
-                                           ;; We can prove this theorem using
-                                           ;; purely smtlink by enabling below
-                                           ;; two hypotheses.
-                                           ;;              ((< 0 (expt-rationalp z m))
-                                           ;;               :hints (:in-theory
-                                           ;;                       (enable expt-rationalp)))
-                                           ;;              ((< 0 (expt-rationalp z n))
-                                           ;;               :hints (:in-theory
-                                           ;;                       (enable expt-rationalp))))
-                                           :int-to-rat t)
-               )))))
+;;     (defthm poly-of-expt-example
+;;       (implies (and (real/rationalp x) (real/rationalp y) (real/rationalp z)
+;;                     (integerp m) (integerp n)
+;;                     (< 0 z) (< z 1) (< 0 m) (< m n))
+;;                (<= (* 2 (expt-rationalp z n) x y)
+;;                    (* (expt-rationalp z m) (x^2+y^2 x y))))
+;;       :hints (("Goal"
+;;                :smtlink-custom (:functions ((expt-rationalp
+;;                                              :formals ((r real/rationalp)
+;;                                                        (i real/rationalp))
+;;                                              :returns ((ex real/rationalp
+;;                                                            :name
+;;                                                            real/rationalp-of-expt-rationalp))
+;;                                              :expansion-depth 0)
+;;                                             (x^2+y^2 :formals ((x real/rationalp)
+;;                                                                (y real/rationalp))
+;;                                                      :returns ((f
+;;                                                                 real/rationalp
+;;                                                                 :name
+;;                                                                 real/rationalp-of-x^2+y^2))
+;;                                                      :expansion-depth 1))
+;;                                            :hypotheses (((< (expt-rationalp z n)
+;;                                                             (expt-rationalp z m))
+;;                                                          :hints (:in-theory
+;;                                                                  (enable
+;;                                                                   expt-rationalp))))
+;;                                            ;; We can prove this theorem using
+;;                                            ;; purely smtlink by enabling below
+;;                                            ;; two hypotheses.
+;;                                            ;;              ((< 0 (expt-rationalp z m))
+;;                                            ;;               :hints (:in-theory
+;;                                            ;;                       (enable expt-rationalp)))
+;;                                            ;;              ((< 0 (expt-rationalp z n))
+;;                                            ;;               :hints (:in-theory
+;;                                            ;;                       (enable expt-rationalp))))
+;;                                            :int-to-rat t)
+;;                )))))
 
-(deftutorial Example-2
-  :parents (Tutorial)
-  :short "Example 2: something wild"
-  :long "<h3>Example 2</h3>
-<p>Prerequisite read for this tutorial example is @(tsee tutorial).</p>
-<p>Smtlink is extensible, with the user's understanding that the extended part
-is not verified and therefore is the user's responsibility to ensure its
-soundness.  A different trust tag is installed if this customized Smtlink is
-used.  Such ability makes Smtlink very powerful.  Here's an example to show the
-usage.</p>
-<p>Let's say we want to prove the theorem:</p>
+;; (deftutorial Example-2
+;;   :parents (Tutorial)
+;;   :short "Example 2: something wild"
+;;   :long "<h3>Example 2</h3>
+;; <p>Prerequisite read for this tutorial example is @(tsee tutorial).</p>
+;; <p>Smtlink is extensible, with the user's understanding that the extended part
+;; is not verified and therefore is the user's responsibility to ensure its
+;; soundness.  A different trust tag is installed if this customized Smtlink is
+;; used.  Such ability makes Smtlink very powerful.  Here's an example to show the
+;; usage.</p>
+;; <p>Let's say we want to prove the theorem:</p>
 
-<box>
-<p>
-<b><color rgb='#323cbe'>Theorem 2.</color></b>
-@($\\forall x,y,z\\in R$), and @($\\forall m,n \\in Z$), if @($ 0 \\le z \\le 1$) and
-@($ 0 \\le m \\le n $), then @($ 2xy\\cdot z^n \\le (x^2+y^2)z^m$).
-</p>
-</box>
+;; <box>
+;; <p>
+;; <b><color rgb='#323cbe'>Theorem 2.</color></b>
+;; @($\\forall x,y,z\\in R$), and @($\\forall m,n \\in Z$), if @($ 0 \\le z \\le 1$) and
+;; @($ 0 \\le m \\le n $), then @($ 2xy\\cdot z^n \\le (x^2+y^2)z^m$).
+;; </p>
+;; </box>
 
-<p>In @('smtlink/z3_interface/'), file @('RewriteExpt.py') is a Python class
-extending from the default class in ACL2_to_Z3.py.  One could imaging defining
-one's own file that does magical things in the SMT solver.  What
-@('RewriteExpt.py') does is that it uses basic rewrite lemmas about @('expt')
-to help the SMT solver to solve.  In order to make Smtlink uses the custom
-version instead of the default, one needs to define and attach a new
-configuration:</p>
+;; <p>In @('smtlink/z3_interface/'), file @('RewriteExpt.py') is a Python class
+;; extending from the default class in ACL2_to_Z3.py.  One could imaging defining
+;; one's own file that does magical things in the SMT solver.  What
+;; @('RewriteExpt.py') does is that it uses basic rewrite lemmas about @('expt')
+;; to help the SMT solver to solve.  In order to make Smtlink uses the custom
+;; version instead of the default, one needs to define and attach a new
+;; configuration:</p>
 
-@(`(:code ($ smtconf-expt-tutorial))`)
-@(`(:code ($ smtconf-expt-defattach-tutorial))`)
+;; @(`(:code ($ smtconf-expt-tutorial))`)
+;; @(`(:code ($ smtconf-expt-defattach-tutorial))`)
 
-<p>Defining the function @('x^2+y^2')</p>
-@(`(:code ($ ||x^2+y^2||))`)
+;; <p>Defining the function @('x^2+y^2')</p>
+;; @(`(:code ($ ||x^2+y^2||))`)
 
-<p>Then define the theorem to prove:</p>
-@(`(:code ($ poly-of-expt-example))`)
+;; <p>Then define the theorem to prove:</p>
+;; @(`(:code ($ poly-of-expt-example))`)
 
-<p>Notice the @(':hints') keyword used this time is @(':smtlink-custom').  It
-allows the customized version of Smtlink to be applied to the current
-clause.  Take a read in @(see smt-hint) for a detailed description of each
-keyword.  Here we will only describe what's used in this example.</p>
+;; <p>Notice the @(':hints') keyword used this time is @(':smtlink-custom').  It
+;; allows the customized version of Smtlink to be applied to the current
+;; clause.  Take a read in @(see smt-hint) for a detailed description of each
+;; keyword.  Here we will only describe what's used in this example.</p>
 
-<p>In the hints, @(':function') tells Smtlink to treat @('expt') as an
-uninterpreted function.  @(':formals') tells us the input argument types of the
-uninterpreted function and @(':returns') tells us the output argument type.
-@(':levels') specifies an expansion level of 0, making the function an
-uninterpreted function.</p>
+;; <p>In the hints, @(':function') tells Smtlink to treat @('expt') as an
+;; uninterpreted function.  @(':formals') tells us the input argument types of the
+;; uninterpreted function and @(':returns') tells us the output argument type.
+;; @(':levels') specifies an expansion level of 0, making the function an
+;; uninterpreted function.</p>
 
-<p>@(':hypotheses') provides a list of hypotheses that the user believes to be
-true and can help with the proof. The hypotheses will be insert into the
-hypotheses when generating the SMT problem. They will be proved correctness
-as part of the returned clauses from the verified clause processor. </p>
+;; <p>@(':hypotheses') provides a list of hypotheses that the user believes to be
+;; true and can help with the proof. The hypotheses will be insert into the
+;; hypotheses when generating the SMT problem. They will be proved correctness
+;; as part of the returned clauses from the verified clause processor. </p>
 
-<p>@(':int-to-rat') tells Smtlink to raise integers to rationals when
-translating the clause into a SMT problem. This is because of the limitation in
-Z3. Integers mixed with real numbers are hard for Z3. We prove the given
-theorem by proving a more general statement in the SMT solver.</p>
+;; <p>@(':int-to-rat') tells Smtlink to raise integers to rationals when
+;; translating the clause into a SMT problem. This is because of the limitation in
+;; Z3. Integers mixed with real numbers are hard for Z3. We prove the given
+;; theorem by proving a more general statement in the SMT solver.</p>
 
-<p>Another observation is that, we are including the arithmetic-5 book for
-proving the returned auxiliary clauses, which requires arithmetic
-reasoning.</p>
-")
+;; <p>Another observation is that, we are including the arithmetic-5 book for
+;; proving the returned auxiliary clauses, which requires arithmetic
+;; reasoning.</p>
+;; ")
 
-;; Buggy example
-(def-saved-event non-theorem-example
-  (acl2::must-fail
-   (defthm non-theorem
-     (implies (and (real/rationalp x)
-                   (real/rationalp y)
-                   (integerp (/ x y)))
-              (not (equal y 0)))
-     :hints(("Goal"
-             :smtlink nil))
-     :rule-classes nil)))
+;; ;; Buggy example
+;; (def-saved-event non-theorem-example
+;;   (acl2::must-fail
+;;    (defthm non-theorem
+;;      (implies (and (real/rationalp x)
+;;                    (real/rationalp y)
+;;                    (integerp (/ x y)))
+;;               (not (equal y 0)))
+;;      :hints(("Goal"
+;;              :smtlink nil))
+;;      :rule-classes nil)))
 
-(deftutorial Example-3
-  :parents (Tutorial)
-  :short "Example 3: defense against evil"
-  :long "<h3>Example 3</h3>
-<p>Prerequisite read for this tutorial example is @(tsee tutorial).</p>
-<p>The third evil example is from one of the reviews we get when we first
-published our paper in @(see Smtlink). </p>
+;; (deftutorial Example-3
+;;   :parents (Tutorial)
+;;   :short "Example 3: defense against evil"
+;;   :long "<h3>Example 3</h3>
+;; <p>Prerequisite read for this tutorial example is @(tsee tutorial).</p>
+;; <p>The third evil example is from one of the reviews we get when we first
+;; published our paper in @(see Smtlink). </p>
 
-@(`(:code ($ non-theorem-example))`)
+;; @(`(:code ($ non-theorem-example))`)
 
-<p>This is an evil theorem because we know below is a theorem in ACL2:</p>
+;; <p>This is an evil theorem because we know below is a theorem in ACL2:</p>
 
-@({
-(thm (equal (/ x 0) 0))
-})
+;; @({
+;; (thm (equal (/ x 0) 0))
+;; })
 
-<p>Therefore if Smtlink falsely prove @('non-theorem'), it will introduce
-contradiction into ACL2.</p>
+;; <p>Therefore if Smtlink falsely prove @('non-theorem'), it will introduce
+;; contradiction into ACL2.</p>
 
-<p>Smtlink fails to prove the @('non-theorem') with error message:</p>
+;; <p>Smtlink fails to prove the @('non-theorem') with error message:</p>
 
-@({
-HARD ACL2 ERROR in SMT-TRANSLATOR=>TRANSLATE-FUNCTION:  Not a basic
-SMT function: INTEGERP
-})
+;; @({
+;; HARD ACL2 ERROR in SMT-TRANSLATOR=>TRANSLATE-FUNCTION:  Not a basic
+;; SMT function: INTEGERP
+;; })
 
-<p>This is because ACL2 treats @('integerp')'s as type declarations in Z3.  But
-here in this theorem, @('(integerp (/ x y))') is a constraint/hypotheses rather
-than a type declaration. When ACL2 tried to translate it as a constraint, it
-finds out @('integerp') is not a supported function.</p>
-")
+;; <p>This is because ACL2 treats @('integerp')'s as type declarations in Z3.  But
+;; here in this theorem, @('(integerp (/ x y))') is a constraint/hypotheses rather
+;; than a type declaration. When ACL2 tried to translate it as a constraint, it
+;; finds out @('integerp') is not a supported function.</p>
+;; ")
 
-(define foo ((x real/rationalp))
-  :returns (rx real/rationalp)
-  (b* ((x (realfix x)))
-    (+ (* x x) 1)))
+;; (define foo ((x real/rationalp))
+;;   :returns (rx real/rationalp)
+;;   (b* ((x (realfix x)))
+;;     (+ (* x x) 1)))
 
-(in-theory (disable (:type-prescription foo)))
+;; (in-theory (disable (:type-prescription foo)))
 
-(defthm poly-ineq-example-functions
-  (implies (and (real/rationalp x))
-           (< 0 (* 2 (foo x))))
-  :hints(("Goal"
-          :smtlink
-          (:functions ((foo :formals ((x real/rationalp))
-                            :returns ((rx real/rationalp
-                                          :name
-                                          real/rationalp-of-foo))
-                            :expansion-depth 0))
-           :hypotheses (((<= 1 (foo x))
-                         :hints (:in-theory (enable foo))))
-          ))))
+;; (defthm poly-ineq-example-functions
+;;   (implies (and (real/rationalp x))
+;;            (< 0 (* 2 (foo x))))
+;;   :hints(("Goal"
+;;           :smtlink
+;;           (:functions ((foo :formals ((x real/rationalp))
+;;                             :returns ((rx real/rationalp
+;;                                           :name
+;;                                           real/rationalp-of-foo))
+;;                             :expansion-depth 0))
+;;            :hypotheses (((<= 1 (foo x))
+;;                          :hints (:in-theory (enable foo))))
+;;           ))))
 
 (def-saved-event x^2+y^2-integer
   (define x^2+y^2-integer ((x integerp)
@@ -412,611 +412,621 @@ finds out @('integerp') is not a supported function.</p>
   :elt-type integerp
   )
 
-(defthm fty-deflist-theorem
-  (implies (and (integer-listp l)
-                (not (equal l nil))
-                (not (equal (cdr l) nil)))
-           (>= (x^2+y^2-integer (car l)
-                                (cadr l))
-               0))
-  :hints(("Goal"
-          :smtlink
-          (:functions ((x^2+y^2-integer :formals ((x integerp)
-                                                  (y integerp))
-                                        :returns ((f integerp
-                                                     :name
-                                                     integerp-of-x^2+y^2-integer))
-                                        :expansion-depth 1)) )))
-  :rule-classes nil)
-
-stop
-
-(local (in-theory (enable integer-list-fix integer-list-cdr
-                          integer-list-cons integer-list-car
-                          integer-list-nil)))
-
-(def-saved-event fty-deflist-theorem-example
-  (defthm fty-deflist-theorem
-    (implies (and (integer-list-p l)
-                  (not (equal l (integer-list-nil)))
-                  (not (equal (integer-list-cdr l) (integer-list-nil))))
-             (>= (x^2+y^2-integer (integer-list-car l)
-                                  (integer-list-car (integer-list-cdr l)))
-                 0))
-    :hints(("Goal"
-            :smtlink
-            (:functions ((x^2+y^2-integer :formals ((x integerp)
-                                                    (y integerp))
-                                          :returns ((f integerp
-                                                       :name
-                                                       integerp-of-x^2+y^2-integer))
-                                          :expansion-depth 1)) )))
-    :rule-classes nil))
+;; (defthm fty-deflist-theorem
+;;   (implies (and (integer-listp l)
+;;                 (not (equal l nil))
+;;                 (not (equal (cdr l) nil)))
+;;            (>= (x^2+y^2-integer (car l)
+;;                                 (cadr l))
+;;                0))
+;;   :hints(("Goal"
+;;           :smtlink
+;;           (:functions ((x^2+y^2-integer :formals ((x integerp)
+;;                                                   (y integerp))
+;;                                         :returns ((f integerp
+;;                                                      :name
+;;                                                      integerp-of-x^2+y^2-integer))
+;;                                         :expansion-depth 1)) )))
+;;   :rule-classes nil)
 
 (acl2::must-fail
-(defthm fty-deflist-theorem-fail
-  (implies (and (integer-list-p l)
-                (not (equal l (integer-list-nil)))
-                (not (equal (integer-list-cdr l) (integer-list-nil))))
-           (>= (x^2+y^2-integer (integer-list-car l)
-                                (integer-list-car (integer-list-cdr l)))
-               1))
+(defthm crazy-list-theorem
+  (implies (and (integer-listp l1)
+                (integer-listp l2)
+                (equal (cons 1 (cons 2 (cons 3 nil))) l2))
+           (equal l1 l2))
   :hints(("Goal"
-          :smtlink
-          (:functions ((x^2+y^2-integer :formals ((x integerp)
-                                                  (y integerp))
-                                        :returns ((f integerp
-                                                     :name
-                                                     integerp-of-x^2+y^2-integer))
-                                        :expansion-depth 1)) )))
+          :smtlink nil))
   :rule-classes nil)
 )
 
-(def-saved-event sandwich-example
-  (defprod sandwich
-    ((bread integerp)
-     (fillings symbolp)))
-  )
 
-(defsmtprod sandwich
-  :rec sandwich-p
-  :fix sandwich-fix
-  :fix-thm sandwich-fix-when-sandwich-p
-  :constructor (sandwich sandwich-p)
-  :destructors ((sandwich->bread$inline integerp)
-                (sandwich->fillings$inline symbolp))
-  )
+;; (local (in-theory (enable integer-list-fix integer-list-cdr
+;;                           integer-list-cons integer-list-car
+;;                           integer-list-nil)))
 
-(def-saved-event fty-defprod-theorem-example
-  (defthm fty-defprod-theorem
-    (implies (and (sandwich-p s1)
-                  (sandwich-p s2))
-             (>= (x^2+y^2-integer
-                  (sandwich->bread s1)
-                  (sandwich->bread s2))
-                 0))
-    :hints(("Goal"
-            :smtlink
-            (:functions ((x^2+y^2-integer :formals ((x integerp)
-                                                    (y integerp))
-                                          :returns ((f integerp
-                                                       :name
-                                                       integerp-of-x^2+y^2-integer))
-                                          :expansion-depth 1)))))
-    :rule-classes nil)
-  )
+;; (def-saved-event fty-deflist-theorem-example
+;;   (defthm fty-deflist-theorem
+;;     (implies (and (integer-list-p l)
+;;                   (not (equal l (integer-list-nil)))
+;;                   (not (equal (integer-list-cdr l) (integer-list-nil))))
+;;              (>= (x^2+y^2-integer (integer-list-car l)
+;;                                   (integer-list-car (integer-list-cdr l)))
+;;                  0))
+;;     :hints(("Goal"
+;;             :smtlink
+;;             (:functions ((x^2+y^2-integer :formals ((x integerp)
+;;                                                     (y integerp))
+;;                                           :returns ((f integerp
+;;                                                        :name
+;;                                                        integerp-of-x^2+y^2-integer))
+;;                                           :expansion-depth 1)) )))
+;;     :rule-classes nil))
 
-(acl2::must-fail
-(defthm fty-defprod-theorem-fail
-  (implies (and (sandwich-p s1)
-                (sandwich-p s2))
-           (>= (x^2+y^2-integer
-                (sandwich->bread s1)
-                (sandwich->bread s2))
-               1))
-  :hints(("Goal"
-          :smtlink
-          (:functions ((x^2+y^2-integer :formals ((x integerp)
-                                                  (y integerp))
-                                        :returns ((f integerp
-                                                     :name
-                                                     integerp-of-x^2+y^2-integer))
-                                        :expansion-depth 1)))))
-  :rule-classes nil)
-)
+;; (acl2::must-fail
+;; (defthm fty-deflist-theorem-fail
+;;   (implies (and (integer-list-p l)
+;;                 (not (equal l (integer-list-nil)))
+;;                 (not (equal (integer-list-cdr l) (integer-list-nil))))
+;;            (>= (x^2+y^2-integer (integer-list-car l)
+;;                                 (integer-list-car (integer-list-cdr l)))
+;;                1))
+;;   :hints(("Goal"
+;;           :smtlink
+;;           (:functions ((x^2+y^2-integer :formals ((x integerp)
+;;                                                   (y integerp))
+;;                                         :returns ((f integerp
+;;                                                      :name
+;;                                                      integerp-of-x^2+y^2-integer))
+;;                                         :expansion-depth 1)) )))
+;;   :rule-classes nil)
+;; )
 
-(defsmtoption maybe-integer
-  :rec maybe-integer-p
-  :fix maybe-integer-fix$inline
-  :fix-thm maybe-integer-fix-when-maybe-integer-p
-  :some-constructor maybe-integer-some
-  :some-destructor maybe-integer-some->val$inline
-  :none-constructor maybe-integer-none
-  :some-type integerp
-  )
+;; (def-saved-event sandwich-example
+;;   (defprod sandwich
+;;     ((bread integerp)
+;;      (fillings symbolp)))
+;;   )
 
-(def-saved-event x^2+y^2-fixed-example
-  (define x^2+y^2-fixed ((x maybe-integer-p)
-                         (y maybe-integer-p))
-    :returns (res maybe-integer-p)
-    (b* ((x (maybe-integer-fix x))
-         (y (maybe-integer-fix y))
-         ((if (equal x (maybe-integer-none)))
-          (maybe-integer-none))
-         ((if (equal y (maybe-integer-none)))
-          (maybe-integer-none)))
-      (maybe-integer-some
-       (+ (* (maybe-integer-some->val x)
-             (maybe-integer-some->val x))
-          (* (maybe-integer-some->val y)
-             (maybe-integer-some->val y))))))
-  )
+;; (defsmtprod sandwich
+;;   :rec sandwich-p
+;;   :fix sandwich-fix
+;;   :fix-thm sandwich-fix-when-sandwich-p
+;;   :constructor (sandwich sandwich-p)
+;;   :destructors ((sandwich->bread$inline integerp)
+;;                 (sandwich->fillings$inline symbolp))
+;;   )
 
-(def-saved-event fty-defoption-theorem-example
-  (defthm fty-defoption-theorem
-    (implies (and (maybe-integer-p m1)
-                  (maybe-integer-p m2)
-                  (not (equal m1 (maybe-integer-none)))
-                  (not (equal m2 (maybe-integer-none))))
-             (>= (maybe-integer-some->val (x^2+y^2-fixed m1 m2))
-               0))
-    :hints(("Goal"
-            :smtlink
-            (:functions ((x^2+y^2-fixed :formals ((x maybe-integer-p)
-                                                  (y maybe-integer-p))
-                                        :returns ((res maybe-integer-p
-                                                       :name
-                                                       maybe-integer-p-of-x^2+y^2-fixed))
-                                        :expansion-depth 1)))))
-    :rule-classes nil)
-  )
+;; (def-saved-event fty-defprod-theorem-example
+;;   (defthm fty-defprod-theorem
+;;     (implies (and (sandwich-p s1)
+;;                   (sandwich-p s2))
+;;              (>= (x^2+y^2-integer
+;;                   (sandwich->bread s1)
+;;                   (sandwich->bread s2))
+;;                  0))
+;;     :hints(("Goal"
+;;             :smtlink
+;;             (:functions ((x^2+y^2-integer :formals ((x integerp)
+;;                                                     (y integerp))
+;;                                           :returns ((f integerp
+;;                                                        :name
+;;                                                        integerp-of-x^2+y^2-integer))
+;;                                           :expansion-depth 1)))))
+;;     :rule-classes nil)
+;;   )
 
-(acl2::must-fail
-(defthm fty-defoption-theorem-fail
-  (implies (and (maybe-integer-p m1)
-                (maybe-integer-p m2)
-                (not (equal m1 (maybe-integer-none)))
-                (not (equal m2 (maybe-integer-none))))
-           (>= (maybe-integer-some->val (x^2+y^2-fixed m1 m2))
-               1))
-  :hints(("Goal"
-          :smtlink
-          (:functions ((x^2+y^2-fixed :formals ((x maybe-integer-p)
-                                                (y maybe-integer-p))
-                                      :returns ((res maybe-integer-p
-                                                     :name
-                                                     maybe-integer-p-of-x^2+y^2-fixed))
-                                      :expansion-depth 1)))))
-  :rule-classes nil)
-)
+;; (acl2::must-fail
+;; (defthm fty-defprod-theorem-fail
+;;   (implies (and (sandwich-p s1)
+;;                 (sandwich-p s2))
+;;            (>= (x^2+y^2-integer
+;;                 (sandwich->bread s1)
+;;                 (sandwich->bread s2))
+;;                1))
+;;   :hints(("Goal"
+;;           :smtlink
+;;           (:functions ((x^2+y^2-integer :formals ((x integerp)
+;;                                                   (y integerp))
+;;                                         :returns ((f integerp
+;;                                                      :name
+;;                                                      integerp-of-x^2+y^2-integer))
+;;                                         :expansion-depth 1)))))
+;;   :rule-classes nil)
+;; )
 
-(deftagsum arithtm
-  (:num ((val integerp)))
-  (:plus ((left arithtm-p)
-          (right arithtm-p)))
-  (:minus ((arg arithtm-p))))
+;; (defsmtoption maybe-integer
+;;   :rec maybe-integer-p
+;;   :fix maybe-integer-fix$inline
+;;   :fix-thm maybe-integer-fix-when-maybe-integer-p
+;;   :some-constructor maybe-integer-some
+;;   :some-destructor maybe-integer-some->val$inline
+;;   :none-constructor maybe-integer-none
+;;   :some-type integerp
+;;   )
 
-(defsmtsum arithtm
-  :rec arithtm-p
-  :fix arithtm-fix
-  :fix-thm arithtm-fix-when-arithtm-p
-  :kind-function arithtm-kind$inline
-  :prods ((:num :constructor (arithtm-num arithtm-p return-type-of-arithtm-num)
-                :destructors ((arithtm-num->val$inline integerp)))
-          (:plus :constructor (arithtm-plus arithtm-p return-type-of-arithtm-plus)
-                 :destructors ((arithtm-plus->left$inline arithtm-p)
-                               (arithtm-plus->right$inline arithtm-p)))
-          (:minus :constructor (arithtm-minus arithtm-p)
-                  :destructors ((arithtm-minus->arg$inline arithtm-p))))
-  )
+;; (def-saved-event x^2+y^2-fixed-example
+;;   (define x^2+y^2-fixed ((x maybe-integer-p)
+;;                          (y maybe-integer-p))
+;;     :returns (res maybe-integer-p)
+;;     (b* ((x (maybe-integer-fix x))
+;;          (y (maybe-integer-fix y))
+;;          ((if (equal x (maybe-integer-none)))
+;;           (maybe-integer-none))
+;;          ((if (equal y (maybe-integer-none)))
+;;           (maybe-integer-none)))
+;;       (maybe-integer-some
+;;        (+ (* (maybe-integer-some->val x)
+;;              (maybe-integer-some->val x))
+;;           (* (maybe-integer-some->val y)
+;;              (maybe-integer-some->val y))))))
+;;   )
 
-(defthm fty-deftagsum-theorem
-  (implies (and (arithtm-p x)
-                (equal (arithtm-kind x) :num))
-           (>= (x^2+y^2-integer (arithtm-num->val x)
-                                (arithtm-num->val x))
-               0))
-  :hints(("Goal"
-          :smtlink
-          (:functions ((x^2+y^2-integer :formals ((x integerp)
-                                                  (y integerp))
-                                        :returns ((f integerp
-                                                     :name
-                                                     integerp-of-x^2+y^2-integer))
-                                        :expansion-depth 1)))))
-  :rule-classes nil)
+;; (def-saved-event fty-defoption-theorem-example
+;;   (defthm fty-defoption-theorem
+;;     (implies (and (maybe-integer-p m1)
+;;                   (maybe-integer-p m2)
+;;                   (not (equal m1 (maybe-integer-none)))
+;;                   (not (equal m2 (maybe-integer-none))))
+;;              (>= (maybe-integer-some->val (x^2+y^2-fixed m1 m2))
+;;                0))
+;;     :hints(("Goal"
+;;             :smtlink
+;;             (:functions ((x^2+y^2-fixed :formals ((x maybe-integer-p)
+;;                                                   (y maybe-integer-p))
+;;                                         :returns ((res maybe-integer-p
+;;                                                        :name
+;;                                                        maybe-integer-p-of-x^2+y^2-fixed))
+;;                                         :expansion-depth 1)))))
+;;     :rule-classes nil)
+;;   )
 
-(def-saved-event symbol-integer-example
-  (defalist symbol-integer-alist
-    :key-type symbolp
-    :val-type integerp
-    :true-listp t)
-  )
+;; (acl2::must-fail
+;; (defthm fty-defoption-theorem-fail
+;;   (implies (and (maybe-integer-p m1)
+;;                 (maybe-integer-p m2)
+;;                 (not (equal m1 (maybe-integer-none)))
+;;                 (not (equal m2 (maybe-integer-none))))
+;;            (>= (maybe-integer-some->val (x^2+y^2-fixed m1 m2))
+;;                1))
+;;   :hints(("Goal"
+;;           :smtlink
+;;           (:functions ((x^2+y^2-fixed :formals ((x maybe-integer-p)
+;;                                                 (y maybe-integer-p))
+;;                                       :returns ((res maybe-integer-p
+;;                                                      :name
+;;                                                      maybe-integer-p-of-x^2+y^2-fixed))
+;;                                       :expansion-depth 1)))))
+;;   :rule-classes nil)
+;; )
 
-(def-saved-event fty-defalist-theorem-example
-  (defthm fty-defalist-theorem
-    (implies (and (symbol-integer-alist-p l)
-                  (symbolp s1)
-                  (symbolp s2)
-                  (not (equal (assoc-equal s1 (symbol-integer-alist-fix l))
-                              (smt::magic-fix 'symbolp_integerp nil)))
-                  (not (equal (assoc-equal s2 (symbol-integer-alist-fix l))
-                              (smt::magic-fix 'symbolp_integerp nil))))
-             (>= (x^2+y^2-integer
-                  (cdr (smt::magic-fix 'symbolp_integerp
-                                       (assoc-equal s1 (symbol-integer-alist-fix l))))
-                  (cdr (smt::magic-fix 'symbolp_integerp
-                                       (assoc-equal s2 (symbol-integer-alist-fix l)))))
-                 0))
-    :hints(("Goal"
-            :smtlink
-            (:fty (symbol-integer-alist)
-                  :functions ((x^2+y^2-integer :formals ((x integerp)
-                                                         (y integerp))
-                                               :returns ((f integerp
-                                                            :meta-extract-thms
-                                                            (integerp-of-x^2+y^2-integer
-                                                             ifix-when-integerp)))
-                                               :level 1)))))
-    :rule-classes nil)
-  )
+;; (deftagsum arithtm
+;;   (:num ((val integerp)))
+;;   (:plus ((left arithtm-p)
+;;           (right arithtm-p)))
+;;   (:minus ((arg arithtm-p))))
 
-(defthm assoc-equal-of-symbol-integer-alist-p
-  (implies (and (symbol-integer-alist-p l)
-                (assoc-equal s l))
-           (and (consp (assoc-equal s l))
-                (integerp (cdr (assoc-equal s l))))))
+;; (defsmtsum arithtm
+;;   :rec arithtm-p
+;;   :fix arithtm-fix
+;;   :fix-thm arithtm-fix-when-arithtm-p
+;;   :kind-function arithtm-kind$inline
+;;   :prods ((:num :constructor (arithtm-num arithtm-p return-type-of-arithtm-num)
+;;                 :destructors ((arithtm-num->val$inline integerp)))
+;;           (:plus :constructor (arithtm-plus arithtm-p return-type-of-arithtm-plus)
+;;                  :destructors ((arithtm-plus->left$inline arithtm-p)
+;;                                (arithtm-plus->right$inline arithtm-p)))
+;;           (:minus :constructor (arithtm-minus arithtm-p)
+;;                   :destructors ((arithtm-minus->arg$inline arithtm-p))))
+;;   )
 
-(define x^2+y^2-integer-consp ((s1 symbolp)
-                               (s2 symbolp)
-                               (l symbol-integer-alist-p))
-  :returns (res integerp)
-  (b* ((l (symbol-integer-alist-fix l))
-       ((if (equal (assoc-equal s1 (symbol-integer-alist-fix l))
-                   (smt::magic-fix 'symbolp_integerp nil)))
-        0)
-       ((if (equal (assoc-equal s2 (symbol-integer-alist-fix l))
-                   (smt::magic-fix 'symbolp_integerp nil)))
-        1)
-       (x1 (cdr (smt::magic-fix 'symbolp_integerp
-                                (assoc-equal s1 (symbol-integer-alist-fix
-                                                 l)))))
-       (x2 (cdr (smt::magic-fix 'symbolp_integerp
-                                (assoc-equal s2 (symbol-integer-alist-fix
-                               l))))))
-    (x^2+y^2-integer x1 x2)))
+;; (defthm fty-deftagsum-theorem
+;;   (implies (and (arithtm-p x)
+;;                 (equal (arithtm-kind x) :num))
+;;            (>= (x^2+y^2-integer (arithtm-num->val x)
+;;                                 (arithtm-num->val x))
+;;                0))
+;;   :hints(("Goal"
+;;           :smtlink
+;;           (:functions ((x^2+y^2-integer :formals ((x integerp)
+;;                                                   (y integerp))
+;;                                         :returns ((f integerp
+;;                                                      :name
+;;                                                      integerp-of-x^2+y^2-integer))
+;;                                         :expansion-depth 1)))))
+;;   :rule-classes nil)
 
-(def-saved-event fty-defalist-theorem-example-consp
-  (defthm fty-defalist-theorem-consp
-    (implies (and (symbol-integer-alist-p l)
-                  (symbolp s1)
-                  (symbolp s2))
-             (>= (x^2+y^2-integer-consp s1 s2 l) 0))
-    :hints(("Goal"
-            :smtlink
-            (:fty (symbol-integer-alist)
-                  :functions ((x^2+y^2-integer :formals ((x integerp)
-                                                         (y integerp))
-                                               :returns ((f integerp
-                                                            :meta-extract-thms
-                                                            (integerp-of-x^2+y^2-integer
-                                                             ifix-when-integerp)))
-                                               :level 1)
-                              (x^2+y^2-integer-consp :formals ((s1 symbolp)
-                                                               (s2 symbolp)
-                                                               (l symbol-integer-alist-p))
-                                                     :returns ((f integerp
-                                                                  :meta-extract-thms
-                                                                  (integerp-of-x^2+y^2-integer-consp
-                                                                   ifix-when-integerp)))
-                                                     :level 1)))))
-    :rule-classes nil)
-  )
+;; (def-saved-event symbol-integer-example
+;;   (defalist symbol-integer-alist
+;;     :key-type symbolp
+;;     :val-type integerp
+;;     :true-listp t)
+;;   )
 
+;; (def-saved-event fty-defalist-theorem-example
+;;   (defthm fty-defalist-theorem
+;;     (implies (and (symbol-integer-alist-p l)
+;;                   (symbolp s1)
+;;                   (symbolp s2)
+;;                   (not (equal (assoc-equal s1 (symbol-integer-alist-fix l))
+;;                               (smt::magic-fix 'symbolp_integerp nil)))
+;;                   (not (equal (assoc-equal s2 (symbol-integer-alist-fix l))
+;;                               (smt::magic-fix 'symbolp_integerp nil))))
+;;              (>= (x^2+y^2-integer
+;;                   (cdr (smt::magic-fix 'symbolp_integerp
+;;                                        (assoc-equal s1 (symbol-integer-alist-fix l))))
+;;                   (cdr (smt::magic-fix 'symbolp_integerp
+;;                                        (assoc-equal s2 (symbol-integer-alist-fix l)))))
+;;                  0))
+;;     :hints(("Goal"
+;;             :smtlink
+;;             (:fty (symbol-integer-alist)
+;;                   :functions ((x^2+y^2-integer :formals ((x integerp)
+;;                                                          (y integerp))
+;;                                                :returns ((f integerp
+;;                                                             :meta-extract-thms
+;;                                                             (integerp-of-x^2+y^2-integer
+;;                                                              ifix-when-integerp)))
+;;                                                :level 1)))))
+;;     :rule-classes nil)
+;;   )
 
-(defthm fty-defalist-theorem-acons
-  (implies (and (symbol-integer-alist-p l)
-                (symbolp s1)
-                (symbolp s2)
-                (not (equal (assoc-equal s1 (symbol-integer-alist-fix
-                                             (acons 'x 1
-                                                    (symbol-integer-alist-fix l))))
-                            (smt::magic-fix 'symbolp_integerp nil)))
-                (not (equal (assoc-equal s2 (symbol-integer-alist-fix l))
-                            (smt::magic-fix 'symbolp_integerp nil))))
-           (>= (x^2+y^2-integer
-                (cdr (smt::magic-fix
-                      'symbolp_integerp
-                      (assoc-equal s1 (symbol-integer-alist-fix
-                                       (acons 'x 1
-                                              (symbol-integer-alist-fix l))))))
-                (cdr (smt::magic-fix 'symbolp_integerp
-                                     (assoc-equal s2 (symbol-integer-alist-fix l)))))
-               0))
-  :hints(("Goal"
-          :smtlink
-          (:fty (symbol-integer-alist)
-                :functions ((x^2+y^2-integer :formals ((x integerp)
-                                                       (y integerp))
-                                             :returns ((f integerp
-                                                          :meta-extract-thms
-                                                          (integerp-of-x^2+y^2-integer
-                                                           ifix-when-integerp)))
-                                             :level 1)))))
-  :rule-classes nil)
+;; (defthm assoc-equal-of-symbol-integer-alist-p
+;;   (implies (and (symbol-integer-alist-p l)
+;;                 (assoc-equal s l))
+;;            (and (consp (assoc-equal s l))
+;;                 (integerp (cdr (assoc-equal s l))))))
 
-(acl2::must-fail
-(defthm fty-defalist-theorem-fail
-  (implies (and (symbol-integer-alist-p l)
-                (symbolp s1)
-                (symbolp s2)
-                (not (equal (assoc-equal s1 (symbol-integer-alist-fix l))
-                            (smt::magic-fix 'symbolp_integerp nil)))
-                (not (equal (assoc-equal s2 (symbol-integer-alist-fix l))
-                            (smt::magic-fix 'symbolp_integerp nil))))
-           (>= (x^2+y^2-integer
-                (cdr (smt::magic-fix 'symbolp_integerp
-                                     (assoc-equal s1 (symbol-integer-alist-fix l))))
-                (cdr (smt::magic-fix 'symbolp_integerp
-                                     (assoc-equal s2 (symbol-integer-alist-fix l)))))
-               1))
-  :hints(("Goal"
-          :smtlink
-          (:fty (symbol-integer-alist)
-                :functions ((x^2+y^2-integer :formals ((x integerp)
-                                                       (y integerp))
-                                             :returns ((f integerp
-                                                          :meta-extract-thms
-                                                          (integerp-of-x^2+y^2-integer
-                                                           ifix-when-integerp)))
-                                             :level 1)))))
-  :rule-classes nil)
-)
+;; (define x^2+y^2-integer-consp ((s1 symbolp)
+;;                                (s2 symbolp)
+;;                                (l symbol-integer-alist-p))
+;;   :returns (res integerp)
+;;   (b* ((l (symbol-integer-alist-fix l))
+;;        ((if (equal (assoc-equal s1 (symbol-integer-alist-fix l))
+;;                    (smt::magic-fix 'symbolp_integerp nil)))
+;;         0)
+;;        ((if (equal (assoc-equal s2 (symbol-integer-alist-fix l))
+;;                    (smt::magic-fix 'symbolp_integerp nil)))
+;;         1)
+;;        (x1 (cdr (smt::magic-fix 'symbolp_integerp
+;;                                 (assoc-equal s1 (symbol-integer-alist-fix
+;;                                                  l)))))
+;;        (x2 (cdr (smt::magic-fix 'symbolp_integerp
+;;                                 (assoc-equal s2 (symbol-integer-alist-fix
+;;                                l))))))
+;;     (x^2+y^2-integer x1 x2)))
 
-(acl2::must-fail
-(defthm bogus-revised
-  (implies (and (symbolp symx) (symbolp symy))
-           (or (equal (symbol-fix symx) 'sym1) (equal (symbol-fix symx) 'sym2)
-               (equal (symbol-fix symx) 'sym3)
-               (equal (symbol-fix symy) 'sym1) (equal (symbol-fix symy) 'sym2)
-               (equal (symbol-fix symy) 'sym3)
-               (equal (symbol-fix symx)
-                      (symbol-fix symy))))
-  :hints (("Goal" :smtlink nil)))
-)
-
-(acl2::must-fail
-(defthm bogus-revised-still-bogus
-  (implies (and (symbolp symx) (symbolp symy))
-           (or (equal symx 'symx) (equal symx 'sym2)
-               (equal symx 'sym3)
-               (equal symy 'symx) (equal symy 'sym2)
-               (equal symy 'sym3)
-               (equal symx symy)))
-  :hints (("Goal" :smtlink nil)))
-)
-
-(defprod sym-prod
-  ((sym symbolp)))
-
-(acl2::must-fail
-(defthm bogus-revised-still-bogus-prod
-  (implies (and (sym-prod-p x) (sym-prod-p y))
-           (or (equal (sym-prod->sym x) 'sym1) (equal (sym-prod->sym x) 'sym2)
-               (equal (sym-prod->sym x) 'sym3)
-               (equal (sym-prod->sym y) 'sym1) (equal (sym-prod->sym y) 'sym2)
-               (equal (sym-prod->sym y) 'sym3)
-               (equal (sym-prod->sym x) (sym-prod->sym y))))
-  :hints (("Goal" :smtlink (:fty (sym-prod)))))
-)
-
-(acl2::must-fail
- (defthm check-guard
-   (implies (acl2::integer-listp x)
-            (equal (1+ (1- (car (acl2::integer-list-fix x))))
-                   (car (acl2::integer-list-fix x))))
-   :hints (("Goal" :smtlink (:fty (acl2::integer-list)))))
-)
-
-(acl2::must-fail
- (defthm check-guard-2
-   (implies (and (symbol-integer-alist-p l)
-                 (symbolp x))
-            (equal (1+ (1- (cdr
-                            (magic-fix 'symbolp_integerp
-                                       (assoc-equal x (symbol-integer-alist-fix
-                                                       l))))))
-                   (cdr (magic-fix 'symbolp_integerp
-                                   (assoc-equal x (symbol-integer-alist-fix l))))))
-   :hints (("Goal" :smtlink (:fty (symbol-integer-alist)))))
- )
-
-(defthm check-guard-3
-  (implies (maybe-integer-p x)
-           (equal (1+ (1- (maybe-integer-some->val
-                           (maybe-integer-fix x))))
-                  (maybe-integer-some->val
-                   (maybe-integer-fix x))))
-  :hints (("Goal" :smtlink (:fty (maybe-integer))))
-  )
-
-(acl2::must-fail
- (defthm check-guard-3-fail
-   (implies (maybe-integer-p x)
-            (equal (1+ (1- (maybe-integer-fix x)))
-                   (maybe-integer-fix x)))
-   :hints (("Goal" :smtlink (:fty (maybe-integer))))
-   )
- )
-
-(acl2::must-fail
-(defthm check-rational-cex
-  (implies (rationalp x)
-           (not (equal x 1/4)))
-  :hints (("Goal" :smtlink (:fty (maybe-integer))))
-  )
-)
-
-(acl2::must-fail
- (defthm check-boolean-cex
-   (implies (booleanp x)
-            (not (equal x nil)))
-   :hints (("Goal" :smtlink (:fty (maybe-integer))))
-   )
- )
-
-(acl2::must-fail
- (defthm check-symbol-cex
-   (implies (symbolp x)
-            (not (equal x 'arbitrary-sym)))
-   :hints (("Goal" :smtlink (:fty (maybe-integer))))
-   )
- )
-
-;; algebraic counter-example example by Carl Kwan
-(acl2::must-fail
-(defthm poly-sat-7
-  (implies (and (real/rationalp x)
-                (equal (* (+ x -1) (+ x 1) (+ x 2)) 0)
-                (< x 0)
-                (real/rationalp y)
-                (equal (* y y) 2))
-           (and (equal x -1)
-                (< y 0)))
-  :rule-classes nil
-  :hints (("Goal"
-		       :smtlink nil)))
-)
-
-(deftutorial FTY-examples
-  :parents (Tutorial)
-  :short "A list of FTY examples"
-  :long "<h3>FTY examples</h3>
-<p>Prerequisite read for this tutorial example is @(tsee tutorial).</p>
-<p>Smtlink supports types defined by @(tsee acl2::FTY) macros @(tsee defprod), @(tsee
-  deflist), @(tsee defalist) and @(tsee defoption). We show here an example for
-  each type.</p>
-
-<h4>defprod</h4>
-<p>Define the function @('x^2+y^2')</p>
-@(`(:code ($ ||x^2+y^2||))`)
-
-<p>Define the defprod @('sandwich')</p>
-@(`(:code ($ sandwich))`)
-
-<p>Then define the theorem to prove:</p>
-@(`(:code ($ fty-defprod-theorem-example))`)
-
-<p>This theorem says, given two @('sandwich-p'), then the square sum of the
-bread field of the two sandwiches should be non-negative. This example doesn't
-quite make sense.  Here we use this as an example to show how @('defprod')
-defined types can be used in a theorem to be discharged by Smtlink.</p>
-
-<p>We notice the @(':fty') hint is used to tell Smtlink which set of FTY types
-we will use in proving this theorem. Here, we use the FTY type
-@('sandwich'). Smtlink will check @('fty::flextypes-table') for information
-about this FTY type.</p>
-
-<p>Counter-examples for defprods like like:</p>
-@({
-Possible counter-example found:
-((S2 (SANDWICH 0 (SYM 2))) (S1 (SANDWICH 0 (SYM 1))))
-})
+;; (def-saved-event fty-defalist-theorem-example-consp
+;;   (defthm fty-defalist-theorem-consp
+;;     (implies (and (symbol-integer-alist-p l)
+;;                   (symbolp s1)
+;;                   (symbolp s2))
+;;              (>= (x^2+y^2-integer-consp s1 s2 l) 0))
+;;     :hints(("Goal"
+;;             :smtlink
+;;             (:fty (symbol-integer-alist)
+;;                   :functions ((x^2+y^2-integer :formals ((x integerp)
+;;                                                          (y integerp))
+;;                                                :returns ((f integerp
+;;                                                             :meta-extract-thms
+;;                                                             (integerp-of-x^2+y^2-integer
+;;                                                              ifix-when-integerp)))
+;;                                                :level 1)
+;;                               (x^2+y^2-integer-consp :formals ((s1 symbolp)
+;;                                                                (s2 symbolp)
+;;                                                                (l symbol-integer-alist-p))
+;;                                                      :returns ((f integerp
+;;                                                                   :meta-extract-thms
+;;                                                                   (integerp-of-x^2+y^2-integer-consp
+;;                                                                    ifix-when-integerp)))
+;;                                                      :level 1)))))
+;;     :rule-classes nil)
+;;   )
 
 
-<h4>deflist</h4>
-<p>Define the theorem to prove:</p>
-@(`(:code ($ fty-deflist-theorem-example))`)
+;; (defthm fty-defalist-theorem-acons
+;;   (implies (and (symbol-integer-alist-p l)
+;;                 (symbolp s1)
+;;                 (symbolp s2)
+;;                 (not (equal (assoc-equal s1 (symbol-integer-alist-fix
+;;                                              (acons 'x 1
+;;                                                     (symbol-integer-alist-fix l))))
+;;                             (smt::magic-fix 'symbolp_integerp nil)))
+;;                 (not (equal (assoc-equal s2 (symbol-integer-alist-fix l))
+;;                             (smt::magic-fix 'symbolp_integerp nil))))
+;;            (>= (x^2+y^2-integer
+;;                 (cdr (smt::magic-fix
+;;                       'symbolp_integerp
+;;                       (assoc-equal s1 (symbol-integer-alist-fix
+;;                                        (acons 'x 1
+;;                                               (symbol-integer-alist-fix l))))))
+;;                 (cdr (smt::magic-fix 'symbolp_integerp
+;;                                      (assoc-equal s2 (symbol-integer-alist-fix l)))))
+;;                0))
+;;   :hints(("Goal"
+;;           :smtlink
+;;           (:fty (symbol-integer-alist)
+;;                 :functions ((x^2+y^2-integer :formals ((x integerp)
+;;                                                        (y integerp))
+;;                                              :returns ((f integerp
+;;                                                           :meta-extract-thms
+;;                                                           (integerp-of-x^2+y^2-integer
+;;                                                            ifix-when-integerp)))
+;;                                              :level 1)))))
+;;   :rule-classes nil)
 
-<p>This theorem says, given a list of integers, if there are at least two
-elements, then the square sum of the two elements should be non-negative.</p>
+;; (acl2::must-fail
+;; (defthm fty-defalist-theorem-fail
+;;   (implies (and (symbol-integer-alist-p l)
+;;                 (symbolp s1)
+;;                 (symbolp s2)
+;;                 (not (equal (assoc-equal s1 (symbol-integer-alist-fix l))
+;;                             (smt::magic-fix 'symbolp_integerp nil)))
+;;                 (not (equal (assoc-equal s2 (symbol-integer-alist-fix l))
+;;                             (smt::magic-fix 'symbolp_integerp nil))))
+;;            (>= (x^2+y^2-integer
+;;                 (cdr (smt::magic-fix 'symbolp_integerp
+;;                                      (assoc-equal s1 (symbol-integer-alist-fix l))))
+;;                 (cdr (smt::magic-fix 'symbolp_integerp
+;;                                      (assoc-equal s2 (symbol-integer-alist-fix l)))))
+;;                1))
+;;   :hints(("Goal"
+;;           :smtlink
+;;           (:fty (symbol-integer-alist)
+;;                 :functions ((x^2+y^2-integer :formals ((x integerp)
+;;                                                        (y integerp))
+;;                                              :returns ((f integerp
+;;                                                           :meta-extract-thms
+;;                                                           (integerp-of-x^2+y^2-integer
+;;                                                            ifix-when-integerp)))
+;;                                              :level 1)))))
+;;   :rule-classes nil)
+;; )
 
-<p>First, Smtlink only allows types defined by deflist that are @(tsee
-true-listp).  We notice the @(':fty') hint is used to tell Smtlink which set of
-FTY types we will use in proving this theorem. Here, we use the FTY type
-@('acl2::integer-list'). Smtlink will check @('fty::flextypes-table') to make
-sure the given deflist type is a true-listp.</p>
+;; (acl2::must-fail
+;; (defthm bogus-revised
+;;   (implies (and (symbolp symx) (symbolp symy))
+;;            (or (equal (symbol-fix symx) 'sym1) (equal (symbol-fix symx) 'sym2)
+;;                (equal (symbol-fix symx) 'sym3)
+;;                (equal (symbol-fix symy) 'sym1) (equal (symbol-fix symy) 'sym2)
+;;                (equal (symbol-fix symy) 'sym3)
+;;                (equal (symbol-fix symx)
+;;                       (symbol-fix symy))))
+;;   :hints (("Goal" :smtlink nil)))
+;; )
 
-<p>Second, we notice extra fixing functions @(tsee acl2::integer-list-fix)
-functions are added. This is because Z3 lists are typed. The polymorphic
-functions like @('car') when translated into Z3, also become typed. Therefore
-we need to inference which @('car') we want to apply here. Currently Smtlink
-doesn't have type inference ability, therefore it requires the user to add
-fixing functions for telling it the types.</p>
+;; (acl2::must-fail
+;; (defthm bogus-revised-still-bogus
+;;   (implies (and (symbolp symx) (symbolp symy))
+;;            (or (equal symx 'symx) (equal symx 'sym2)
+;;                (equal symx 'sym3)
+;;                (equal symy 'symx) (equal symy 'sym2)
+;;                (equal symy 'sym3)
+;;                (equal symx symy)))
+;;   :hints (("Goal" :smtlink nil)))
+;; )
 
-<p>Counter-examples for deflists like like:</p>
-@({
-Possible counter-example found: ((L (CONS 0 (CONS 0 NIL))))
-})
+;; (defprod sym-prod
+;;   ((sym symbolp)))
 
-<h4>defalist</h4>
-<p>Define the defalist @('symbol-integer-alist')</p>
-@(`(:code ($ symbol-integer-example))`)
+;; (acl2::must-fail
+;; (defthm bogus-revised-still-bogus-prod
+;;   (implies (and (sym-prod-p x) (sym-prod-p y))
+;;            (or (equal (sym-prod->sym x) 'sym1) (equal (sym-prod->sym x) 'sym2)
+;;                (equal (sym-prod->sym x) 'sym3)
+;;                (equal (sym-prod->sym y) 'sym1) (equal (sym-prod->sym y) 'sym2)
+;;                (equal (sym-prod->sym y) 'sym3)
+;;                (equal (sym-prod->sym x) (sym-prod->sym y))))
+;;   :hints (("Goal" :smtlink (:fty (sym-prod)))))
+;; )
 
-<p>Then define the theorem to prove:</p>
-@(`(:code ($ fty-defalist-theorem-example))`)
+;; (acl2::must-fail
+;;  (defthm check-guard
+;;    (implies (acl2::integer-listp x)
+;;             (equal (1+ (1- (car (acl2::integer-list-fix x))))
+;;                    (car (acl2::integer-list-fix x))))
+;;    :hints (("Goal" :smtlink (:fty (acl2::integer-list)))))
+;; )
 
-<p>This theorem says, given a symbol-integer-alist l, two symbols s1 and s2, if
-one can find both s1 and s2 in the alist l, then the values satisfy that their
-square sum is non-negative. I hope the square sum example hasn't bored you yet
-at this point.</p>
+;; (acl2::must-fail
+;;  (defthm check-guard-2
+;;    (implies (and (symbol-integer-alist-p l)
+;;                  (symbolp x))
+;;             (equal (1+ (1- (cdr
+;;                             (magic-fix 'symbolp_integerp
+;;                                        (assoc-equal x (symbol-integer-alist-fix
+;;                                                        l))))))
+;;                    (cdr (magic-fix 'symbolp_integerp
+;;                                    (assoc-equal x (symbol-integer-alist-fix l))))))
+;;    :hints (("Goal" :smtlink (:fty (symbol-integer-alist)))))
+;;  )
 
-<p>Similar to deflists, we notice extra fixing functions
-@('symbol-integer-alist-fix') functions are added due to similar reasons. In
-addition, we notice ACL2 doesn't have a type specification for the thing
-returned by an assoc-equal. To make sure @('cdr') knows what its argument type
-is, we add a @('magic-fix') function.</p>
+;; (defthm check-guard-3
+;;   (implies (maybe-integer-p x)
+;;            (equal (1+ (1- (maybe-integer-some->val
+;;                            (maybe-integer-fix x))))
+;;                   (maybe-integer-some->val
+;;                    (maybe-integer-fix x))))
+;;   :hints (("Goal" :smtlink (:fty (maybe-integer))))
+;;   )
 
-<p>Counter-examples for defalists like like:</p>
-@({
-((S2 (SYM 2)) (L (K SYMBOL (SOME 0))) (S1 (SYM 1)))
-})
+;; (acl2::must-fail
+;;  (defthm check-guard-3-fail
+;;    (implies (maybe-integer-p x)
+;;             (equal (1+ (1- (maybe-integer-fix x)))
+;;                    (maybe-integer-fix x)))
+;;    :hints (("Goal" :smtlink (:fty (maybe-integer))))
+;;    )
+;;  )
 
-<p>Here, the counter-example for alist l is</p>
- @({(K SYMBOL (SOME 0))})
-<p>This means in Z3 a constant array mapping from symbols to the maybe integer
- 0. Also, @('SYM') stands for generated symbols for symbol
- counter-examples.</p>
+;; (acl2::must-fail
+;; (defthm check-rational-cex
+;;   (implies (rationalp x)
+;;            (not (equal x 1/4)))
+;;   :hints (("Goal" :smtlink (:fty (maybe-integer))))
+;;   )
+;; )
 
-<h4>defoption</h4>
-<p>Define the defoption @('maybe-integer')</p>
-@(`(:code ($ maybe-integer-example))`)
+;; (acl2::must-fail
+;;  (defthm check-boolean-cex
+;;    (implies (booleanp x)
+;;             (not (equal x nil)))
+;;    :hints (("Goal" :smtlink (:fty (maybe-integer))))
+;;    )
+;;  )
 
-<p>Define the fixed version of @('x^2+y^2')</p>
-@(`(:code ($ x^2+y^2-fixed-example))`)
+;; (acl2::must-fail
+;;  (defthm check-symbol-cex
+;;    (implies (symbolp x)
+;;             (not (equal x 'arbitrary-sym)))
+;;    :hints (("Goal" :smtlink (:fty (maybe-integer))))
+;;    )
+;;  )
 
-<p>Then define the theorem to prove:</p>
-@(`(:code ($ fty-defoption-theorem-example))`)
+;; ;; algebraic counter-example example by Carl Kwan
+;; (acl2::must-fail
+;; (defthm poly-sat-7
+;;   (implies (and (real/rationalp x)
+;;                 (equal (* (+ x -1) (+ x 1) (+ x 2)) 0)
+;;                 (< x 0)
+;;                 (real/rationalp y)
+;;                 (equal (* y y) 2))
+;;            (and (equal x -1)
+;;                 (< y 0)))
+;;   :rule-classes nil
+;;   :hints (("Goal"
+;; 		       :smtlink nil)))
+;; )
 
-<p>This theorem says, given a maybe-integer m1 and a maybe-integer m2, if they
-are not nils, then the square sum of their values is non-negative.</p>
+;; (deftutorial FTY-examples
+;;   :parents (Tutorial)
+;;   :short "A list of FTY examples"
+;;   :long "<h3>FTY examples</h3>
+;; <p>Prerequisite read for this tutorial example is @(tsee tutorial).</p>
+;; <p>Smtlink supports types defined by @(tsee acl2::FTY) macros @(tsee defprod), @(tsee
+;;   deflist), @(tsee defalist) and @(tsee defoption). We show here an example for
+;;   each type.</p>
 
-<p>Similar to deflists and defalists, we notice extra fixing functions
-@('maybe-integer-fix') functions are added due to similar reasons. In addition,
-we notice in definition of function @('x^2+y^2-fixed'), even when one knows x
-and y are not nil, they are still maybe-integers. Therefore, field-accessors
-and constructors are required.</p>
+;; <h4>defprod</h4>
+;; <p>Define the function @('x^2+y^2')</p>
+;; @(`(:code ($ ||x^2+y^2||))`)
 
-<p>Counter-examples for defalists like like:</p>
-@({
-Possible counter-example found: ((M2 (SOME 0)) (M1 (SOME 0)))
-})
+;; <p>Define the defprod @('sandwich')</p>
+;; @(`(:code ($ sandwich))`)
 
-")
+;; <p>Then define the theorem to prove:</p>
+;; @(`(:code ($ fty-defprod-theorem-example))`)
 
-(defthm poly-ineq-example-with-prog2$
-  (implies (and (real/rationalp x) (real/rationalp y)
-                (<= (+ (* (/ 9 8) x x) (* y y)) 1)
-                (<= (prog2$ (cw "I'm here!~%")
-                            (x^2-y^2 x y))
-                    1))
-           (< y (- (* 3 (- x (/ 17 8)) (- x (/ 17 8))) 3)))
-  :hints(("Goal"
-          :smtlink
-          (:functions ((x^2-y^2 :formals ((x real/rationalp)
-                                          (y real/rationalp))
-                                :returns ((f real/rationalp
-                                             :meta-extract-thms
-                                             (real/rationalp-of-x^2-y^2
-                                              realfix-when-real/rationalp)))
-                                :level 1))))))
+;; <p>This theorem says, given two @('sandwich-p'), then the square sum of the
+;; bread field of the two sandwiches should be non-negative. This example doesn't
+;; quite make sense.  Here we use this as an example to show how @('defprod')
+;; defined types can be used in a theorem to be discharged by Smtlink.</p>
+
+;; <p>We notice the @(':fty') hint is used to tell Smtlink which set of FTY types
+;; we will use in proving this theorem. Here, we use the FTY type
+;; @('sandwich'). Smtlink will check @('fty::flextypes-table') for information
+;; about this FTY type.</p>
+
+;; <p>Counter-examples for defprods like like:</p>
+;; @({
+;; Possible counter-example found:
+;; ((S2 (SANDWICH 0 (SYM 2))) (S1 (SANDWICH 0 (SYM 1))))
+;; })
+
+
+;; <h4>deflist</h4>
+;; <p>Define the theorem to prove:</p>
+;; @(`(:code ($ fty-deflist-theorem-example))`)
+
+;; <p>This theorem says, given a list of integers, if there are at least two
+;; elements, then the square sum of the two elements should be non-negative.</p>
+
+;; <p>First, Smtlink only allows types defined by deflist that are @(tsee
+;; true-listp).  We notice the @(':fty') hint is used to tell Smtlink which set of
+;; FTY types we will use in proving this theorem. Here, we use the FTY type
+;; @('acl2::integer-list'). Smtlink will check @('fty::flextypes-table') to make
+;; sure the given deflist type is a true-listp.</p>
+
+;; <p>Second, we notice extra fixing functions @(tsee acl2::integer-list-fix)
+;; functions are added. This is because Z3 lists are typed. The polymorphic
+;; functions like @('car') when translated into Z3, also become typed. Therefore
+;; we need to inference which @('car') we want to apply here. Currently Smtlink
+;; doesn't have type inference ability, therefore it requires the user to add
+;; fixing functions for telling it the types.</p>
+
+;; <p>Counter-examples for deflists like like:</p>
+;; @({
+;; Possible counter-example found: ((L (CONS 0 (CONS 0 NIL))))
+;; })
+
+;; <h4>defalist</h4>
+;; <p>Define the defalist @('symbol-integer-alist')</p>
+;; @(`(:code ($ symbol-integer-example))`)
+
+;; <p>Then define the theorem to prove:</p>
+;; @(`(:code ($ fty-defalist-theorem-example))`)
+
+;; <p>This theorem says, given a symbol-integer-alist l, two symbols s1 and s2, if
+;; one can find both s1 and s2 in the alist l, then the values satisfy that their
+;; square sum is non-negative. I hope the square sum example hasn't bored you yet
+;; at this point.</p>
+
+;; <p>Similar to deflists, we notice extra fixing functions
+;; @('symbol-integer-alist-fix') functions are added due to similar reasons. In
+;; addition, we notice ACL2 doesn't have a type specification for the thing
+;; returned by an assoc-equal. To make sure @('cdr') knows what its argument type
+;; is, we add a @('magic-fix') function.</p>
+
+;; <p>Counter-examples for defalists like like:</p>
+;; @({
+;; ((S2 (SYM 2)) (L (K SYMBOL (SOME 0))) (S1 (SYM 1)))
+;; })
+
+;; <p>Here, the counter-example for alist l is</p>
+;;  @({(K SYMBOL (SOME 0))})
+;; <p>This means in Z3 a constant array mapping from symbols to the maybe integer
+;;  0. Also, @('SYM') stands for generated symbols for symbol
+;;  counter-examples.</p>
+
+;; <h4>defoption</h4>
+;; <p>Define the defoption @('maybe-integer')</p>
+;; @(`(:code ($ maybe-integer-example))`)
+
+;; <p>Define the fixed version of @('x^2+y^2')</p>
+;; @(`(:code ($ x^2+y^2-fixed-example))`)
+
+;; <p>Then define the theorem to prove:</p>
+;; @(`(:code ($ fty-defoption-theorem-example))`)
+
+;; <p>This theorem says, given a maybe-integer m1 and a maybe-integer m2, if they
+;; are not nils, then the square sum of their values is non-negative.</p>
+
+;; <p>Similar to deflists and defalists, we notice extra fixing functions
+;; @('maybe-integer-fix') functions are added due to similar reasons. In addition,
+;; we notice in definition of function @('x^2+y^2-fixed'), even when one knows x
+;; and y are not nil, they are still maybe-integers. Therefore, field-accessors
+;; and constructors are required.</p>
+
+;; <p>Counter-examples for defalists like like:</p>
+;; @({
+;; Possible counter-example found: ((M2 (SOME 0)) (M1 (SOME 0)))
+;; })
+
+;; ")
+
+;; (defthm poly-ineq-example-with-prog2$
+;;   (implies (and (real/rationalp x) (real/rationalp y)
+;;                 (<= (+ (* (/ 9 8) x x) (* y y)) 1)
+;;                 (<= (prog2$ (cw "I'm here!~%")
+;;                             (x^2-y^2 x y))
+;;                     1))
+;;            (< y (- (* 3 (- x (/ 17 8)) (- x (/ 17 8))) 3)))
+;;   :hints(("Goal"
+;;           :smtlink
+;;           (:functions ((x^2-y^2 :formals ((x real/rationalp)
+;;                                           (y real/rationalp))
+;;                                 :returns ((f real/rationalp
+;;                                              :meta-extract-thms
+;;                                              (real/rationalp-of-x^2-y^2
+;;                                               realfix-when-real/rationalp)))
+;;                                 :level 1))))))

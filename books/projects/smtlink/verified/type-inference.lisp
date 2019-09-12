@@ -492,12 +492,26 @@ term ~p0 is not supported yet. ~%" term)))))
 
 ;; TODO: I will change this function to extract the name of the elt-type from a
 ;; theorem instead of assuming the name convention later.
+;; Probably use a table of user defined types from the smtlink hint.
+(define elt-type-table ()
+  '((integerp . integer-listp)
+    (rationalp . rational-listp)))
+
+(define list-type-table ()
+  '((integer-listp . integerp)
+    (rational-listp . rationalp)))
+
 (define elt-type-of-list-type ((x symbolp))
-  :returns (fixer symbolp)
-  (b* ((x (symbol-fix x))
-       (removed-x (remove-suffix x "-LISTP"))
-       (added-x (add-suffix removed-x "P")))
-    added-x))
+  :returns (elt-type symbolp)
+  (if (equal x 't)
+      't
+    (cdr (assoc-equal (symbol-fix x) (list-type-table)))))
+
+(define list-type-of-elt-type ((x symbolp))
+  :returns (list-type symbolp)
+  (if (equal x 't)
+      't
+    (cdr (assoc-equal (symbol-fix x) (elt-type-table)))))
 
 (define make-judgement ((fn symbolp)
                         (actuals pseudo-term-listp)
@@ -537,27 +551,60 @@ term ~p0 is not supported yet. ~%" term)))))
       ;; ('assoc-equal )
       )))
 
-(define infer-fncall-cons ((fn symbolp)
-                           (actuals pseudo-term-listp)
-                           (type-alst pseudo-term-alistp)
-                           (expected-type symbolp)
-                           (fixinfo smt-fixtype-info-p)
-                           state)
-  :irrelevant-formals-ok t
-  :ignore-ok t
-  :returns (new-alst pseudo-term-alistp)
-  (pseudo-term-alist-fix type-alst))
+(define get-fn-judge ((fn symbolp))
+  :returns (judge-fn symbolp)
+  (cond ((equal fn 'cons) 'infer-fncall-cons)
+        (t 'infer-fncall-default))
+  ///
+  (more-returns
+   (judge-fn (iff (equal judge-fn 'infer-fncall-cons) (equal fn 'cons))
+             :name get-fn-judge-of-cons)))
 
 (defines infer-type
   :well-founded-relation l<
   :verify-guards nil
 
-  (define infer-fncall ((fn symbolp)
-                        (actuals pseudo-term-listp)
-                        (type-alst pseudo-term-alistp)
-                        (expected-type symbolp)
-                        (fixinfo smt-fixtype-info-p)
-                        state)
+  (define infer-fncall-cons ((fn symbolp)
+                             (actuals pseudo-term-listp)
+                             (type-alst pseudo-term-alistp)
+                             (expected-type symbolp)
+                             (fixinfo smt-fixtype-info-p)
+                             state)
+    :guard (equal fn 'cons) ;; should we allow other functions that act like cons?
+    :returns (new-alst pseudo-term-alistp)
+    :measure (list (acl2-count (pseudo-term-list-fix actuals)) 1)
+    (b* ((fn (symbol-fix fn))
+         (actuals (pseudo-term-list-fix actuals))
+         (type-alst (pseudo-term-alist-fix type-alst))
+         ((unless (mbt (equal fn 'cons))) type-alst)
+         (expected-elt-type (elt-type-of-list-type expected-type))
+         (car-type-alst
+          (infer-type (car actuals) type-alst expected-elt-type fixinfo state))
+         (car-type (get-type (car actuals) car-type-alst)) ;; int
+         (bound (if (equal expected-elt-type 't)
+                    car-type
+                  (lu-bound expected-elt-type car-type))) ;; rat
+         (expected-lst-type (list-type-of-elt-type bound)) ;; rlist
+         (cadr-type-alst
+          (infer-type (cadr actuals) car-type-alst expected-lst-type fixinfo
+                      state))
+         (cadr-type (get-type (cadr actuals) cadr-type-alst)) ;; null
+         (lst-type (if (equal cadr-type 'null) expected-lst-type cadr-type))
+         (elt-type (elt-type-of-list-type lst-type))
+         ((unless (subtype-of car-type elt-type))
+          (er hard? 'type-inference=>infer-fncall-cons
+              "Can't cons a ~p0 onto a ~p1 in term ~p2~%"
+              car-type lst-type `(,fn ,@actuals))))
+      (acons `(,fn ,@actuals)
+             `(,lst-type (,fn ,@actuals))
+             cadr-type-alst)))
+
+  (define infer-fncall-default ((fn symbolp)
+                                (actuals pseudo-term-listp)
+                                (type-alst pseudo-term-alistp)
+                                (expected-type symbolp)
+                                (fixinfo smt-fixtype-info-p)
+                                state)
     :guard (not (equal fn 'quote))
     :returns (new-alst pseudo-term-alistp)
     :measure (list (acl2-count (pseudo-term-list-fix actuals)) 1)
@@ -565,8 +612,6 @@ term ~p0 is not supported yet. ~%" term)))))
          (actuals (pseudo-term-list-fix actuals))
          (type-alst (pseudo-term-alist-fix type-alst))
          ((unless (mbt (not (equal fn 'quote)))) type-alst)
-         ((if (equal fn 'cons))
-          (infer-fncall-cons fn actuals type-alst expected-type fixinfo state))
          (expected-types (get-expected-types fn state))
          (actuals-type-alst
           (infer-type-list actuals type-alst expected-types fixinfo state))
@@ -578,6 +623,25 @@ term ~p0 is not supported yet. ~%" term)))))
       (acons `(,fn ,@actuals)
              `(,return-type (,fn ,@actuals))
              actuals-type-alst)))
+
+  (define infer-fncall ((fn symbolp)
+                        (actuals pseudo-term-listp)
+                        (type-alst pseudo-term-alistp)
+                        (expected-type symbolp)
+                        (fixinfo smt-fixtype-info-p)
+                        state)
+    :guard (not (equal fn 'quote))
+    :returns (new-alst pseudo-term-alistp)
+    :measure (list (acl2-count (pseudo-term-list-fix actuals)) 2)
+    (b* ((fn (symbol-fix fn))
+         (fn-judge (get-fn-judge fn)))
+      (case-match fn-judge
+        ('infer-fncall-cons
+         (infer-fncall-cons fn actuals type-alst expected-type fixinfo
+                            state))
+        ('infer-fncall-default
+         (infer-fncall-default fn actuals type-alst expected-type fixinfo
+                               state)))))
 
   (define infer-type ((term pseudo-termp)
                       (type-alst pseudo-term-alistp)
