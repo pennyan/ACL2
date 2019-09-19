@@ -412,6 +412,88 @@
   :elt-type integerp
   )
 
+(local (in-theory (enable acl2::rational-list-fix)))
+
+(define rational-list-cons ((x rationalp)
+                           (l rational-listp))
+  :returns (nl rational-listp)
+  (b* ((x (ifix x))
+       (l (acl2::rational-list-fix l)))
+    (cons x l)))
+
+(define rational-list-car ((l rational-listp))
+  :returns (x rationalp)
+  (b* ((l (acl2::rational-list-fix l)))
+    (ifix (car l))))
+
+(define rational-list-cdr ((l rational-listp))
+  :returns (nl rational-listp)
+  (b* ((l (acl2::rational-list-fix l)))
+    (cdr l)))
+
+(define rational-list-nil ()
+  :returns (nl rational-listp)
+  (acl2::rational-list-fix nil))
+
+(defthm rational-list-fix-when-rational-listp
+  (implies (rational-listp x)
+           (equal (acl2::rational-list-fix x) x)))
+
+(defsmtlist rational-list
+  :rec rational-listp
+  :fix acl2::rational-list-fix
+  :fix-thm rational-list-fix-when-rational-listp
+  :cons rational-list-cons
+  :car rational-list-car
+  :cdr rational-list-cdr
+  :nil-fn rational-list-nil
+  :elt-type rationalp
+  )
+
+(acl2::must-fail
+ (defthm crazy-list-theorem-1
+   (implies (and (integer-listp l1)
+                 (integer-listp l2)
+                 (equal (cons 1 (cons 2 (cons 3 nil))) l2))
+            (equal l1 l2))
+   :hints(("Goal"
+           :smtlink nil))
+   :rule-classes nil)
+ )
+
+(acl2::must-fail
+ (defthm crazy-list-theorem-2
+   (implies (and (rational-listp l1)
+                 (rational-listp l2)
+                 (equal (cons 1/2 (cons 2 (cons 3 nil))) l2))
+            (equal l1 l2))
+   :hints(("Goal"
+           :smtlink nil))
+   :rule-classes nil)
+ )
+
+(acl2::must-fail
+ (defthm crazy-list-theorem-3
+   (implies (and (rational-listp l1)
+                 (rational-listp l2)
+                 (equal (cons 1/2 (cons 1/3 nil)) l2))
+            (equal l1 l2))
+   :hints(("Goal"
+           :smtlink nil))
+   :rule-classes nil)
+ )
+
+(acl2::must-fail
+ (defthm crazy-list-theorem-4
+   (implies (and (rational-listp l1)
+                 (rational-listp l2)
+                 (equal (cons 1 (cons 2 (cons 3 l1))) l2))
+            (equal l1 l2))
+   :hints(("Goal"
+           :smtlink nil))
+   :rule-classes nil)
+ )
+
 ;; (defthm fty-deflist-theorem
 ;;   (implies (and (integer-listp l)
 ;;                 (not (equal l nil))
@@ -428,17 +510,6 @@
 ;;                                                      integerp-of-x^2+y^2-integer))
 ;;                                         :expansion-depth 1)) )))
 ;;   :rule-classes nil)
-
-(acl2::must-fail
-(defthm crazy-list-theorem
-  (implies (and (integer-listp l1)
-                (integer-listp l2)
-                (equal (cons 1 (cons 2 (cons 3 nil))) l2))
-           (equal l1 l2))
-  :hints(("Goal"
-          :smtlink nil))
-  :rule-classes nil)
-)
 
 
 ;; (local (in-theory (enable integer-list-fix integer-list-cdr
