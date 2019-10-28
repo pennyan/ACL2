@@ -476,7 +476,7 @@
  (defthm crazy-list-theorem-3
    (implies (and (rational-listp l1)
                  (rational-listp l2)
-                 (equal (cons 1/2 (cons 1/3 nil)) l2))
+                 (equal (cons 1 (cons 1/2 (cons 3 nil))) l2))
             (equal l1 l2))
    :hints(("Goal"
            :smtlink nil))
@@ -485,6 +485,17 @@
 
 (acl2::must-fail
  (defthm crazy-list-theorem-4
+   (implies (and (rational-listp l1)
+                 (rational-listp l2)
+                 (equal (cons 1/2 (cons 1/3 nil)) l2))
+            (equal l1 l2))
+   :hints(("Goal"
+           :smtlink nil))
+   :rule-classes nil)
+ )
+
+(acl2::must-fail
+ (defthm crazy-list-theorem-5
    (implies (and (rational-listp l1)
                  (rational-listp l2)
                  (equal (cons 1 (cons 2 (cons 3 l1))) l2))

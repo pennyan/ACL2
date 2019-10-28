@@ -143,7 +143,6 @@
   (b* ((type1 (symbol-fix type1))
        (type2 (symbol-fix type2)))
     (cond ((equal type2 t) t)
-          ((or (null type1) (null type2)) nil)
           ((equal type1 type2) t)
           ((and (equal type1 'null) (equal type2 'booleanp)) t)
           ((and (equal type1 'null) (list-type? type2)) t)
@@ -165,7 +164,8 @@
         type2)
        ((if (subtype-of type2 type1))
         type1))
-    nil))
+    (er hard? 'lu-bound
+        "Type ~p0 and type ~p1 have no upper bound.~%")))
 
 (define lu-bound-list ((type-lst symbol-listp))
   :returns (bound symbolp)
@@ -181,18 +181,18 @@
 
 (define update-with-expected ((term pseudo-termp)
                               (type-alst pseudo-term-alistp)
-                              (infered symbolp)
+                              (inferred symbolp)
                               (expected symbolp))
   :returns (new-alst pseudo-term-alistp)
   (b* ((term (pseudo-term-fix term))
        (type-alst (pseudo-term-alist-fix type-alst))
-       (infered (symbol-fix infered))
+       (inferred (symbol-fix inferred))
        (expected (symbol-fix expected))
-       ((unless (subtype-of infered expected))
+       ((unless (subtype-of inferred expected))
         (er hard? 'type-inference=>update-with-expected
             "Expected type ~p0 but ~p1 is of type ~p2~%"
-            expected term infered)))
-    (acons term `(,infered ,term) type-alst)))
+            expected term inferred)))
+    (acons term `(,inferred ,term) type-alst)))
 
 ;; What constants are recognized
 ;; 1 2 3 ... integerp
@@ -304,7 +304,9 @@ term ~p0 is not supported yet. ~%" term)))))
   (b* ((term (pseudo-term-fix term))
        (type-alst (pseudo-term-alist-fix type-alst))
        (the-item (assoc-equal term type-alst))
-       ((unless the-item) nil)
+       ((unless the-item)
+        (er hard? 'type-inference=>get-type
+            "The term hasn't been typed yet: ~q0" term))
        (type-term (cdr the-item))
        ((unless (and (consp type-term) (symbolp (car type-term))))
         (er hard? 'type-inference=>get-type
@@ -564,6 +566,20 @@ term ~p0 is not supported yet. ~%" term)))))
   :well-founded-relation l<
   :verify-guards nil
 
+  ;; Type Inference for Cons
+  ;; From expected-type for the cons, calculate expected type for the car of
+  ;; cons. Infer the type for car of cons with expected type for the car.
+  ;; If expected-elt-type is t, then use infer type as bound, else take the
+  ;; upper bound of expected type and the inferred type.
+  ;; From the bound, calculate expected list type. Then use expected list type
+  ;; for inferring the type of the cadr of the list.
+  ;; If type of cadr is 'null, this means cadr is 'nil, use the expected list
+  ;; type as list type in that case. Otherwise use the inferred type as the
+  ;; list type.
+  ;; From the inferred list type, get the corresponding element type. Check if
+  ;; the inferred car type is a subtype of the element type.
+  ;; Return the inferred list type.
+
   (define infer-fncall-cons ((fn symbolp)
                              (actuals pseudo-term-listp)
                              (type-alst pseudo-term-alistp)
@@ -577,18 +593,22 @@ term ~p0 is not supported yet. ~%" term)))))
          (actuals (pseudo-term-list-fix actuals))
          (type-alst (pseudo-term-alist-fix type-alst))
          ((unless (mbt (equal fn 'cons))) type-alst)
+         (- (cw "expected type: ~q0" expected-type))
          (expected-elt-type (elt-type-of-list-type expected-type))
          (car-type-alst
-          (infer-type (car actuals) type-alst expected-elt-type fixinfo state))
+          (infer-type (car actuals) type-alst t fixinfo state))
          (car-type (get-type (car actuals) car-type-alst)) ;; int
-         (bound (if (equal expected-elt-type 't)
+         (- (cw "car type: ~q0" car-type))
+         (bound (if (equal expected-elt-type t)
                     car-type
                   (lu-bound expected-elt-type car-type))) ;; rat
+         (- (cw "bound: ~q0" bound))
          (expected-lst-type (list-type-of-elt-type bound)) ;; rlist
          (cadr-type-alst
           (infer-type (cadr actuals) car-type-alst expected-lst-type fixinfo
                       state))
          (cadr-type (get-type (cadr actuals) cadr-type-alst)) ;; null
+         (- (cw "cadr type: ~q0" cadr-type))
          (lst-type (if (equal cadr-type 'null) expected-lst-type cadr-type))
          (elt-type (elt-type-of-list-type lst-type))
          ((unless (subtype-of car-type elt-type))
@@ -719,8 +739,8 @@ term ~p0 is not supported yet. ~%" term)))))
 (define infer-type-cp ((cl pseudo-term-listp)
                        (hints t)
                        state)
-  (b* ((infered-clause (infer-type-fn cl hints state)))
-    (value infered-clause)))
+  (b* ((inferred-clause (infer-type-fn cl hints state)))
+    (value inferred-clause)))
 
 (local (in-theory (enable infer-type-cp infer-type-fn infer-type)))
 
