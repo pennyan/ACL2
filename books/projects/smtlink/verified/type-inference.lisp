@@ -385,7 +385,6 @@ term ~p0 is not supported yet. ~%" term)))))
   (("Goal"
     :in-theory (disable consp-of-pseudo-lambdap
                         symbol-listp
-                        acl2::pseudo-lambdap-when-pseudo-termp
                         assoc-equal
                         default-car
                         std::defguts-p
@@ -412,14 +411,12 @@ term ~p0 is not supported yet. ~%" term)))))
                 (("Goal"
                   :in-theory (disable consp-of-pseudo-lambdap
                                       symbol-listp
-                                      acl2::pseudo-lambdap-when-pseudo-termp
                                       fgetprop
                                       pseudo-termp))))
   :guard-hints
   (("Goal"
     :in-theory (disable consp-of-pseudo-lambdap
                         symbol-listp
-                        acl2::pseudo-lambdap-when-pseudo-termp
                         assoc-equal
                         default-car
                         std::defguts-p
