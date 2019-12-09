@@ -450,6 +450,7 @@
   :elt-type rationalp
   )
 
+;; should type check
 (acl2::must-fail
  (defthm crazy-list-theorem-1
    (implies (and (integer-listp l1)
@@ -461,6 +462,7 @@
    :rule-classes nil)
  )
 
+;; should type check
 (acl2::must-fail
  (defthm crazy-list-theorem-2
    (implies (and (rational-listp l1)
@@ -472,6 +474,7 @@
    :rule-classes nil)
  )
 
+;; should type check
 (acl2::must-fail
  (defthm crazy-list-theorem-3
    (implies (and (rational-listp l1)
@@ -483,6 +486,7 @@
    :rule-classes nil)
  )
 
+;; should type check
 (acl2::must-fail
  (defthm crazy-list-theorem-4
    (implies (and (rational-listp l1)
@@ -494,6 +498,7 @@
    :rule-classes nil)
  )
 
+;; should type check
 (acl2::must-fail
  (defthm crazy-list-theorem-5
    (implies (and (rational-listp l1)
@@ -504,6 +509,153 @@
            :smtlink nil))
    :rule-classes nil)
  )
+
+;; should fail type inference. Can't compare two lists with difference sorts --
+;; integer-listp and rational-listp.
+(acl2::must-fail
+ (defthm crazy-list-theorem-6
+   (implies (and (integer-listp l1)
+                 (rational-listp l2)
+                 (equal (cons 1 (cons 2 (cons 3 l1))) l2))
+            (equal l1 l2))
+   :hints(("Goal"
+           :smtlink nil))
+   :rule-classes nil)
+ )
+
+;; tests for acons
+(defalist rational-rational-alist
+  :key-type rationalp
+  :val-type rationalp
+  :pred rational-rational-alistp
+  :true-listp t)
+
+(defsmtarray rational-rational-alist
+  :rec rational-rational-alistp
+  :fix rational-rational-alist-fix
+  :fix-thm rational-rational-alist-fix-when-rational-rational-alist-p
+  :k k
+  :store rational-rational-alist-store
+  :select rational-rational-alist-select
+  :key-type rationalp
+  :val-type rationalp
+  )
+
+(defalist integer-integer-alist
+  :key-type integerp
+  :val-type integerp
+  :pred integer-integer-alistp
+  :true-listp t)
+
+(defsmtarray integer-integer-alist
+  :rec integer-integer-alistp
+  :fix integer-integer-alist-fix
+  :fix-thm integer-integer-alist-fix-when-integer-integer-alist-p
+  :k k
+  :store integer-integer-alist-store
+  :select integer-integer-alist-select
+  :key-type integerp
+  :val-type integerp
+  )
+
+(defalist integer-rational-alist
+  :key-type integerp
+  :val-type rationalp
+  :pred integer-rational-alistp
+  :true-listp t)
+
+(defsmtarray integer-rational-alist
+  :rec integer-rational-alistp
+  :fix integer-rational-alist-fix
+  :fix-thm integer-rational-alist-fix-when-integer-rational-alist-p
+  :k k
+  :store integer-rational-alist-store
+  :select integer-rational-alist-select
+  :key-type integerp
+  :val-type rationalp
+  )
+
+(defalist rational-integer-alist
+  :key-type rationalp
+  :val-type integerp
+  :pred rational-integer-alistp
+  :true-listp t)
+
+(defsmtarray rational-integer-alist
+  :rec rational-integer-alistp
+  :fix rational-integer-alist-fix
+  :fix-thm rational-integer-alist-fix-when-rational-integer-alist-p
+  :k k
+  :store rational-integer-alist-store
+  :select rational-integer-alist-select
+  :key-type rationalp
+  :val-type integerp
+  )
+
+;; should type check
+(acl2::must-fail
+(defthm crazy-alist-theorem
+  (implies (and (rational-rational-alistp al1)
+                (rational-rational-alistp al2))
+           (equal (acons 1 1/2 al1) al2))
+  :hints(("Goal"
+          :smtlink nil))
+  :rule-classes nil)
+)
+
+;; should type check
+(acl2::must-fail
+(defthm crazy-alist-theorem-1
+  (implies (and (rational-rational-alistp al1)
+                (rational-rational-alistp al2))
+           (equal (acons 1/2 1 (acons 1 1/2 al1)) al2))
+  :hints(("Goal"
+          :smtlink nil))
+  :rule-classes nil)
+)
+
+;; should fail type inference
+(acl2::must-fail
+(defthm crazy-alist-theorem-2
+  (implies (and (integer-integer-alistp al1)
+                (rational-rational-alistp al2))
+           (equal (acons 1 1/2 (acons 4 3 al1)) al2))
+  :hints(("Goal"
+          :smtlink nil))
+  :rule-classes nil)
+)
+
+;; should type check
+(acl2::must-fail
+(defthm crazy-alist-theorem-3
+  (implies (integer-rational-alistp al2)
+           (equal (acons 1 1/2 (acons 4 3 nil)) al2))
+  :hints(("Goal"
+          :smtlink nil))
+  :rule-classes nil)
+)
+
+;; should type check
+(acl2::must-fail
+(defthm crazy-alist-theorem-4
+  (implies (integer-rational-alistp al)
+           (assoc-equal 1 (acons 1 2 al)))
+  :hints(("Goal"
+          :smtlink nil))
+  :rule-classes nil)
+)
+
+;; should type check
+(acl2::must-fail
+ (defthm crazy-alist-theorem-5
+   (implies (integer-rational-alistp al)
+            (b* ((al al))
+              (assoc-equal 1 (acons 1 2 al))))
+   :hints(("Goal"
+           :smtlink nil))
+   :rule-classes nil)
+ )
+
 
 ;; (defthm fty-deflist-theorem
 ;;   (implies (and (integer-listp l)

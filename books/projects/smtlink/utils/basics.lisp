@@ -135,6 +135,11 @@
   :pred pseudo-term-alistp
   :true-listp t)
 
+(defthm pseudo-term-alistp-of-pairlis$-of-symbol-listp-and-pseudo-term-listp
+  (implies (and (symbol-listp y)
+                (pseudo-term-listp x))
+           (pseudo-term-alistp (pairlis$ y x))))
+
 (define true-list-fix ((lst true-listp))
   :parents (SMT-hint-interface)
   :short "Fixing function for true-listp."
@@ -181,4 +186,9 @@
 (deflist symbol-list-list
   :elt-type symbol-listp
   :pred symbol-list-listp
+  :true-listp t)
+
+(defalist scope
+  :key-type symbol-listp
+  :val-type pseudo-term-listp
   :true-listp t)
