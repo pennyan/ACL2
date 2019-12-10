@@ -238,6 +238,7 @@
   :returns (bound symbolp)
   (b* ((type1 (symbol-fix type1))
        (type2 (symbol-fix type2))
+       (- (cw "type1: ~p0; type2: ~p1~%" type1 type2))
        ((if (subtype-of type1 type2))
         type2)
        ((if (subtype-of type2 type1))
@@ -469,6 +470,7 @@
                         std::defguts-p
                         pseudo-termp)))
   (b* ((fn (remove-suffix fn "$INLINE"))
+       (- (cw "fn: ~q0" fn))
        (gut (assoc-equal fn (get-define-guts-alist (w state))))
        ((unless (and (consp gut) (std::defguts-p (cdr gut))))
         (er hard? 'type-inference=>get-guards
@@ -502,16 +504,19 @@
                         pseudo-termp)))
   (b* ((fn (remove-suffix fn "$INLINE"))
        (gut (assoc-equal fn (get-define-guts-alist (w state))))
+       (- (cw "gut: ~q0" gut))
        ((unless (and (consp gut) (std::defguts-p (cdr gut))))
         (er hard? 'type-inference=>get-return
             "Can't find function ~p0 in the std::defguts table.~%" fn))
        (returnspecs (std::defguts->returnspecs (cdr gut)))
+       (- (cw "returnspecs: ~q0" returnspecs))
        ((unless (and (consp returnspecs) (std::returnspec-p (car returnspecs))
                      (null (cdr returnspecs))))
         (er hard? 'type-inference=>get-return
             "Currently only functions that returns one argument is supported
                     ~p0~%" fn))
        (returnspec (std::returnspec->return-type (car returnspecs)))
+       (- (cw "returnspec: ~q0" returnspec))
        ((unless (and (pseudo-termp returnspec) (type-decl-p returnspec fixinfo)))
         (er hard? 'type-inference=>get-return
             "Return spec for ~p0 is not a type-decl-p ~p1.~%" fn returnspec)))
@@ -682,7 +687,7 @@
       ('not (judgement :nargs 1 :get-type nil
                        :bound nil :numerical nil :returned 'booleanp))
       ('if (judgement :nargs 3 :bound (cdr types) :numerical nil
-                      :returned 'booleanp))
+                      :returned bound))
       ('implies (judgement :nargs 2 :get-type nil :bound nil :numerical nil
                            :returned 'booleanp))
       ('car (judgement :nargs 1 :bound nil :numerical nil
@@ -1016,6 +1021,8 @@
        ((smtlink-hint h) smtlink-hint)
        ((mv type-hyp-lst untyped-theorem)
         (smt-extract (disjoin cl) h.types-info))
+       (- (cw "type-hyp-lst: ~q0" type-hyp-lst))
+       (- (cw "untyped-theorem: ~q0" untyped-theorem))
        (type-alist (type-list-to-alist type-hyp-lst h.types-info))
        (- (cw "type-alist: ~q0" type-alist))
        ((mv new-hyp top-type)

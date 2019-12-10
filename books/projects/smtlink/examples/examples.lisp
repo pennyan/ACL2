@@ -656,6 +656,85 @@
    :rule-classes nil)
  )
 
+(defprod lunch
+  ((main symbolp)
+   (snack integerp)
+   (drink rationalp)))
+
+(defsmtprod lunch
+  :rec lunch-p
+  :fix lunch-fix
+  :fix-thm lunch-fix-when-lunch-p
+  :constructor (lunch lunch-p)
+  :destructors ((main symbolp) (snack integerp) (drink rationalp))
+  )
+
+;;should type check
+(acl2::must-fail
+(defthm crazy-prod-theorem-1
+  (implies (lunch-p x)
+           (acons (lunch->snack x) (lunch->drink x) nil))
+  :hints(("Goal"
+          :smtlink nil))))
+
+(defoption maybe-lunch lunch-p)
+
+(defsmtoption maybe-lunch
+  :rec maybe-lunch-p
+  :fix maybe-lunch-fix
+  :fix-thm maybe-lunch-fix-when-maybe-lunch-p
+  :some-constructor maybe-lunch-some
+  :some-destructor maybe-lunch-some->val
+  :none-constructor maybe-lunch-none
+  :some-type lunchp
+  )
+
+;; should type check
+(acl2::must-fail
+(defthm crazy-option-theorem-1
+  (implies (maybe-lunch-p x)
+           (if x
+               (acons (lunch->snack x) (lunch->drink x) nil)
+             nil))
+  :hints(("Goal"
+          :smtlink nil))
+  :rule-classes nil)
+)
+
+(deftagsum meal
+  (:lunch ((main symbolp)
+           (snack integerp)
+           (drink rationalp)))
+  (:dinner ((appetizer symbolp)
+            (main symbolp)
+            (desert integerp))))
+
+(defsmtsum meal
+  :rec meal-p
+  :fix meal-fix
+  :fix-thm meal-fix-when-meal-p
+  :kind-function meal-kind
+  :prods ((:lunch :constructor (meal-lunch meal-p)
+                  :destructors ((main symbolp)
+                                (snack integerp)
+                                (drink raitonalp)))
+          (:dinner :contructor (meal-dinner meal-p)
+                   :destructors ((appetizer symbolp)
+                                 (main symbolp)
+                                 (desert integerp)))))
+
+;; should type check
+(defthm crazy-sum-theorem-1
+  (implies (meal-p x)
+           (if (equal (meal-kind x) :lunch)
+               (equal (meal-lunch->snack x) (meal-lunch->drink x))
+             (equal (meal-dinner->appetizer x) (meal-dinner->main x))))
+  :hints(("Goal"
+          :smtlink nil))
+  :rule-classes nil)
+
+(def)
+
 
 ;; (defthm fty-deflist-theorem
 ;;   (implies (and (integer-listp l)
