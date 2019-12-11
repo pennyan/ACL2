@@ -38,6 +38,14 @@
              (symbolp (car x)))
     :hints (("Goal" :in-theory (enable pseudo-lambdap))))
 
+  (defthm equal-len-of-pseudo-lambda-formals-and-actuals
+    (implies (and (pseudo-termp term)
+                  (consp term)
+                  (pseudo-lambdap (car term)))
+             (equal (len (lambda-formals (car term)))
+                    (len (cdr term))))
+    :hints (("Goal" :in-theory (enable pseudo-lambdap))))
+
   ;; I find that Sol has another version of pseudo-lambda-p and
   ;; pseudo-lambda-fix in clause-processors/pseudo-term-fty.lisp that's
   ;; probably more FTY friendly.

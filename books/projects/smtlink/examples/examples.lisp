@@ -733,8 +733,6 @@
           :smtlink nil))
   :rule-classes nil)
 
-(def)
-
 
 ;; (defthm fty-deflist-theorem
 ;;   (implies (and (integer-listp l)

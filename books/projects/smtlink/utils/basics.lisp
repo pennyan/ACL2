@@ -140,6 +140,10 @@
                 (pseudo-term-listp x))
            (pseudo-term-alistp (pairlis$ y x))))
 
+(defthm nil-of-assoc-equal-of-pseudo-term-alistp
+  (implies (and (pseudo-term-alistp x) (not (consp (assoc-equal y x))))
+           (not (assoc-equal y x))))
+
 (define true-list-fix ((lst true-listp))
   :parents (SMT-hint-interface)
   :short "Fixing function for true-listp."
