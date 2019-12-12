@@ -178,6 +178,12 @@
   :ignore-ok t
   t)
 
+(define kind-fn? ((x symbolp))
+  :returns (ok booleanp)
+  (b* ((str (symbol-name (symbol-fix x)))
+       ((if (< (length str) 5)) nil))
+    (not (null (search "-KIND" str)))))
+
 ;;
 (define expected-types ()
   `((equal . (t t))
@@ -485,6 +491,7 @@
                         std::defguts-p
                         pseudo-termp)))
   (b* ((fn (remove-suffix fn "$INLINE"))
+       ((if (kind-fn? fn)) 'symbolp)
        (gut (assoc-equal fn (get-define-guts-alist (w state))))
        (- (cw "gut: ~q0" gut))
        ((unless (and (consp gut) (std::defguts-p (cdr gut))))
