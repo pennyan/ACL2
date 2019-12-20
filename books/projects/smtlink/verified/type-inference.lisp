@@ -493,19 +493,16 @@
   (b* ((fn (remove-suffix fn "$INLINE"))
        ((if (kind-fn? fn)) 'symbolp)
        (gut (assoc-equal fn (get-define-guts-alist (w state))))
-       (- (cw "gut: ~q0" gut))
        ((unless (and (consp gut) (std::defguts-p (cdr gut))))
         (er hard? 'type-inference=>get-return
             "Can't find function ~p0 in the std::defguts table.~%" fn))
        (returnspecs (std::defguts->returnspecs (cdr gut)))
-       (- (cw "returnspecs: ~q0" returnspecs))
        ((unless (and (consp returnspecs) (std::returnspec-p (car returnspecs))
                      (null (cdr returnspecs))))
         (er hard? 'type-inference=>get-return
             "Currently only functions that returns one argument is supported
                     ~p0~%" fn))
        (returnspec (std::returnspec->return-type (car returnspecs)))
-       (- (cw "returnspec: ~q0" returnspec))
        ((unless (and (pseudo-termp returnspec) (type-decl-p returnspec fixinfo)))
         (er hard? 'type-inference=>get-return
             "Return spec for ~p0 is not a type-decl-p ~p1.~%" fn returnspec)))
@@ -684,27 +681,104 @@
       (& (get-return fn fixinfo state))
       )))
 
-(define get-fn-judge ((fn symbolp))
-  :returns (judge-fn symbolp)
-  (cond ((equal fn 'cons) 'infer-fncall-cons)
-        ((equal fn 'acons) 'infer-fncall-acons)
-        ((equal fn 'assoc-equal) 'infer-fncall-assoc-equal)
-        ((equal fn 'cdr) 'infer-fncall-cdr)
-        (t 'infer-fncall-default))
-  ///
-  (more-returns
-   (judge-fn (iff (equal judge-fn 'infer-fncall-cons) (equal fn 'cons))
-             :name get-fn-judge-of-cons)
-   (judge-fn (iff (equal judge-fn 'infer-fncall-acons) (equal fn 'acons))
-             :name get-fn-judge-of-acons)
-   (judge-fn (iff (equal judge-fn 'infer-fncall-assoc-equal) (equal fn 'assoc-equal))
-             :name get-fn-judge-of-assoc-equal)
-   (judge-fn (iff (equal judge-fn 'infer-fncall-cdr) (equal fn 'cdr))
-             :name get-fn-judge-of-cdr)))
+(define cut-bound ((expected-type symbolp)
+                   (type symbolp))
+  :returns (bound symbolp)
+  (b* ((type (symbol-fix type))
+       (expected-type (symbol-fix expected-type))
+       ((if expected-type) type))
+    (lu-bound expected-type type)))
+
+(local
+ (defthm pseudo-termp-of-lambda-conjunction
+   (implies (and (symbol-listp formals)
+                 (pseudo-termp body-conj)
+                 (pseudo-term-listp actuals)
+                 (pseudo-termp actuals-conj)
+                 (equal (len formals) (len actuals)))
+            (pseudo-termp
+             `(and ((lambda ,formals ,body-conj) ,@actuals)
+                   ,actuals-conj))))
+ )
 
 (defines infer-type
   :well-founded-relation l<
   :verify-guards nil
+  :hints (("Goal" :in-theory (disable symbolp-of-fn-call-of-pseudo-termp
+                                      pseudo-term-listp-of-symbol-listp
+                                      acl2::pseudo-termp-opener
+                                      acl2::symbol-listp-when-not-consp
+                                      acl2::pseudo-lambdap-of-car-when-pseudo-lambda-listp
+                                      pseudo-term-alist-fix-when-pseudo-term-alistp
+                                      assoc-equal
+                                      default-car
+                                      default-cdr
+                                      consp-of-cdr-of-pseudo-lambdap
+                                      acl2::true-listp-of-car-when-true-list-listp
+                                      true-list-listp
+                                      acl2::pseudo-lambda-listp-of-cdr-when-pseudo-lambda-listp
+                                      acl2::symbol-listp-cdr-assoc-equal
+                                      acl2::symbol-list-listp
+                                      nil-of-assoc-equal-of-pseudo-term-alistp
+                                      acl2::pseudo-termp-cadr-from-pseudo-term-listp
+                                      pseudo-term-alistp-when-not-consp
+                                      consp-car-of-pseudo-term-alist-fix
+                                      pseudo-termp-of-car-when-member-equal-of-pseudo-term-alistp
+                                      member-equal
+                                      pseudo-term-listp
+                                      acl2::rational-listp-of-cdr-when-rational-listp
+                                      acl2::integer-listp-of-cdr-when-integer-listp
+                                      (:rewrite symbol-listp-of-car-when-symbol-list-listp)
+                                      (:rewrite symbolp-of-caar-when-symbol-symbol-alistp)
+                                      symbolp-of-caar-when-smtlink-hint-alist-p
+                                      acl2::symbolp-of-caar-when-symbol-symbol-alistp
+                                      symbolp-of-caar-when-symbol-prod-alist-p
+                                      symbolp-of-caar-when-symbol-hint-pair-alist-p
+                                      symbolp-of-caar-when-smt-fixtype-info-p
+                                      acl2::rationalp-of-car-when-rational-listp
+                                      acl2::integerp-of-car-when-integer-listp
+                                      (:definition integer-listp)
+                                      (:definition rational-listp)
+                                      )))
+  :returns-hints (("Goal"
+                   :in-theory (disable symbolp-of-fn-call-of-pseudo-termp
+                                       pseudo-term-listp-of-symbol-listp
+                                       acl2::pseudo-termp-opener
+                                       acl2::symbol-listp-when-not-consp
+                                       acl2::pseudo-lambdap-of-car-when-pseudo-lambda-listp
+                                       pseudo-term-alist-fix-when-pseudo-term-alistp
+                                       assoc-equal
+                                       default-car
+                                       default-cdr
+                                       consp-of-cdr-of-pseudo-lambdap
+                                       acl2::true-listp-of-car-when-true-list-listp
+                                       true-list-listp
+                                       acl2::pseudo-lambda-listp-of-cdr-when-pseudo-lambda-listp
+                                       acl2::symbol-listp-cdr-assoc-equal
+                                       acl2::symbol-list-listp
+                                       nil-of-assoc-equal-of-pseudo-term-alistp
+                                       acl2::pseudo-termp-cadr-from-pseudo-term-listp
+                                       pseudo-term-alistp-when-not-consp
+                                       consp-car-of-pseudo-term-alist-fix
+                                       pseudo-termp-of-car-when-member-equal-of-pseudo-term-alistp
+                                       member-equal
+                                       pseudo-term-listp
+                                       acl2::rational-listp-of-cdr-when-rational-listp
+                                       acl2::integer-listp-of-cdr-when-integer-listp
+                                       (:rewrite symbol-listp-of-car-when-symbol-list-listp)
+                                       (:rewrite symbolp-of-caar-when-symbol-symbol-alistp)
+                                       symbolp-of-caar-when-smtlink-hint-alist-p
+                                       acl2::symbolp-of-caar-when-symbol-symbol-alistp
+                                       symbolp-of-caar-when-symbol-prod-alist-p
+                                       symbolp-of-caar-when-symbol-hint-pair-alist-p
+                                       symbolp-of-caar-when-smt-fixtype-info-p
+                                       pseudo-termp
+                                       (:executable-counterpart symbolp)
+                                       acl2::rationalp-of-car-when-rational-listp
+                                       acl2::integerp-of-car-when-integer-listp
+                                       (:definition integer-listp)
+                                       (:definition rational-listp)
+                                       )))
 
   ;; Type Inference for Cons
   ;; This is an algorithm that first goes top down passing along the type
@@ -712,22 +786,22 @@
   ;; calculating the upper bound of the passed information with the inferred
   ;; information. It then goes bottom up passing along the upper bound as the
   ;; inferred type for the whole list.
-
-  (define infer-fncall-cons ((fn symbolp)
-                             (actuals pseudo-term-listp)
-                             (var-alst pseudo-term-alistp)
-                             (type-alst pseudo-term-alistp)
-                             (conj-acc pseudo-termp)
-                             (expected-type symbolp)
-                             (fixinfo smt-fixtype-info-p)
-                             state)
-    :guard (equal fn 'cons) ;; should we allow other functions that act like cons?
+  (define infer-cons ((fn symbolp)
+                      (actuals pseudo-term-listp)
+                      (var-alst pseudo-term-alistp)
+                      (type-alst pseudo-term-alistp)
+                      (conj-acc pseudo-termp)
+                      (expected-type symbolp)
+                      (fixinfo smt-fixtype-info-p)
+                      state)
+    :guard (equal fn 'cons)
     :returns (mv (new-conj pseudo-termp)
                  (new-alst pseudo-term-alistp)
                  (new-type symbolp))
     :measure (list (acl2-count (pseudo-term-list-fix actuals)) 1)
     (b* ((fn (symbol-fix fn))
          (actuals (pseudo-term-list-fix actuals))
+         (var-alst (pseudo-term-alist-fix var-alst))
          (type-alst (pseudo-term-alist-fix type-alst))
          (conj-acc (pseudo-term-fix conj-acc))
          ((unless (mbt (equal fn 'cons))) (mv conj-acc type-alst nil))
@@ -737,37 +811,30 @@
          ;; Taking the upper bound of t with car-type will produce t, which is
          ;; not what we want. Therefore we are making a case for this special
          ;; occasion.
-         (bound (if (equal expected-elt-type t)
-                    car-type
-                  (lu-bound expected-elt-type car-type)))
+         (bound (cut-bound expected-elt-type car-type))
          (expected-lst-type (list-type-of-elt-type bound))
          ((mv cadr-conj cadr-type-alst cadr-type)
           (infer-type (cadr actuals) var-alst car-type-alst car-conj
                       expected-lst-type fixinfo state))
          ;; If cadr is nil of type 'null, then the type for the list should be
          ;; the expected type, otherwise use cadr-type
-         (lst-type (if (equal cadr-type 'null) expected-lst-type cadr-type))
-         (elt-type (elt-type-of-list-type lst-type))
+         (return-type (if (equal cadr-type 'null) expected-lst-type cadr-type))
+         (elt-type (elt-type-of-list-type return-type))
          ((unless (subtype-of car-type elt-type))
           (mv (er hard? 'type-inference=>infer-fncall-cons
                   "Can't cons a ~p0 onto a ~p1 in term ~p2~%"
-                  car-type lst-type `(,fn ,@actuals))
+                  car-type return-type `(,fn ,@actuals))
               nil nil)))
-      (mv `(and (,lst-type (,fn ,@actuals))
-                ,cadr-conj)
-          (acons `(,fn ,@actuals)
-                 `(,lst-type (,fn ,@actuals))
-                 cadr-type-alst)
-          lst-type)))
+      (mv cadr-conj cadr-type-alst return-type)))
 
-  (define infer-fncall-acons ((fn symbolp)
-                              (actuals pseudo-term-listp)
-                              (var-alst pseudo-term-alistp)
-                              (type-alst pseudo-term-alistp)
-                              (conj-acc pseudo-termp)
-                              (expected-type symbolp)
-                              (fixinfo smt-fixtype-info-p)
-                              state)
+  (define infer-acons ((fn symbolp)
+                       (actuals pseudo-term-listp)
+                       (var-alst pseudo-term-alistp)
+                       (type-alst pseudo-term-alistp)
+                       (conj-acc pseudo-termp)
+                       (expected-type symbolp)
+                       (fixinfo smt-fixtype-info-p)
+                       state)
     :guard (equal fn 'acons)
     :returns (mv (new-conj pseudo-termp)
                  (new-alst pseudo-term-alistp)
@@ -775,6 +842,7 @@
     :measure (list (acl2-count (pseudo-term-list-fix actuals)) 1)
     (b* ((fn (symbol-fix fn))
          (actuals (pseudo-term-list-fix actuals))
+         (var-alst (pseudo-term-alist-fix var-alst))
          (type-alst (pseudo-term-alist-fix type-alst))
          (conj-acc (pseudo-term-fix conj-acc))
          ((unless (mbt (equal fn 'acons))) (mv conj-acc type-alst nil))
@@ -782,44 +850,35 @@
          (expected-val-type (val-type-of-alist-type expected-type))
          ((mv key-conj key-type-alst key-type)
           (infer-type (car actuals) var-alst type-alst conj-acc t fixinfo state))
-         (key-bound (if (equal expected-key-type t)
-                        key-type
-                      (lu-bound expected-key-type key-type)))
+         (key-bound (cut-bound expected-key-type key-type))
          ((mv val-conj val-type-alst val-type)
           (infer-type (cadr actuals) var-alst key-type-alst key-conj t fixinfo state))
-         (val-bound (if (equal expected-val-type t)
-                        val-type
-                      (lu-bound expected-val-type val-type)))
+         (val-bound (cut-bound expected-val-type val-type))
          (expected-alst-type
           (alist-type-of-key-val-type `(,key-bound ,val-bound)))
          ((mv alst-conj alst-type-alst alst-type)
           (infer-type (caddr actuals) var-alst val-type-alst val-conj
                       expected-alst-type fixinfo state))
-         (whole-alst-type
+         (return-type
           (if (equal alst-type 'null) expected-alst-type alst-type))
-         (whole-key-type (key-type-of-alist-type whole-alst-type))
-         (whole-val-type (val-type-of-alist-type whole-alst-type))
+         (whole-key-type (key-type-of-alist-type return-type))
+         (whole-val-type (val-type-of-alist-type return-type))
          ((unless (and (subtype-of key-type whole-key-type)
                        (subtype-of val-type whole-val-type)))
           (mv (er hard? 'type-inference=>infer-fncall-acons
                   "Can't acons a ~p0 with a ~p1 onto a ~p2 in term ~p3~%"
-                  key-type val-type  whole-alst-type `(,fn ,@actuals))
+                  key-type val-type return-type `(,fn ,@actuals))
               nil nil)))
-      (mv `(and (,whole-alst-type (,fn ,@actuals))
-                ,alst-conj)
-          (acons `(,fn ,@actuals)
-                 `(,whole-alst-type (,fn ,@actuals))
-                 alst-type-alst)
-          whole-alst-type)))
+      (mv alst-conj alst-type-alst return-type)))
 
-  (define infer-fncall-assoc-equal ((fn symbolp)
-                                    (actuals pseudo-term-listp)
-                                    (var-alst pseudo-term-alistp)
-                                    (type-alst pseudo-term-alistp)
-                                    (conj-acc pseudo-termp)
-                                    (expected-type symbolp)
-                                    (fixinfo smt-fixtype-info-p)
-                                    state)
+  (define infer-assoc-equal ((fn symbolp)
+                             (actuals pseudo-term-listp)
+                             (var-alst pseudo-term-alistp)
+                             (type-alst pseudo-term-alistp)
+                             (conj-acc pseudo-termp)
+                             (expected-type symbolp)
+                             (fixinfo smt-fixtype-info-p)
+                             state)
     :guard (equal fn 'assoc-equal)
     :returns (mv (new-conj pseudo-termp)
                  (new-alst pseudo-term-alistp)
@@ -829,10 +888,10 @@
     :ignore-ok t
     (b* ((fn (symbol-fix fn))
          (actuals (pseudo-term-list-fix actuals))
+         (var-alst (pseudo-term-alist-fix var-alst))
          (type-alst (pseudo-term-alist-fix type-alst))
          (conj-acc (pseudo-term-fix conj-acc))
          ((unless (mbt (equal fn 'assoc-equal))) (mv conj-acc type-alst nil))
-         (expected-key-type (key-type-of-cons-type expected-type))
          ((mv key-conj key-type-alst key-type)
           (infer-type (car actuals) var-alst type-alst conj-acc t fixinfo state))
          ((mv alst-conj alst-type-alst alst-type)
@@ -844,22 +903,17 @@
                   key-type alst-type `(,fn ,@actuals))
               nil nil))
          (cons-type (cons-type-of-alist-type alst-type))
-         (maybe-cons-type (maybe-of-cons-table cons-type)))
-      (mv `(and (,maybe-cons-type (,fn ,@actuals))
-                ,alst-conj)
-          (acons `(,fn ,@actuals)
-                 `(,maybe-cons-type (,fn ,@actuals))
-                 alst-type-alst)
-          maybe-cons-type)))
+         (return-type (maybe-of-cons-table cons-type)))
+      (mv alst-conj alst-type-alst return-type)))
 
-  (define infer-fncall-cdr ((fn symbolp)
-                            (actuals pseudo-term-listp)
-                            (var-alst pseudo-term-alistp)
-                            (type-alst pseudo-term-alistp)
-                            (conj-acc pseudo-termp)
-                            (expected-type symbolp)
-                            (fixinfo smt-fixtype-info-p)
-                            state)
+  (define infer-cdr ((fn symbolp)
+                     (actuals pseudo-term-listp)
+                     (var-alst pseudo-term-alistp)
+                     (type-alst pseudo-term-alistp)
+                     (conj-acc pseudo-termp)
+                     (expected-type symbolp)
+                     (fixinfo smt-fixtype-info-p)
+                     state)
     :guard (equal fn 'cdr)
     :returns (mv (new-conj pseudo-termp)
                  (new-alst pseudo-term-alistp)
@@ -867,6 +921,7 @@
     :measure (list (acl2-count (pseudo-term-list-fix actuals)) 1)
     (b* ((fn (symbol-fix fn))
          (actuals (pseudo-term-list-fix actuals))
+         (var-alst (pseudo-term-alist-fix var-alst))
          (type-alst (pseudo-term-alist-fix type-alst))
          (conj-acc (pseudo-term-fix conj-acc))
          ((unless (mbt (equal fn 'cdr))) (mv conj-acc type-alst nil))
@@ -877,55 +932,10 @@
                              (val-type-of-alist-type car-type))
                             (t (er hard? 'type-inference=>infer-fncall-cdr
                                    "The argument to cdr is of the wrong type. ~
-                                    ~p0 in ~p1 is of type ~p2~%"
-                                   (car actuals) `(,fn ,@actuals) car-type))))
-         ((unless (subtype-of return-type expected-type))
-          (mv (er hard? 'type-inference=>infer-fncall-cdr
-                  "Expected type ~p0 but ~p1 is of type ~p2~%"
-                  expected-type `(,fn ,@actuals) return-type)
-              nil nil)))
-      (mv `(and (,return-type (,fn ,@actuals))
-                ,car-conj)
-          (acons `(,fn ,@actuals)
-                 `(,return-type (,fn ,@actuals))
-                 car-type-alst)
-          return-type)))
-
-  (define infer-fncall-default ((fn symbolp)
-                                (actuals pseudo-term-listp)
-                                (var-alst pseudo-term-alistp)
-                                (type-alst pseudo-term-alistp)
-                                (conj-acc pseudo-termp)
-                                (expected-type symbolp)
-                                (fixinfo smt-fixtype-info-p)
-                                state)
-    :guard (not (equal fn 'quote))
-    :returns (mv (new-conj pseudo-termp)
-                 (new-alst pseudo-term-alistp)
-                 (new-type symbolp))
-    :measure (list (acl2-count (pseudo-term-list-fix actuals)) 1)
-    (b* ((fn (symbol-fix fn))
-         (actuals (pseudo-term-list-fix actuals))
-         (var-alst (pseudo-term-alist-fix var-alst))
-         (type-alst (pseudo-term-alist-fix type-alst))
-         (conj-acc (pseudo-term-fix conj-acc))
-         ((unless (mbt (not (equal fn 'quote)))) (mv conj-acc type-alst nil))
-         (expected-types (get-expected-types fn state))
-         ((mv actuals-conj actuals-type-alst actuals-types)
-          (infer-type-list actuals var-alst type-alst conj-acc expected-types
-                           fixinfo state))
-         (return-type (make-judgement fn actuals actuals-types fixinfo state))
-         ((unless (subtype-of return-type expected-type))
-          (mv (er hard? 'type-inference=>infer-fncall-default
-                  "Expected type ~p0 but ~p1 is of type ~p2~%"
-                  expected-type `(,fn ,@actuals) return-type)
-              nil nil)))
-      (mv `(and (,return-type (,fn ,@actuals))
-                ,actuals-conj)
-          (acons `(,fn ,@actuals)
-                 `(,return-type (,fn ,@actuals))
-                 actuals-type-alst)
-          return-type)))
+                                              ~p0 in ~p1 is of type ~p2~%"
+                                   (car actuals) `(,fn ,@actuals)
+                                   car-type)))))
+      (mv car-conj car-type-alst return-type)))
 
   (define infer-fncall ((fn symbolp)
                         (actuals pseudo-term-listp)
@@ -941,26 +951,44 @@
                  (new-type symbolp))
     :measure (list (acl2-count (pseudo-term-list-fix actuals)) 2)
     (b* ((fn (symbol-fix fn))
-         (fn-judge (get-fn-judge fn))
+         ;; (fn-judge (get-fn-judge fn))
+         (actuals (pseudo-term-list-fix actuals))
+         (var-alst (pseudo-term-alist-fix var-alst))
          (type-alst (pseudo-term-alist-fix type-alst))
-         (conj-acc (pseudo-term-fix conj-acc)))
-      (case-match fn-judge
-        ('infer-fncall-cons
-         (infer-fncall-cons fn actuals var-alst type-alst conj-acc
-                        expected-type fixinfo state))
-        ('infer-fncall-acons
-         (infer-fncall-acons fn actuals var-alst type-alst conj-acc
+         (conj-acc (pseudo-term-fix conj-acc))
+         ((unless (mbt (not (equal fn 'quote)))) (mv conj-acc type-alst nil))
+         ((mv new-conj new-alst return-type)
+          (cond ((equal fn 'cons) ;; cons
+                 (infer-cons fn actuals var-alst type-alst conj-acc
                              expected-type fixinfo state))
-        ('infer-fncall-assoc-equal
-         (infer-fncall-assoc-equal fn actuals var-alst type-alst conj-acc
-                        expected-type fixinfo state))
-        ('infer-fncall-cdr
-         (infer-fncall-cdr fn actuals var-alst type-alst conj-acc expected-type
-                        fixinfo state))
-        ('infer-fncall-default
-         (infer-fncall-default fn actuals var-alst type-alst conj-acc
-                        expected-type fixinfo state))
-        (& (mv conj-acc type-alst nil)))))
+                ((equal fn 'acons) ;; acons
+                 (infer-acons fn actuals var-alst type-alst conj-acc
+                              expected-type fixinfo state))
+                ((equal fn 'assoc-equal) ;; assoc-equal
+                 (infer-assoc-equal fn actuals var-alst type-alst conj-acc
+                                    expected-type fixinfo state))
+                ((equal fn 'cdr) ;; cdr
+                 (infer-cdr fn actuals var-alst type-alst conj-acc
+                            expected-type fixinfo state))
+                (t ;; fncall
+                 (b* ((expected-types (get-expected-types fn state))
+                      ((mv actuals-conj actuals-type-alst actuals-types)
+                       (infer-type-list actuals var-alst type-alst conj-acc
+                                        expected-types fixinfo state))
+                      (return-type (make-judgement fn actuals actuals-types
+                                                   fixinfo state)))
+                   (mv actuals-conj actuals-type-alst return-type)))))
+         ((unless (subtype-of return-type expected-type))
+          (mv (er hard? 'type-inference=>infer-fncall
+                  "Expected type ~p0 but ~p1 is of type ~p2~%"
+                  expected-type `(,fn ,@actuals) return-type)
+              nil nil)))
+      (mv `(and (,return-type (,fn ,@actuals))
+                ,new-conj)
+          (acons `(,fn ,@actuals)
+                 `(,return-type (,fn ,@actuals))
+                 new-alst)
+          return-type)))
 
   (define infer-type ((term pseudo-termp)
                       (var-alst pseudo-term-alistp)
@@ -993,6 +1021,8 @@
           (b* (((mv actuals-conj actuals-type-alst actuals-types)
                 (infer-type-list actuals var-alst type-alst conj-acc nil fixinfo state))
                (formals (lambda-formals fn))
+               ((unless (mbt (equal (len formals) (len actuals))))
+                (mv conj-acc type-alst nil))
                (body (lambda-body fn))
                (lambda-var-alst
                 (extend-var-alist-for-lambda var-alst formals actuals-types))
@@ -1033,10 +1063,11 @@
           (infer-type-list rest var-alst first-alst first-conj rest-expected
                            fixinfo state)))
       (mv rest-conj rest-alst (cons first-type rest-types))))
-
   )
 
-(verify-guards infer-type)
+(verify-guards infer-type
+  :hints (("Goal" :in-theory (disable pseudo-termp pseudo-term-listp
+                                      acl2::pseudo-term-listp-of-cons))))
 
 (local
  (in-theory (enable pseudo-term-listp)))
@@ -1058,10 +1089,7 @@
        ((mv new-conj new-hyp top-type)
         (infer-type untyped-theorem type-alist nil ''t t h.types-info state))
        (- (cw "type conj: ~p0, top-type: ~p1~%" new-conj top-type))
-       ;; (new-cl `((implies ,(conjoin (type-alist-to-type-list new-hyp))
-       ;; ,new-thm)))
-       (new-cl `((implies ,(conjoin (type-alist-to-type-list type-alist))
-                          ,untyped-theorem)))
+       (new-cl `((implies ,new-conj ,untyped-theorem)))
        (next-cp (cdr (assoc-equal 'infer-type *SMT-architecture*)))
        ((if (null next-cp)) (list cl))
        (the-hint

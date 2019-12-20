@@ -64,6 +64,12 @@
 (defthm pseudo-term-listp-of-symbol-listp
   (implies (symbol-listp x) (pseudo-term-listp x)))
 
+(defthm pseudo-termp-of-fncall
+  (implies (and (symbolp fn) (pseudo-termp x))
+           (pseudo-termp (list fn x)))
+  :hints (("Goal" :in-theory (enable pseudo-termp
+                                     pseudo-term-listp))))
+
 (define pseudo-term-list-fix ((x pseudo-term-listp))
   :returns (new-x pseudo-term-listp)
   (mbe :logic (if (consp x)
