@@ -18,6 +18,7 @@
 (include-book "verified/hint-please")
 (include-book "verified/type-hyp")
 (include-book "verified/type-inference")
+(include-book "verified/type-decorate")
 (include-book "verified/add-hypo-cp")
 (include-book "verified/expand-cp")
 (include-book "verified/type-extract-cp")

@@ -656,6 +656,26 @@
    :rule-classes nil)
  )
 
+;; should type check
+(defthm crazy-alist-theorem-1
+  (implies (and (rational-integer-alistp al)
+                (integerp x))
+           (b* ((y (assoc-equal x al))
+                ((if y) (cdr y)))
+             0))
+  :hints(("Goal"
+          :smtlink nil)))
+
+;; should type check
+(defthm crazy-alist-theorem-2
+  (implies (and (rational-integer-alistp al)
+                (integerp x))
+           (b* ((y (cdr (assoc-equal x al)))
+                ((if y) y))
+             0))
+  :hints(("Goal"
+          :smtlink nil)))
+
 (defprod lunch
   ((main symbolp)
    (snack integerp)
