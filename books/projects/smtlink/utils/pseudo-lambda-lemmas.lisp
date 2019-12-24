@@ -30,12 +30,14 @@
   (defthm not-stringp-of-cadr-of-pseudo-lambdap
     (implies (pseudo-lambdap x) (not (stringp (cadr x)))))
 
-  (defthm symbolp-of-fn-call-of-pseudo-termp
-    (implies (and (pseudo-termp x)
-                  (consp x)
-                  (not (acl2::fquotep x))
-                  (not (pseudo-lambdap (car x))))
-             (symbolp (car x)))
+  (defthm lambda-of-pseudo-lambdap
+    (implies (pseudo-lambdap x)
+             (equal (car x) 'lambda))
+    :hints (("Goal" :in-theory (enable pseudo-lambdap))))
+
+  (defthm true-listp-of-cdr-of-pseudo-lambdap
+    (implies (pseudo-lambdap x)
+             (true-listp (cdr x)))
     :hints (("Goal" :in-theory (enable pseudo-lambdap))))
 
   (defthm equal-len-of-pseudo-lambda-formals-and-actuals
