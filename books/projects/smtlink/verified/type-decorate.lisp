@@ -49,8 +49,8 @@
        ((unless (smtlink-hint-p smtlink-hint))
         (list cl))
        ((smtlink-hint h) smtlink-hint)
-       (new-cl `(,cl))
-       (next-cp (cdr (assoc-equal 'decorate-type *SMT-architecture*)))
+       (new-cl cl)
+       (next-cp (cdr (assoc-equal 'type-decorate *SMT-architecture*)))
        ((if (null next-cp)) (list cl))
        (the-hint
         `(:clause-processor (,next-cp clause ',h state)))

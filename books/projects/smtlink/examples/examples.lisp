@@ -636,6 +636,9 @@
 )
 
 ;; should type check
+(defun maybe-integer-rational-consp (x)
+  (or (null x) (and (consp x) (integerp (car x)) (rationalp (cdr x)))))
+
 (acl2::must-fail
 (defthm crazy-alist-theorem-4
   (implies (integer-rational-alistp al)
