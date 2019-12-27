@@ -9,8 +9,7 @@
 (include-book "std/util/bstar" :dir :system)
 (include-book "xdoc/top" :dir :system)
 (include-book "std/util/define" :dir :system)
-(include-book "ordinals/lexicographic-ordering-without-arithmetic"
-              :dir :system)
+(include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 (include-book "clause-processors/just-expand" :dir :system)
 (include-book "tools/defevaluator-fast" :dir :system)
 

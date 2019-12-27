@@ -636,8 +636,74 @@
 )
 
 ;; should type check
-(defun maybe-integer-rational-consp (x)
-  (or (null x) (and (consp x) (integerp (car x)) (rationalp (cdr x)))))
+(define integer-rational-consp (x)
+  :guard t
+  (and (consp x) (integerp (car x)) (rationalp (cdr x))))
+
+(define integer-rational-cons-fix ((x integer-rational-consp))
+  :returns (fixed integer-rational-consp)
+  (mbe :logic (if (integer-rational-consp x) x `(0 . 0))
+       :exec x)
+  ///
+  (more-returns
+   (fixed (implies (integer-rational-consp x) (equal fixed x))
+          :name equal-fixed-and-x-of-integer-rational-consp)))
+
+(defthm integer-rational-cons-fix-idempotent-lemma
+  (equal (integer-rational-cons-fix (integer-rational-cons-fix x))
+         (integer-rational-cons-fix x))
+  :hints (("Goal" :in-theory (enable integer-rational-cons-fix))))
+
+(deffixtype integer-rational-cons
+  :fix integer-rational-cons-fix
+  :pred integer-rational-consp
+  :equiv integer-rational-cons-equiv
+  :define t
+  :forward t
+  :topic integer-rational-consp)
+
+(defoption maybe-integer-rational-consp integer-rational-consp
+  :pred maybe-integer-rational-consp)
+
+(defsmtabstract integer-rational-consp
+  :rec integer-rational-consp
+  :fix integer-rational-cons-fix
+  :fix-thm integer-rational-cons-fix-when-integer-rational-consp
+  :basicp t)
+
+(defsmtoption maybe-integer-rational-consp
+  :rec maybe-integer-rational-consp
+  :fix maybe-integer-rational-cons-fix
+  :fix-thm maybe-integer-rational-cons-fix-when-maybe-integer-rational-consp
+  :some-constructor maybe-integer-rational-consp-some
+  :some-destructor maybe-integer-rational-consp-some->val
+  :none-constructor maybe-integer-rational-consp-none
+  :some-type integer-rational-consp
+  )
+
+(defoption maybe-rational rationalp
+  :pred maybe-rationalp)
+
+(defsmtoption maybe-rationalp
+  :rec maybe-rationalp
+  :fix maybe-rational-fix
+  :fix-thm maybe-rational-fix-when-maybe-rationalp
+  :some-constructor maybe-rational-some
+  :some-destructor maybe-rational-some->val
+  :none-constructor maybe-rational-none
+  :some-type rationalp
+  )
+
+(define maybe-integer-rational-cdr ((x maybe-integer-rational-consp))
+  :returns (y maybe-rationalp)
+  :guard-hints (("Goal" :in-theory (enable
+                                    maybe-integer-rational-consp-some->val
+                                    maybe-integer-rational-consp
+                                    integer-rational-consp)))
+  (b* ((x (maybe-integer-rational-consp-fix x)))
+    (if x
+        (maybe-rational-some (cdr (maybe-integer-rational-consp-some->val x)))
+      (maybe-rational-none))))
 
 (acl2::must-fail
 (defthm crazy-alist-theorem-4
@@ -661,7 +727,7 @@
 
 ;; should type check
 (defthm crazy-alist-theorem-1
-  (implies (and (rational-integer-alistp al)
+  (implies (and (integer-rational-alistp al)
                 (integerp x))
            (b* ((y (assoc-equal x al))
                 ((if y) (cdr y)))
@@ -671,7 +737,7 @@
 
 ;; should type check
 (defthm crazy-alist-theorem-2
-  (implies (and (rational-integer-alistp al)
+  (implies (and (integer-rational-alistp al)
                 (integerp x))
            (b* ((y (cdr (assoc-equal x al)))
                 ((if y) y))

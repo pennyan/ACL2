@@ -190,6 +190,13 @@
       (equal x 'maybe-rational-integer-consp)
       (equal x 'maybe-rational-rational-consp)))
 
+(define cons-type? ((x symbolp))
+  :returns (ok booleanp)
+  (or (equal x 'integer-integer-consp)
+      (equal x 'integer-rational-consp)
+      (equal x 'rational-integer-consp)
+      (equal x 'rational-rational-consp)))
+
 (define kind-fn? ((x symbolp))
   :returns (ok booleanp)
   (b* ((str (symbol-name (symbol-fix x)))
@@ -688,6 +695,14 @@
                       (maybe-rational-rational-consp .
                                                      maybe-rational-rational-cdr)))))
 
+(define cdr-type-of-consp ((x symbolp))
+  :returns (maybe-type symbolp)
+  (cdr (assoc-equal (symbol-fix x)
+                    '((integer-integer-consp . integerp)
+                      (integer-rational-consp . rationalp)
+                      (rational-integer-consp . integerp)
+                      (rational-rational-consp . rationalp)))))
+
 (define return-type-cdr-of-maybe-consp ((x symbolp))
   :returns (maybe-type symbolp)
   (cdr (assoc-equal (symbol-fix x)
@@ -699,12 +714,12 @@
 (define get-val-fn ((x symbolp))
   :returns (val-fn symbolp)
   (cdr (assoc-equal (symbol-fix x)
-                    '((maybe-integerp . maybe-integer-some->val)
-                      (maybe-rationalp . maybe-rational-some->val)
-                      (maybe-integer-integer-consp . maybe-integer-integer-consp-some->val)
-                      (maybe-integer-rational-consp . maybe-integer-rational-consp-some->val)
-                      (maybe-rational-integer-consp . maybe-rational-integer-consp-some->val)
-                      (maybe-rational-rational-consp . maybe-rational-rational-consp-some->val)))))
+                    '((maybe-integerp . maybe-integer-some->val$inline)
+                      (maybe-rationalp . maybe-rational-some->val$inline)
+                      (maybe-integer-integer-consp . maybe-integer-integer-consp-some->val$inline)
+                      (maybe-integer-rational-consp . maybe-integer-rational-consp-some->val$inline)
+                      (maybe-rational-integer-consp . maybe-rational-integer-consp-some->val$inline)
+                      (maybe-rational-rational-consp . maybe-rational-rational-consp-some->val$inline)))))
 
 (define make-judgement ((fn symbolp)
                         (actuals pseudo-term-listp)
@@ -1051,6 +1066,16 @@
                      `(,car-type (,fn ,car-term))
                      car-type-alst)
               car-type))
+         ((if (cons-type? car-type))
+          (b* ((cdr-type (cdr-type-of-consp car-type)))
+            (mv `(,fn ,car-term)
+                `(if (,cdr-type (,fn ,car-term))
+                     ,car-conj
+                   'nil)
+                (acons `(,fn ,car-term)
+                       `(,cdr-type (,fn ,car-term))
+                       car-type-alst)
+                cdr-type)))
          ((unless (maybe-consp-type? car-type))
           (mv (er hard? 'type-inference=>infer-fncall-cdr
                   "The argument to cdr is of the wrong type. ~
@@ -1153,13 +1178,13 @@
           (infer-type (car actuals) var-alst type-alst conj-acc
                       (car expected-types) fixinfo clock state))
          (new-then-else (if (option-type? cond-type)
-                            (cdr actuals)
-                          (b* ((val-fn (get-val-fn cond-type))
-                               (subst `(,val-fn ,(car actuals)))
-                               (substed-then
-                                (term-substitution (cadr actuals) (car actuals)
-                                                   subst)))
-                            (cons substed-then (cddr actuals)))))
+                            (b* ((val-fn (get-val-fn cond-type))
+                                 (subst `(,val-fn ,(car actuals)))
+                                 (substed-then
+                                  (term-substitution (cadr actuals) (car actuals)
+                                                     subst)))
+                              (cons substed-then (cddr actuals)))
+                          (cdr actuals)))
          ((mv then-else-term then-else-conj then-else-type-alst
               then-else-types)
           (infer-type-list new-then-else var-alst cond-type-alst cond-conj
