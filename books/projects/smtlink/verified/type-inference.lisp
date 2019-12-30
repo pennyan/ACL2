@@ -136,6 +136,23 @@
 
 ;; -----------------------------------------------------------------
 
+(defprod type-info
+  ((typeterm pseudo-termp)
+   (augterm pseudo-termp)))
+
+(defalist pseudo-term-info-alist
+  :key-type pseudo-term
+  :val-type type-info
+  :pred pseudo-term-info-alistp
+  :true-listp t)
+
+(local
+ (defthm type-info-of-assoc-equal-of-pseudo-term-info-alistp
+   (implies (and (pseudo-term-info-alistp type-alst)
+                 (assoc-equal term type-alst))
+            (type-info-p (cdr (assoc-equal term type-alst)))))
+ )
+
 (define typing-rules ()
   `((equal . equal-theorem)
     (< . <-theorem)
@@ -264,19 +281,22 @@
     (lu-bound (car type-lst) (lu-bound-list (cdr type-lst)))))
 
 (define update-with-expected ((term pseudo-termp)
-                              (type-alst pseudo-term-alistp)
+                              (type-alst pseudo-term-info-alistp)
                               (inferred symbolp)
                               (expected symbolp))
-  :returns (new-alst pseudo-term-alistp)
+  :returns (new-alst pseudo-term-info-alistp)
   (b* ((term (pseudo-term-fix term))
-       (type-alst (pseudo-term-alist-fix type-alst))
+       (type-alst (pseudo-term-info-alist-fix type-alst))
        (inferred (symbol-fix inferred))
        (expected (symbol-fix expected))
        ((unless (subtype-of inferred expected))
         (er hard? 'type-inference=>update-with-expected
             "Expected type ~p0 but ~p1 is of type ~p2~%"
             expected term inferred)))
-    (acons term `(,inferred ,term) type-alst)))
+    (acons term (make-type-info
+                 :typeterm `(,inferred ,term)
+                 :augterm term)
+           type-alst)))
 
 ;; What constants are recognized
 ;; 1 2 3 ... integerp
@@ -289,17 +309,17 @@
 ;; '(a b c) ... symbol-listp
 ;; '(t nil nil ...) ... boolean-listp
 (define infer-constant ((term pseudo-termp)
-                        (type-alst pseudo-term-alistp)
+                        (type-alst pseudo-term-info-alistp)
                         (conj-acc pseudo-termp)
                         (expected-type symbolp))
   :guard (and (not (acl2::variablep term))
               (acl2::fquotep term))
   :returns (mv (new-term pseudo-termp)
                (new-conj pseudo-termp)
-               (new-type-alst pseudo-term-alistp)
+               (new-type-alst pseudo-term-info-alistp)
                (new-type symbolp))
   (b* ((term (pseudo-term-fix term))
-       (type-alst (pseudo-term-alist-fix type-alst))
+       (type-alst (pseudo-term-info-alist-fix type-alst))
        (conj-acc (pseudo-term-fix conj-acc))
        ((if (acl2::variablep term)) (mv term conj-acc type-alst nil))
        ((unless (acl2::fquotep term)) (mv term conj-acc type-alst nil))
@@ -829,7 +849,12 @@
                                       (:definition rational-listp)
                                       )))
   :returns-hints (("Goal"
-                   :in-theory (disable symbolp-of-fn-call-of-pseudo-termp
+                   :in-theory (disable (:definition len)
+                                       type-decl-p-definition
+                                       consp-when-member-equal-of-pseudo-term-info-alistp
+                                       pseudo-termp-of-car-when-member-equal-of-pseudo-term-info-alistp
+                                       symbolp-of-fn-call-of-pseudo-termp
+                                       acl2::pseudo-lambdap-when-member-equal-of-pseudo-lambda-listp
                                        pseudo-term-listp-of-symbol-listp
                                        acl2::pseudo-termp-opener
                                        acl2::symbol-listp-when-not-consp
@@ -877,7 +902,7 @@
   (define infer-cons ((fn symbolp)
                       (actuals pseudo-term-listp)
                       (var-alst pseudo-term-alistp)
-                      (type-alst pseudo-term-alistp)
+                      (type-alst pseudo-term-info-alistp)
                       (conj-acc pseudo-termp)
                       (expected-type symbolp)
                       (fixinfo smt-fixtype-info-p)
@@ -886,13 +911,13 @@
     :guard (equal fn 'cons)
     :returns (mv (new-term pseudo-termp)
                  (new-conj pseudo-termp)
-                 (new-alst pseudo-term-alistp)
+                 (new-alst pseudo-term-info-alistp)
                  (new-type symbolp))
     :measure (list (nfix clock) (acl2-count (pseudo-term-list-fix actuals)) 1)
     (b* ((fn (symbol-fix fn))
          (actuals (pseudo-term-list-fix actuals))
          (var-alst (pseudo-term-alist-fix var-alst))
-         (type-alst (pseudo-term-alist-fix type-alst))
+         (type-alst (pseudo-term-info-alist-fix type-alst))
          (conj-acc (pseudo-term-fix conj-acc))
          ((unless (mbt (equal fn 'cons)))
           (mv nil conj-acc type-alst nil))
@@ -923,14 +948,16 @@
                ,cadr-conj
              'nil)
           (acons new-term
-                 `(,return-type ,new-term)
+                 (make-type-info
+                  :typeterm `(,return-type ,new-term)
+                  :augterm new-term)
                  cadr-type-alst)
           return-type)))
 
   (define infer-acons ((fn symbolp)
                        (actuals pseudo-term-listp)
                        (var-alst pseudo-term-alistp)
-                       (type-alst pseudo-term-alistp)
+                       (type-alst pseudo-term-info-alistp)
                        (conj-acc pseudo-termp)
                        (expected-type symbolp)
                        (fixinfo smt-fixtype-info-p)
@@ -939,13 +966,13 @@
     :guard (equal fn 'acons)
     :returns (mv (new-term pseudo-termp)
                  (new-conj pseudo-termp)
-                 (new-alst pseudo-term-alistp)
+                 (new-alst pseudo-term-info-alistp)
                  (new-type symbolp))
     :measure (list (nfix clock) (acl2-count (pseudo-term-list-fix actuals)) 1)
     (b* ((fn (symbol-fix fn))
          (actuals (pseudo-term-list-fix actuals))
          (var-alst (pseudo-term-alist-fix var-alst))
-         (type-alst (pseudo-term-alist-fix type-alst))
+         (type-alst (pseudo-term-info-alist-fix type-alst))
          (conj-acc (pseudo-term-fix conj-acc))
          ((unless (mbt (equal fn 'acons)))
           (mv nil conj-acc type-alst nil))
@@ -980,14 +1007,16 @@
                ,alst-conj
              'nil)
           (acons new-term
-                 `(,return-type ,new-term)
+                 (make-type-info
+                  :typeterm `(,return-type ,new-term)
+                  :augterm new-term)
                  alst-type-alst)
           return-type)))
 
   (define infer-assoc-equal ((fn symbolp)
                              (actuals pseudo-term-listp)
                              (var-alst pseudo-term-alistp)
-                             (type-alst pseudo-term-alistp)
+                             (type-alst pseudo-term-info-alistp)
                              (conj-acc pseudo-termp)
                              (expected-type symbolp)
                              (fixinfo smt-fixtype-info-p)
@@ -996,7 +1025,7 @@
     :guard (equal fn 'assoc-equal)
     :returns (mv (new-term pseudo-termp)
                  (new-conj pseudo-termp)
-                 (new-alst pseudo-term-alistp)
+                 (new-alst pseudo-term-info-alistp)
                  (new-type symbolp))
     :measure (list (nfix clock) (acl2-count (pseudo-term-list-fix actuals)) 1)
     :irrelevant-formals-ok t
@@ -1004,7 +1033,7 @@
     (b* ((fn (symbol-fix fn))
          (actuals (pseudo-term-list-fix actuals))
          (var-alst (pseudo-term-alist-fix var-alst))
-         (type-alst (pseudo-term-alist-fix type-alst))
+         (type-alst (pseudo-term-info-alist-fix type-alst))
          (conj-acc (pseudo-term-fix conj-acc))
          ((unless (mbt (equal fn 'assoc-equal)))
           (mv nil conj-acc type-alst nil))
@@ -1028,14 +1057,16 @@
                ,alst-conj
              'nil)
           (acons new-term
-                 `(,return-type ,new-term)
+                 (make-type-info
+                  :typeterm `(,return-type ,new-term)
+                  :augterm new-term)
                  alst-type-alst)
           return-type)))
 
   (define infer-cdr ((fn symbolp)
                      (actuals pseudo-term-listp)
                      (var-alst pseudo-term-alistp)
-                     (type-alst pseudo-term-alistp)
+                     (type-alst pseudo-term-info-alistp)
                      (conj-acc pseudo-termp)
                      (expected-type symbolp)
                      (fixinfo smt-fixtype-info-p)
@@ -1044,13 +1075,13 @@
     :guard (equal fn 'cdr)
     :returns (mv (new-term pseudo-termp)
                  (new-conj pseudo-termp)
-                 (new-alst pseudo-term-alistp)
+                 (new-alst pseudo-term-info-alistp)
                  (new-type symbolp))
     :measure (list (nfix clock) (acl2-count (pseudo-term-list-fix actuals)) 1)
     (b* ((fn (symbol-fix fn))
          (actuals (pseudo-term-list-fix actuals))
          (var-alst (pseudo-term-alist-fix var-alst))
-         (type-alst (pseudo-term-alist-fix type-alst))
+         (type-alst (pseudo-term-info-alist-fix type-alst))
          (conj-acc (pseudo-term-fix conj-acc))
          ((unless (mbt (equal fn 'cdr)))
           (mv nil conj-acc type-alst nil))
@@ -1063,7 +1094,9 @@
                    ,car-conj
                  'nil)
               (acons `(,fn ,car-term)
-                     `(,car-type (,fn ,car-term))
+                     (make-type-info
+                      :typeterm `(,car-type (,fn ,car-term))
+                      :augterm `(,fn ,car-term))
                      car-type-alst)
               car-type))
          ((if (cons-type? car-type))
@@ -1073,7 +1106,9 @@
                      ,car-conj
                    'nil)
                 (acons `(,fn ,car-term)
-                       `(,cdr-type (,fn ,car-term))
+                       (make-type-info
+                        :typeterm `(,cdr-type (,fn ,car-term))
+                        :augterm `(,fn ,car-term))
                        car-type-alst)
                 cdr-type)))
          ((unless (maybe-consp-type? car-type))
@@ -1091,14 +1126,16 @@
                ,car-conj
              'nil)
           (acons new-term
-                 `(,return-type ,new-term)
+                 (make-type-info
+                  :typeterm `(,return-type ,new-term)
+                  :augterm new-term)
                  car-type-alst)
           return-type)))
 
   (define infer-fn ((fn symbolp)
                     (actuals pseudo-term-listp)
                     (var-alst pseudo-term-alistp)
-                    (type-alst pseudo-term-alistp)
+                    (type-alst pseudo-term-info-alistp)
                     (conj-acc pseudo-termp)
                     (expected-type symbolp)
                     (fixinfo smt-fixtype-info-p)
@@ -1107,13 +1144,13 @@
     :guard (not (equal fn 'quote))
     :returns (mv (new-term pseudo-termp)
                  (new-conj pseudo-termp)
-                 (new-alst pseudo-term-alistp)
+                 (new-alst pseudo-term-info-alistp)
                  (new-type symbolp))
     :measure (list (nfix clock) (acl2-count (pseudo-term-list-fix actuals)) 1)
     (b* ((fn (symbol-fix fn))
          (actuals (pseudo-term-list-fix actuals))
          (var-alst (pseudo-term-alist-fix var-alst))
-         (type-alst (pseudo-term-alist-fix type-alst))
+         (type-alst (pseudo-term-info-alist-fix type-alst))
          (conj-acc (pseudo-term-fix conj-acc))
          ((unless (mbt (not (equal fn 'quote))))
           (mv nil conj-acc type-alst nil))
@@ -1135,14 +1172,16 @@
                ,actuals-conj
              'nil)
           (acons new-term
-                 `(,return-type ,new-term)
+                 (make-type-info
+                  :typeterm `(,return-type ,new-term)
+                  :augterm new-term)
                  actuals-type-alst)
           return-type)))
 
   (define infer-if ((fn symbolp)
                     (actuals pseudo-term-listp)
                     (var-alst pseudo-term-alistp)
-                    (type-alst pseudo-term-alistp)
+                    (type-alst pseudo-term-info-alistp)
                     (conj-acc pseudo-termp)
                     (expected-type symbolp)
                     (fixinfo smt-fixtype-info-p)
@@ -1151,14 +1190,14 @@
     :guard (equal fn 'if)
     :returns (mv (new-term pseudo-termp)
                  (new-conj pseudo-termp)
-                 (new-alst pseudo-term-alistp)
+                 (new-alst pseudo-term-info-alistp)
                  (new-type symbolp))
     :measure (list (nfix clock) (acl2-count (pseudo-term-list-fix actuals)) 1)
     (b* ((fn (symbol-fix fn))
          (clock (nfix clock))
          (actuals (pseudo-term-list-fix actuals))
          (var-alst (pseudo-term-alist-fix var-alst))
-         (type-alst (pseudo-term-alist-fix type-alst))
+         (type-alst (pseudo-term-info-alist-fix type-alst))
          (conj-acc (pseudo-term-fix conj-acc))
          ((unless (mbt (equal fn 'if)))
           (mv nil conj-acc type-alst nil))
@@ -1208,14 +1247,16 @@
                ,then-else-conj
              'nil)
           (acons new-term
-                 `(,return-type ,new-term)
+                 (make-type-info
+                  :typeterm `(,return-type ,new-term)
+                  :augterm new-term)
                  then-else-type-alst)
           return-type)))
 
   (define infer-fncall ((fn symbolp)
                         (actuals pseudo-term-listp)
                         (var-alst pseudo-term-alistp)
-                        (type-alst pseudo-term-alistp)
+                        (type-alst pseudo-term-info-alistp)
                         (conj-acc pseudo-termp)
                         (expected-type symbolp)
                         (fixinfo smt-fixtype-info-p)
@@ -1224,13 +1265,13 @@
     :guard (not (equal fn 'quote))
     :returns (mv (new-term pseudo-termp)
                  (new-conj pseudo-termp)
-                 (new-alst pseudo-term-alistp)
+                 (new-alst pseudo-term-info-alistp)
                  (new-type symbolp))
     :measure (list (nfix clock) (acl2-count (pseudo-term-list-fix actuals)) 2)
     (b* ((fn (symbol-fix fn))
          (actuals (pseudo-term-list-fix actuals))
          (var-alst (pseudo-term-alist-fix var-alst))
-         (type-alst (pseudo-term-alist-fix type-alst))
+         (type-alst (pseudo-term-info-alist-fix type-alst))
          (conj-acc (pseudo-term-fix conj-acc))
          ((unless (mbt (not (equal fn 'quote))))
           (mv nil conj-acc type-alst nil)))
@@ -1255,7 +1296,7 @@
 
   (define infer-type ((term pseudo-termp)
                       (var-alst pseudo-term-alistp)
-                      (type-alst pseudo-term-alistp)
+                      (type-alst pseudo-term-info-alistp)
                       (conj-acc pseudo-termp)
                       (expected-type symbolp)
                       (fixinfo smt-fixtype-info-p)
@@ -1263,12 +1304,12 @@
                       state)
     :returns (mv (new-term pseudo-termp)
                  (new-conj pseudo-termp)
-                 (new-alst pseudo-term-alistp)
+                 (new-alst pseudo-term-info-alistp)
                  (new-type symbolp))
     :measure (list (nfix clock) (acl2-count (pseudo-term-fix term)) 0)
     (b* ((term (pseudo-term-fix term))
          (var-alst (pseudo-term-alist-fix var-alst))
-         (type-alst (pseudo-term-alist-fix type-alst))
+         (type-alst (pseudo-term-info-alist-fix type-alst))
          (conj-acc (pseudo-term-fix conj-acc))
          (item (assoc-equal term var-alst))
          ((if (and (consp (cdr item)) (symbolp (cadr item)) item))
@@ -1277,8 +1318,11 @@
           (mv (er hard? 'type-inferece=>infer-type "Variable ~p0 isn't typed in the
                     environment.~%" term) nil nil nil))
          (item (assoc-equal term type-alst))
-         ((if (and (consp (cdr item)) (symbolp (cadr item)) item))
-          (mv term conj-acc type-alst (cadr item)))
+         ((if (and (consp item)
+                   (consp (type-info->typeterm (cdr item)))
+                   (symbolp (car (type-info->typeterm (cdr item))))))
+          (mv (type-info->augterm (cdr item)) conj-acc
+              type-alst (car (type-info->typeterm (cdr item)))))
          ((if (acl2::fquotep term))
           (infer-constant term type-alst conj-acc expected-type))
          ((cons fn actuals) term)
@@ -1311,14 +1355,17 @@
                 `((lambda ,formals ,body-term) ,@actuals-term)))
             (mv lambda-term
                 lambda-conj
-                (acons term `(,body-type ,term) actuals-type-alst)
+                (acons term (make-type-info
+                             :typeterm `(,body-type ,term)
+                             :augterm lambda-term)
+                       actuals-type-alst)
                 body-type))))
       (infer-fncall fn actuals var-alst type-alst conj-acc expected-type
                     fixinfo clock state)))
 
   (define infer-type-list ((term-lst pseudo-term-listp)
                            (var-alst pseudo-term-alistp)
-                           (type-alst pseudo-term-alistp)
+                           (type-alst pseudo-term-info-alistp)
                            (conj-acc pseudo-termp)
                            (expected-type-lst symbol-listp)
                            (fixinfo smt-fixtype-info-p)
@@ -1326,12 +1373,12 @@
                            state)
     :returns (mv (new-term-lst pseudo-term-listp)
                  (new-conj pseudo-termp)
-                 (new-alst pseudo-term-alistp)
+                 (new-alst pseudo-term-info-alistp)
                  (new-type-lst symbol-listp))
     :measure (list (nfix clock) (acl2-count (pseudo-term-list-fix term-lst)) 0)
     (b* ((term-lst (pseudo-term-list-fix term-lst))
          (var-alst (pseudo-term-alist-fix var-alst))
-         (type-alst (pseudo-term-alist-fix type-alst))
+         (type-alst (pseudo-term-info-alist-fix type-alst))
          (conj-acc (pseudo-term-fix conj-acc))
          ((unless (consp term-lst)) (mv term-lst conj-acc type-alst nil))
          ((cons first rest) term-lst)
@@ -1339,9 +1386,11 @@
          ((mv first-term first-conj first-alst first-type)
           (infer-type first var-alst type-alst conj-acc first-expected fixinfo
                       clock state))
+         (- (cw "first-conj: ~q0" first-conj))
          ((mv rest-terms rest-conj rest-alst rest-types)
           (infer-type-list rest var-alst first-alst first-conj rest-expected
-                           fixinfo clock state)))
+                           fixinfo clock state))
+         (- (cw "rest-conj: ~q0" rest-conj)))
       (mv (cons first-term rest-terms)
           rest-conj rest-alst (cons first-type rest-types))))
   )

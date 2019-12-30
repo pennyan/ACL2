@@ -729,9 +729,13 @@
 (defthm crazy-alist-theorem-1
   (implies (and (integer-rational-alistp al)
                 (integerp x))
+           (+
            (b* ((y (assoc-equal x al))
                 ((if y) (cdr y)))
-             0))
+             0)
+           (b* ((y (assoc-equal x al))
+                ((if y) (+ 1 (cdr y))))
+             0)))
   :hints(("Goal"
           :smtlink nil)))
 
