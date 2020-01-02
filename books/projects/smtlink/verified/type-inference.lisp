@@ -17,6 +17,27 @@
 (include-book "hint-please")
 (include-book "term-substitution")
 
+(define is-maybe-type? ((type symbolp)
+                        (smtlink-hint smtlink-hint-p))
+  :returns (ok booleanp)
+  :irrelevant-formals-ok t
+  :ignore-ok t
+  nil)
+
+(define get-nonnil-thm ((type symbolp)
+                        (smtlink-hint smtlink-hint-p))
+  :returns (thm pseudo-termp)
+  :irrelevant-formals-ok t
+  :ignore-ok t
+  nil)
+
+(define get-returns-thm ((fn symbolp)
+                         (smtlink-hint smtlink-hint-p))
+  :returns (thm pseudo-termp)
+  :irrelevant-formals-ok t
+  :ignore-ok t
+  nil)
+
 ;; -----------------------------------------------------------------
 ;;       Define evaluators
 
@@ -123,29 +144,54 @@
          ,(shadow-path-cond formals path-tl)
        'nil)))
 
-(define look-up-type-judgement ((term pseudo-termp)
-                                  (judgements pseudo-termp)
-                                  (acc pseudo-termp))
-    :returns (judgement pseudo-termp)
-    (b* ((term (pseudo-term-fix term))
-         (judgements (pseudo-term-fix judgements))
-         (acc (pseudo-term-fix acc))
-         ((if (or (acl2::quotep judgements)
-                  (acl2::variablep judgements)))
-          acc)
-         ((cons fn actuals) judgements)
-         ((if (pseudo-lambdap fn)) acc)
-         ;; TODO: doesn't allow type judgement like (< x '0) to be found
-         ((if (and (not (equal fn 'if))
-                   (equal (len actuals) 1)
-                   (equal (car actuals) term)))
-          `(if ,judgements ,acc 'nil))
-         ((unless (equal fn 'if)) acc)
-         ((if (not (equal (len actuals) 3)))
-          (er hard? 'type-inference=>look-up-type-judgement
-              "Wrong if statement: ~q0" judgements))
-         ((unless (equal (cddr actuals) 'nil)) acc))
-    (look-up-type-judgement term (cadr actuals) acc)))
+;; return the topest judgement
+(define type-judgement-top ((judgements pseudo-termp))
+  :returns (judgement pseudo-termp)
+  (b* ((judgements (pseudo-term-fix judgements))
+       ((unless (is-conjunct? judgements))
+        (er hard? 'type-inference=>type-judgement-top
+            "The top of type judgement is not a conjunction of conditions: ~q0"
+            judgements))
+       ((if (equal judgements 't))
+        (er hard? 'type-inference=>type-judgement-top
+            "The judgements is empty.~%")))
+    (cadr judgements)))
+
+(define strengthen-judgement ((judgement pseudo-termp)
+                              (path-cond pseudo-termp)
+                              (smtlink-hint smtlink-hint-p)
+                              state)
+  :returns (new-judgement pseudo-termp)
+  :ignore-ok t ;; for var
+  (b* ((judgement (pseudo-term-fix judgement))
+       ((unless (and (equal (len judgement) 2)
+                     (symbolp (car judgement))))
+        (er hard? 'type-inference=>strengthen-judgement
+            "Judgement to be strengthened ~p0 is malformed.~%" judgement))
+       ((cons type term) judgement)
+       (maybe-type? (is-maybe-type? type smtlink-hint))
+       ((unless maybe-type?) judgement)
+       (not-nil?
+        (path-cond-implies-expr path-cond judgement state))
+       ((unless not-nil?) judgement)
+       (nonnil-name (get-nonnil-thm type smtlink-hint))
+       (nonnil-thm
+        (acl2::meta-extract-formula-w nonnil-name (w state)))
+       ((unless (pseudo-termp nonnil-thm))
+        (er hard? 'type-inference=>strengthen-judgement
+            "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
+            nonnil-name nonnil-thm))
+       ((mv ok strengthened-type)
+        (case-match nonnil-thm
+          (('implies ('and (!type var) ('not ('null var)))
+                     (strengthened-type var))
+           (mv t strengthened-type))
+          (& (mv nil nil))))
+       ((unless ok)
+        (er hard? 'type-inference=>strengthen-judgement
+            "The non-nil theorem for type ~p0 is of the wrong syntactic form ~
+              ~p1~%" type nonnil-thm)))
+    `(,strengthened-type ,term)))
 
 ;; TODO
 (define type-judgement-nil ((smtlink-hint smtlink-hint-p))
@@ -180,8 +226,9 @@
 
   (define type-judgement-lambda ((term pseudo-termp)
                                  (path-cond pseudo-termp)
-                                 (smtlink-hint smtlink-hint-p))
-    :measure (list (acl2-count (pseudo-term-list-fix term)) 1)
+                                 (smtlink-hint smtlink-hint-p)
+                                 state)
+    :measure (list (acl2-count (pseudo-term-list-fix term)) 0)
     :guard (and (consp term)
                 (pseudo-lambdap (car term)))
     :returns (judgements pseudo-termp)
@@ -191,26 +238,102 @@
          ((cons fn actuals) term)
          (formals (lambda-formals fn))
          (body (lambda-body fn))
-         
-         )
-      ())
-    )
+         (shadowed-path-cond (shadow-path-cond formals path-cond))
+         (body-judgements
+          (type-judgement body shadowed-path-cond smtlink-hint state))
+         (actuals-judgements
+          (type-judgement-list actuals path-cond smtlink-hint state))
+         (substed-actuals-judgements
+          (term-substitution-multi actuals-judgements actuals formals))
+         (lambda-judgements
+          `((lambda ,formals
+              (if ,body-judgements
+                  ,substed-actuals-judgements
+                'nil))
+            ,@actuals))
+         (return-judgement
+          (term-substitution (type-judgement-top body-judgements) body term)))
+      `(if ,return-judgement
+           (if ,lambda-judgements
+               ,actuals-judgements
+             'nil)
+         'nil)))
 
-  (define type-judgement-fncall ((term pseudo-termp)
-                                 (path-cond pseudo-termp)
-                                 (smtlink-hint smtlink-hint-p))
-    :measure (list (acl2-count (pseudo-term-list-fix term)) 1)
+  (define type-judgement-if ((term pseudo-termp)
+                             (path-cond pseudo-termp)
+                             (smtlink-hint smtlink-hint-p)
+                             state)
     :guard (and (consp term)
-                (symbolp (car term)))
+                (equal (car term) 'if))
+    :measure (list (acl2-count (pseudo-term-list-fix term)) 0)
     :returns (judgements pseudo-termp)
-    :irrelevant-formals-ok t
-    :ignore-ok t
-    't)
+    (b* ((term (pseudo-term-fix term))
+         (path-cond (pseudo-term-fix path-cond))
+         ((unless (mbt (and (consp term) (equal (car term) 'if)))) nil)
+         ((cons & actuals) term)
+         ((unless (equal (len actuals) 3))
+          (er hard? 'type-inference=>type-judgement-if
+              "Mangled if term: ~q0" term))
+         ((list cond then else) term)
+         (judge-cond (type-judgement cond path-cond smtlink-hint state))
+         (judge-then (type-judgement then path-cond smtlink-hint state))
+         (judge-else (type-judgement else path-cond smtlink-hint state))
+         (judge-then-top (type-judgement-top judge-then))
+         (judge-else-top (type-judgement-top judge-else))
+         (judge-if-top (term-substitution judge-then-top then term))
+         ((unless (equal judge-if-top
+                         (term-substitution judge-else-top else term)))
+          (er hard? 'type-inference=>type-judgement-if
+              "Inconsistent type for then expression ~p0 and else expression ~
+               ~p1~%" then else)))
+      `(if ,judge-if-top
+           (if ,judge-cond
+               (if ,cond ,judge-then ,judge-else)
+             'nil)
+         'nil)))
+
+  (define type-judgement-fn ((term pseudo-termp)
+                             (path-cond pseudo-termp)
+                             (smtlink-hint smtlink-hint-p)
+                             state)
+    :guard (and (consp term)
+                (not (equal (car term) 'if)))
+    :measure (list (acl2-count (pseudo-term-list-fix term)) 0)
+    :returns (judgements pseudo-termp)
+    (b* ((term (pseudo-term-fix term))
+         (path-cond (pseudo-term-fix path-cond))
+         ((unless (mbt (and (consp term) (not (equal (car term) 'if))))) nil)
+         ((cons fn actuals) term)
+         (actuals-judgements
+          (type-judgement-list actuals path-cond smtlink-hint state))
+         (returns-name (get-returns-thm fn smtlink-hint))
+         (returns-thm
+          (acl2::meta-extract-formula-w returns-name (w state)))
+         ((unless (pseudo-termp returns-thm))
+          (er hard? 'type-inference=>type-judgement-fn
+              "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
+              returns-name returns-thm))
+         ((mv ok type)
+          (case-match returns-thm
+            ((type (!fn . &))  (mv t type))
+            (& (mv nil nil))))
+         ((unless ok)
+          (er hard? 'type-inference=>type-judgement-fn
+              "The returns theorem for function ~p0 is of the wrong syntactic ~
+               form ~p1~%" fn returns-thm))
+         (weak-return-judgement `(,type ,term))
+         (return-judgement
+          (strengthen-judgement weak-return-judgement path-cond smtlink-hint
+                                state)))
+      `(if ,return-judgement
+           ,actuals-judgements
+         'nil)))
 
   (define type-judgement ((term pseudo-termp)
                           (path-cond pseudo-termp)
-                          (smtlink-hint smtlink-hint-p))
-    :measure (list (acl2-count (pseudo-term-list-fix term)) 0)
+                          (smtlink-hint smtlink-hint-p)
+                          state)
+    :measure (list (acl2-count (pseudo-term-list-fix term)) 1)
     :returns (judgements pseudo-termp)
     (b* ((term (pseudo-term-fix term))
          (path-cond (pseudo-term-fix path-cond))
@@ -220,21 +343,26 @@
           (type-judgement-quoted term smtlink-hint))
          ((cons fn &) term)
          ((if (pseudo-lambdap fn))
-          (type-judgement-lambda term path-cond smtlink-hint)))
-      (type-judgement-fncall term path-cond smtlink-hint)))
+          (type-judgement-lambda term path-cond smtlink-hint state))
+         ((if (equal fn 'if))
+          (type-judgement-if term path-cond smtlink-hint state)))
+      (type-judgement-fn term path-cond smtlink-hint state)))
 
   (define type-judgement-list ((term-lst pseudo-term-listp)
                                (path-cond pseudo-termp)
-                               (smtlink-hint smtlink-hint-p))
-    :measure (list (acl2-count (pseudo-term-list-fix term-lst)) 0)
+                               (smtlink-hint smtlink-hint-p)
+                               state)
+    :measure (list (acl2-count (pseudo-term-list-fix term-lst)) 1)
     :returns (judgements-lst pseudo-termp)
     (b* ((term-lst (pseudo-term-list-fix term-lst))
          (path-cond (pseudo-term-fix path-cond))
          ((unless (consp term-lst)) 't)
          ((cons first rest) term-lst)
-         (first-judge (type-judgement first path-cond smtlink-hint))
-         (rest-judge (type-judgement-list rest path-cond smtlink-hint)))
+         (first-judge (type-judgement first path-cond smtlink-hint state))
+         (rest-judge (type-judgement-list rest path-cond smtlink-hint state)))
       `(if ,first-judge
            ,rest-judge
          'nil)))
   )
+
+(verify-guards type-judgements)

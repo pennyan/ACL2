@@ -122,6 +122,11 @@
                 (consp term))
            (pseudo-termp (car term))))
 
+(defthm acl2-count-of-cdr-of-pseudo-termp
+  (implies (and (consp (pseudo-term-fix term)))
+           (< (acl2-count (pseudo-term-list-fix (cdr (pseudo-term-fix term))))
+              (acl2-count (pseudo-term-list-fix term)))))
+
 (define pseudo-term-list-list-fix ((x pseudo-term-list-listp))
   :returns (fixed pseudo-term-list-listp)
   (mbe :logic (if (consp x)

@@ -89,3 +89,19 @@
            :expand (term-substitution-list term-lst subterm subst))))
 
 (verify-guards term-substitution)
+
+(define term-substitution-multi ((term pseudo-termp)
+                                 (subterm-lst pseudo-term-listp)
+                                 (subst-lst pseudo-term-listp))
+  :returns (substed-term pseudo-termp)
+  (b* ((term (pseudo-term-fix term))
+       (subterm-lst (pseudo-term-list-fix subterm-lst))
+       (subst-lst (pseudo-term-list-fix subst-lst))
+       ((unless (and (consp subterm-lst)
+                     (consp subst-lst)))
+        term)
+       ((cons subterm-hd subterm-tl) subterm-lst)
+       ((cons subst-hd subst-tl) subst-lst))
+    (term-substitution-multi (term-substitution term subterm-hd subst-hd)
+                             subterm-tl
+                             subst-tl)))
