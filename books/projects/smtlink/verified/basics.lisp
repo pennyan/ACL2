@@ -70,8 +70,8 @@
 ;; current tag . next computed-hint
 (defval *SMT-architecture*
   '((process-hint          . add-hypo-cp)
-    (add-hypo              . infer-type-cp)
-    (infer-type            . type-decorate-cp)
+    (add-hypo              . type-judge-cp)
+    (type-judge            . type-decorate-cp)
     (type-decorate         . expand-cp)
     (expand                . type-extract-cp)
     (type-extract          . uninterpreted-fn-cp)

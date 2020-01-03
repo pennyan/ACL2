@@ -9,34 +9,191 @@
 (include-book "std/util/bstar" :dir :system)
 (include-book "xdoc/top" :dir :system)
 (include-book "std/util/define" :dir :system)
+(include-book "centaur/fty/top" :dir :system)
 (include-book "tools/defevaluator-fast" :dir :system)
 (include-book "clause-processors/just-expand" :dir :system)
 (include-book "clause-processors/meta-extract-user" :dir :system)
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 
+(include-book "basics")
 (include-book "hint-please")
 (include-book "term-substitution")
 
+;; ---------------------------------------------------
+;; Datatypes and functions that operates them
+
+(defalist type-to-supertypes-alist
+  :key-type symbolp
+  :val-type symbol-listp
+  :true-listp t)
+
+(defthm assoc-equal-of-type-to-supertypes-alist
+  (implies (and (type-to-supertypes-alist-p x)
+                (assoc-equal y x))
+           (consp (assoc-equal y x))))
+
+(defprod type-tuple
+  ((type symbolp)
+   (super-type symbolp)))
+
+(defalist type-tuple-to-thm-alist
+  :key-type type-tuple-p
+  :val-type symbolp
+  :true-listp t)
+
+(defprod return-spec
+  ((return-type symbolp)
+   (returns-thm symbolp)))
+
+(fty::deftypes function-description
+  (deftagsum arg-decl
+    (:next ((next arg-check-p)))
+    (:done ((r return-spec-p))))
+  (defalist arg-check
+    :key-type symbolp
+    :val-type arg-decl-p))
+
+(defprod list-type-description
+  ((recognizer symbolp)
+   (elt-type symbolp)
+   (cons-thm symbolp)
+   (car-thm symbolp)
+   (cdr-thm symbolp)
+   (true-list-thm symbolp)))
+
+(defprod alist-type-description
+  ((recognizer symbolp)
+   (key-type symbolp)
+   (val-type symbolp)
+   (acons-thm symbolp)
+   (assoc-equal-thm symbolp)
+   (true-list-thm symbolp)))
+
+(defprod prod-type-description
+  ((recognizer symbolp)
+   (field-types symbol-listp)
+   (constructor-thm symbolp)
+   (destructor-thms symbol-listp)))
+
+(defprod option-type-description
+  ((recognizer symbolp)
+   (some-type symbolp)
+   (some-constructor-thm symbolp)
+   (none-constructor-thm symbolp)
+   (some-destructor-thm symbolp)))
+
+(defprod sum-type-description
+  ((prod-list prod-type-description-p)))
+
+(defprod abstract-type-description
+  ((recognizer symbolp)))
+
+;; For some reason, this one takes a while
+(defprod type-options
+  ((supertype type-to-supertypes-alist-p)
+   (supertype-thm type-tuple-to-thm-alist-p)
+   (functions arg-check-p)
+   (list list-type-description-p)
+   (alist alist-type-description-p)
+   (prod prod-type-description-p)
+   (option option-type-description-p)
+   (sum sum-type-description-p)
+   (abstract abstract-type-description-p)))
+
 (define is-maybe-type? ((type symbolp)
-                        (smtlink-hint smtlink-hint-p))
+                        (options type-options-p))
   :returns (ok booleanp)
   :irrelevant-formals-ok t
   :ignore-ok t
   nil)
 
 (define get-nonnil-thm ((type symbolp)
-                        (smtlink-hint smtlink-hint-p))
+                        (options type-options-p))
   :returns (thm pseudo-termp)
   :irrelevant-formals-ok t
   :ignore-ok t
   nil)
 
 (define get-returns-thm ((fn symbolp)
-                         (smtlink-hint smtlink-hint-p))
+                         (options type-options-p))
   :returns (thm pseudo-termp)
   :irrelevant-formals-ok t
   :ignore-ok t
   nil)
+
+;; ----------------------------------------------------------------
+;;       Subtyping
+
+(defines supertype-transitive-closure
+  :well-founded-relation l<
+  :verify-guards nil
+
+  (define supertype ((type symbolp)
+                     (supertype-alst
+                      type-to-supertypes-alist-p)
+                     (closure symbol-listp)
+                     (clock natp)) ;; clock is the length of the supertype-alst
+    :measure (list (nfix clock) (acl2-count (symbol-fix type)))
+    :returns (closure symbol-listp)
+    (b* ((type (symbol-fix type))
+         (supertype-alst (type-to-supertypes-alist-fix supertype-alst))
+         (closure (symbol-list-fix closure))
+         (clock (nfix clock))
+         ((if (zp clock)) closure)
+         (exist? (member-equal type closure))
+         ((if exist?) closure)
+         (new-closure (cons type closure))
+         (item (assoc-equal type supertype-alst))
+         ((unless item)
+          (er hard? 'type-inference=>supertype
+              "Type ~p0 doesn't exist in the supertype alist.~%" type))
+         ((unless (cdr item)) new-closure)
+         (supertype-lst (cdr item)))
+      (supertype-list supertype-lst supertype-alst new-closure (1- clock))))
+
+  (define supertype-list ((type-lst symbol-listp)
+                          (supertype-alst
+                           type-to-supertypes-alist-p)
+                          (closure symbol-listp)
+                          (clock natp))
+    :measure (list (nfix clock) (acl2-count (symbol-list-fix type-lst)))
+    :returns (closure symbol-listp)
+    (b* ((type-lst (symbol-list-fix type-lst))
+         (supertype-alst (type-to-supertypes-alist-fix supertype-alst))
+         (closure (symbol-list-fix closure))
+         (clock (nfix clock))
+         ((unless (consp type-lst)) closure)
+         ((cons type-hd type-tl) type-lst)
+         (new-closure
+          (supertype type-hd supertype-alst closure clock)))
+      (supertype-list type-tl supertype-alst new-closure clock)))
+  )
+
+(verify-guards supertype)
+
+(define supertype-to-judgements ((supertypes symbol-listp)
+                                 (term pseudo-termp))
+  :returns (judgements pseudo-termp)
+  :measure (len supertypes)
+  (b* ((supertypes (symbol-list-fix supertypes))
+       (term (pseudo-term-fix term))
+       ((unless (consp supertypes)) 't)
+       ((cons supertypes-hd supertypes-tl) supertypes))
+    `(if (,supertypes-hd ,term)
+         ,(supertype-to-judgements supertypes-tl term)
+       'nil)))
+
+(define supertype-judgement ((root-type symbolp)
+                             (term pseudo-termp)
+                             (supertype-alst
+                              type-to-supertypes-alist-p))
+  :returns (judgements pseudo-termp)
+  (b* ((root-type (symbol-fix root-type))
+       (supertype-alst (type-to-supertypes-alist-fix supertype-alst))
+       (clock (len supertype-alst))
+       (supertypes
+        (supertype root-type supertype-alst nil clock)))
+    (supertype-to-judgements supertypes term)))
 
 ;; -----------------------------------------------------------------
 ;;       Define evaluators
@@ -159,7 +316,7 @@
 
 (define strengthen-judgement ((judgement pseudo-termp)
                               (path-cond pseudo-termp)
-                              (smtlink-hint smtlink-hint-p)
+                              (options type-options-p)
                               state)
   :returns (new-judgement pseudo-termp)
   :ignore-ok t ;; for var
@@ -169,12 +326,12 @@
         (er hard? 'type-inference=>strengthen-judgement
             "Judgement to be strengthened ~p0 is malformed.~%" judgement))
        ((cons type term) judgement)
-       (maybe-type? (is-maybe-type? type smtlink-hint))
+       (maybe-type? (is-maybe-type? type options))
        ((unless maybe-type?) judgement)
        (not-nil?
         (path-cond-implies-expr path-cond judgement state))
        ((unless not-nil?) judgement)
-       (nonnil-name (get-nonnil-thm type smtlink-hint))
+       (nonnil-name (get-nonnil-thm type options))
        (nonnil-thm
         (acl2::meta-extract-formula-w nonnil-name (w state)))
        ((unless (pseudo-termp nonnil-thm))
@@ -194,7 +351,7 @@
     `(,strengthened-type ,term)))
 
 ;; TODO
-(define type-judgement-nil ((smtlink-hint smtlink-hint-p))
+(define type-judgement-nil ((options type-options-p))
   :returns (judgements pseudo-termp)
   :irrelevant-formals-ok t
   :ignore-ok t
@@ -204,7 +361,7 @@
          'nil)))
 
 (define type-judgement-quoted ((term pseudo-termp)
-                               (smtlink-hint smtlink-hint-p))
+                               (options type-options-p))
   :guard (and (not (acl2::variablep term))
               (acl2::fquotep term))
   :returns (judgements pseudo-termp)
@@ -213,22 +370,47 @@
        (const (cadr term)))
     (cond ((integerp const) `(integerp ',const))
           ((rationalp const) `(rationalp ',const))
-          ((null const) (type-judgement-nil smtlink-hint))
+          ((null const) (type-judgement-nil options))
           ((booleanp const) `(booleanp ',const))
           ((symbolp const) `(symbolp ',const))
           (t (er hard? 'type-inference=>type-judgement-quoted
                  "Type inference for constant term ~p0 is not supported.~%"
                  term)))))
 
+(local
+ (defthm pseudo-termp-of-lambda
+   (implies (and (symbol-listp formals)
+                 (pseudo-termp body-judgements)
+                 (pseudo-term-listp actuals)
+                 (pseudo-termp substed-actuals-judgements)
+                 (equal (len formals) (len actuals)))
+            (pseudo-termp `((lambda ,formals
+                              (if ,body-judgements
+                                  ,substed-actuals-judgements
+                                'nil))
+                            ,@actuals))))
+ )
+
 (defines type-judgements
   :well-founded-relation l<
   :verify-guards nil
+  :hints (("Goal"
+           :in-theory (disable
+                       (:definition pseudo-termp)
+                       (:rewrite acl2::pseudo-term-listp-of-cons)
+                       nth symbol-listp assoc-equal)))
+  :returns-hints
+  (("Goal"
+    :in-theory (disable
+                (:definition pseudo-termp)
+                (:rewrite acl2::pseudo-term-listp-of-cons)
+                nth symbol-listp assoc-equal)))
 
   (define type-judgement-lambda ((term pseudo-termp)
                                  (path-cond pseudo-termp)
-                                 (smtlink-hint smtlink-hint-p)
+                                 (options type-options-p)
                                  state)
-    :measure (list (acl2-count (pseudo-term-list-fix term)) 0)
+    :measure (list (acl2-count (pseudo-term-fix term)) 0)
     :guard (and (consp term)
                 (pseudo-lambdap (car term)))
     :returns (judgements pseudo-termp)
@@ -240,9 +422,9 @@
          (body (lambda-body fn))
          (shadowed-path-cond (shadow-path-cond formals path-cond))
          (body-judgements
-          (type-judgement body shadowed-path-cond smtlink-hint state))
+          (type-judgement body shadowed-path-cond options state))
          (actuals-judgements
-          (type-judgement-list actuals path-cond smtlink-hint state))
+          (type-judgement-list actuals path-cond options state))
          (substed-actuals-judgements
           (term-substitution-multi actuals-judgements actuals formals))
          (lambda-judgements
@@ -261,11 +443,11 @@
 
   (define type-judgement-if ((term pseudo-termp)
                              (path-cond pseudo-termp)
-                             (smtlink-hint smtlink-hint-p)
+                             (options type-options-p)
                              state)
     :guard (and (consp term)
                 (equal (car term) 'if))
-    :measure (list (acl2-count (pseudo-term-list-fix term)) 0)
+    :measure (list (acl2-count (pseudo-term-fix term)) 0)
     :returns (judgements pseudo-termp)
     (b* ((term (pseudo-term-fix term))
          (path-cond (pseudo-term-fix path-cond))
@@ -275,9 +457,9 @@
           (er hard? 'type-inference=>type-judgement-if
               "Mangled if term: ~q0" term))
          ((list cond then else) term)
-         (judge-cond (type-judgement cond path-cond smtlink-hint state))
-         (judge-then (type-judgement then path-cond smtlink-hint state))
-         (judge-else (type-judgement else path-cond smtlink-hint state))
+         (judge-cond (type-judgement cond path-cond options state))
+         (judge-then (type-judgement then path-cond options state))
+         (judge-else (type-judgement else path-cond options state))
          (judge-then-top (type-judgement-top judge-then))
          (judge-else-top (type-judgement-top judge-else))
          (judge-if-top (term-substitution judge-then-top then term))
@@ -294,19 +476,25 @@
 
   (define type-judgement-fn ((term pseudo-termp)
                              (path-cond pseudo-termp)
-                             (smtlink-hint smtlink-hint-p)
+                             (options type-options-p)
                              state)
     :guard (and (consp term)
-                (not (equal (car term) 'if)))
-    :measure (list (acl2-count (pseudo-term-list-fix term)) 0)
+                (symbolp (car term))
+                (not (equal (car term) 'if))
+                (not (equal (car term) 'quote)))
+    :measure (list (acl2-count (pseudo-term-fix term)) 0)
     :returns (judgements pseudo-termp)
     (b* ((term (pseudo-term-fix term))
          (path-cond (pseudo-term-fix path-cond))
-         ((unless (mbt (and (consp term) (not (equal (car term) 'if))))) nil)
+         ((unless (mbt (and (consp term)
+                            (symbolp (car term))
+                            (not (equal (car term) 'quote))
+                            (not (equal (car term) 'if)))))
+          nil)
          ((cons fn actuals) term)
          (actuals-judgements
-          (type-judgement-list actuals path-cond smtlink-hint state))
-         (returns-name (get-returns-thm fn smtlink-hint))
+          (type-judgement-list actuals path-cond options state))
+         (returns-name (get-returns-thm fn options))
          (returns-thm
           (acl2::meta-extract-formula-w returns-name (w state)))
          ((unless (pseudo-termp returns-thm))
@@ -323,7 +511,7 @@
                form ~p1~%" fn returns-thm))
          (weak-return-judgement `(,type ,term))
          (return-judgement
-          (strengthen-judgement weak-return-judgement path-cond smtlink-hint
+          (strengthen-judgement weak-return-judgement path-cond options
                                 state)))
       `(if ,return-judgement
            ,actuals-judgements
@@ -331,26 +519,26 @@
 
   (define type-judgement ((term pseudo-termp)
                           (path-cond pseudo-termp)
-                          (smtlink-hint smtlink-hint-p)
+                          (options type-options-p)
                           state)
-    :measure (list (acl2-count (pseudo-term-list-fix term)) 1)
+    :measure (list (acl2-count (pseudo-term-fix term)) 1)
     :returns (judgements pseudo-termp)
     (b* ((term (pseudo-term-fix term))
          (path-cond (pseudo-term-fix path-cond))
          ((if (acl2::variablep term))
           (look-up-path-cond term path-cond))
          ((if (acl2::quotep term))
-          (type-judgement-quoted term smtlink-hint))
+          (type-judgement-quoted term options))
          ((cons fn &) term)
          ((if (pseudo-lambdap fn))
-          (type-judgement-lambda term path-cond smtlink-hint state))
+          (type-judgement-lambda term path-cond options state))
          ((if (equal fn 'if))
-          (type-judgement-if term path-cond smtlink-hint state)))
-      (type-judgement-fn term path-cond smtlink-hint state)))
+          (type-judgement-if term path-cond options state)))
+      (type-judgement-fn term path-cond options state)))
 
   (define type-judgement-list ((term-lst pseudo-term-listp)
                                (path-cond pseudo-termp)
-                               (smtlink-hint smtlink-hint-p)
+                               (options type-options-p)
                                state)
     :measure (list (acl2-count (pseudo-term-list-fix term-lst)) 1)
     :returns (judgements-lst pseudo-termp)
@@ -358,11 +546,52 @@
          (path-cond (pseudo-term-fix path-cond))
          ((unless (consp term-lst)) 't)
          ((cons first rest) term-lst)
-         (first-judge (type-judgement first path-cond smtlink-hint state))
-         (rest-judge (type-judgement-list rest path-cond smtlink-hint state)))
+         (first-judge (type-judgement first path-cond options state))
+         (rest-judge (type-judgement-list rest path-cond options state)))
       `(if ,first-judge
            ,rest-judge
          'nil)))
   )
 
-(verify-guards type-judgements)
+(verify-guards type-judgement)
+
+(define type-judge-fn ((cl pseudo-term-listp)
+                       (smtlink-hint t)
+                       state)
+  :returns (subgoal-lst pseudo-term-list-listp)
+  (b* (((unless (pseudo-term-listp cl)) nil)
+       ((unless (smtlink-hint-p smtlink-hint))
+        (list cl))
+       ((smtlink-hint h) smtlink-hint)
+       (goal (disjoin cl))
+       (options (construct-type-options smtlink-hint)) ;; TODO
+       (type-judgements (type-judgement goal 't options state))
+       (new-cl `((implies ,type-judgements ,goal)))
+       (next-cp (cdr (assoc-equal 'type-judge *SMT-architecture*)))
+       ((if (null next-cp)) (list cl))
+       (the-hint
+        `(:clause-processor (,next-cp clause ',h state)))
+       (hinted-goal `((hint-please ',the-hint) ,@new-cl)))
+    (list hinted-goal)))
+
+(define type-judge-cp ((cl pseudo-term-listp)
+                       (hints t)
+                       state)
+  (b* ((new-clause (type-judge-fn cl hints state)))
+    (value new-clause)))
+
+(local (in-theory (enable type-judge-cp type-judge-fn)))
+
+(skip-proofs
+ (defthm correctness-of-type-judge-cp
+   (implies (and (ev-infer-meta-extract-global-facts)
+                 (pseudo-term-listp cl)
+                 (alistp a)
+                 (ev-infer
+                  (conjoin-clauses
+                   (acl2::clauses-result
+                    (type-judge-cp cl hint state)))
+                  a))
+            (ev-infer (disjoin cl) a))
+   :rule-classes :clause-processor)
+ )
