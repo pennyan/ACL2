@@ -20,15 +20,27 @@
 (include-book "term-substitution")
 
 ;; ---------------------------------------------------
+
 ;; Datatypes and functions that operates them
 
-(defalist type-to-supertypes-alist
+;; This is a version where a type can have multiple supertypes
+;; (defalist type-to-supertypes-alist
+;;   :key-type symbolp
+;;   :val-type symbol-listp
+;;   :true-listp t)
+
+;; (defthm assoc-equal-of-type-to-supertypes-alist
+;;   (implies (and (type-to-supertypes-alist-p x)
+;;                 (assoc-equal y x))
+;;            (consp (assoc-equal y x))))
+
+(defalist type-to-supertype-alist
   :key-type symbolp
-  :val-type symbol-listp
+  :val-type symbolp
   :true-listp t)
 
-(defthm assoc-equal-of-type-to-supertypes-alist
-  (implies (and (type-to-supertypes-alist-p x)
+(defthm assoc-equal-of-type-to-supertype-alist
+  (implies (and (type-to-supertype-alist-p x)
                 (assoc-equal y x))
            (consp (assoc-equal y x))))
 
@@ -90,7 +102,7 @@
 
 ;; For some reason, this one takes a while
 (defprod type-options
-  ((supertype type-to-supertypes-alist-p)
+  ((supertype type-to-supertype-alist-p)
    (supertype-thm type-tuple-to-thm-alist-p)
    (functions arg-check-p)
    (list list-type-description-p)
@@ -124,52 +136,76 @@
 ;; ----------------------------------------------------------------
 ;;       Subtyping
 
-(defines supertype-transitive-closure
-  :well-founded-relation l<
-  :verify-guards nil
+;; (defines supertype-transitive-closure
+;;   :well-founded-relation l<
+;;   :verify-guards nil
 
-  (define supertype ((type symbolp)
-                     (supertype-alst
-                      type-to-supertypes-alist-p)
-                     (closure symbol-listp)
-                     (clock natp)) ;; clock is the length of the supertype-alst
-    :measure (list (nfix clock) (acl2-count (symbol-fix type)))
-    :returns (closure symbol-listp)
-    (b* ((type (symbol-fix type))
-         (supertype-alst (type-to-supertypes-alist-fix supertype-alst))
-         (closure (symbol-list-fix closure))
-         (clock (nfix clock))
-         ((if (zp clock)) closure)
-         (exist? (member-equal type closure))
-         ((if exist?) closure)
-         (new-closure (cons type closure))
-         (item (assoc-equal type supertype-alst))
-         ((unless item)
-          (er hard? 'type-inference=>supertype
-              "Type ~p0 doesn't exist in the supertype alist.~%" type))
-         ((unless (cdr item)) new-closure)
-         (supertype-lst (cdr item)))
-      (supertype-list supertype-lst supertype-alst new-closure (1- clock))))
+;;   (define supertype ((type symbolp)
+;;                      (supertype-alst
+;;                       type-to-supertypes-alist-p)
+;;                      (closure symbol-listp)
+;;                      (clock natp)) ;; clock is the length of the supertype-alst
+;;     :measure (list (nfix clock) (acl2-count (symbol-fix type)))
+;;     :returns (closure symbol-listp)
+;;     (b* ((type (symbol-fix type))
+;;          (supertype-alst (type-to-supertypes-alist-fix supertype-alst))
+;;          (closure (symbol-list-fix closure))
+;;          (clock (nfix clock))
+;;          ((if (zp clock)) closure)
+;;          (exist? (member-equal type closure))
+;;          ((if exist?) closure)
+;;          (new-closure (cons type closure))
+;;          (item (assoc-equal type supertype-alst))
+;;          ((unless item)
+;;           (er hard? 'type-inference=>supertype
+;;               "Type ~p0 doesn't exist in the supertype alist.~%" type))
+;;          ((unless (cdr item)) new-closure)
+;;          (supertype-lst (cdr item)))
+;;       (supertype-list supertype-lst supertype-alst new-closure (1- clock))))
 
-  (define supertype-list ((type-lst symbol-listp)
-                          (supertype-alst
-                           type-to-supertypes-alist-p)
-                          (closure symbol-listp)
-                          (clock natp))
-    :measure (list (nfix clock) (acl2-count (symbol-list-fix type-lst)))
-    :returns (closure symbol-listp)
-    (b* ((type-lst (symbol-list-fix type-lst))
-         (supertype-alst (type-to-supertypes-alist-fix supertype-alst))
-         (closure (symbol-list-fix closure))
-         (clock (nfix clock))
-         ((unless (consp type-lst)) closure)
-         ((cons type-hd type-tl) type-lst)
-         (new-closure
-          (supertype type-hd supertype-alst closure clock)))
-      (supertype-list type-tl supertype-alst new-closure clock)))
-  )
+;;   (define supertype-list ((type-lst symbol-listp)
+;;                           (supertype-alst
+;;                            type-to-supertypes-alist-p)
+;;                           (closure symbol-listp)
+;;                           (clock natp))
+;;     :measure (list (nfix clock) (acl2-count (symbol-list-fix type-lst)))
+;;     :returns (closure symbol-listp)
+;;     (b* ((type-lst (symbol-list-fix type-lst))
+;;          (supertype-alst (type-to-supertypes-alist-fix supertype-alst))
+;;          (closure (symbol-list-fix closure))
+;;          (clock (nfix clock))
+;;          ((unless (consp type-lst)) closure)
+;;          ((cons type-hd type-tl) type-lst)
+;;          (new-closure
+;;           (supertype type-hd supertype-alst closure clock)))
+;;       (supertype-list type-tl supertype-alst new-closure clock)))
+;;   )
+;;
+;; (verify-guards supertype)
 
-(verify-guards supertype)
+(defthm symbolp-of-cdr-of-assoc-equal-from-type-to-supertype-alist
+  (implies (and (type-to-supertype-alist-p x)
+                (assoc-equal y x))
+           (symbolp (cdr (assoc-equal y x)))))
+
+(define supertype-clocked ((type symbolp)
+                           (supertype-alst
+                            type-to-supertype-alist-p)
+                           (clock natp))
+  :returns (supertypes symbol-listp)
+  :measure (nfix clock)
+  (b* ((type (symbol-fix type))
+       (supertype-alst (type-to-supertype-alist-fix supertype-alst))
+       (clock (nfix clock))
+       ((if (zp clock))
+        (er hard? 'type-inference=>supertype
+            "Run out of clocks.~%"))
+       (conspair (assoc-equal type supertype-alst))
+       ((unless conspair) nil))
+    (cons (cdr conspair)
+          (supertype-clocked (cdr conspair) supertype-alst (1- clock)))))
+
+;; -----------------------------------------------------
 
 (define supertype-to-judgements ((supertypes symbol-listp)
                                  (term pseudo-termp))
@@ -183,16 +219,15 @@
          ,(supertype-to-judgements supertypes-tl term)
        'nil)))
 
-(define supertype-judgement ((root-type symbolp)
-                             (term pseudo-termp)
+(define supertype-judgement ((type-judgement pseudo-termp)
                              (supertype-alst
-                              type-to-supertypes-alist-p))
+                              type-to-supertype-alist-p))
   :returns (judgements pseudo-termp)
   (b* ((root-type (symbol-fix root-type))
-       (supertype-alst (type-to-supertypes-alist-fix supertype-alst))
+       (supertype-alst (type-to-supertype-alist-fix supertype-alst))
        (clock (len supertype-alst))
        (supertypes
-        (supertype root-type supertype-alst nil clock)))
+        (supertype-clocked root-type supertype-alst clock)))
     (supertype-to-judgements supertypes term)))
 
 ;; -----------------------------------------------------------------
@@ -313,6 +348,17 @@
         (er hard? 'type-inference=>type-judgement-top
             "The judgements is empty.~%")))
     (cadr judgements)))
+
+(define intersect-judgements ((judge1 pseudo-termp)
+                              (judge2 pseudo-termp)
+                              (thms type-tuple-to-thm-alist))
+  :returns (intersection pseudo-termp)
+  (b* ((judge1 (pseudo-term-fix judge1))
+       (judge2 (pseudo-term-fix judge2))
+       (thms (type-tuple-to-thm-alist thms))
+       ()
+       )
+    ()))
 
 (define strengthen-judgement ((judgement pseudo-termp)
                               (path-cond pseudo-termp)
