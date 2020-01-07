@@ -216,8 +216,142 @@
   (or (type-predicate-p judge supertype-alst)
       (single-var-fncall-p judge)))
 
-;; ----------------------------------------------------------------
-;;       Subtyping
+(define is-conjunct? ((term pseudo-termp))
+  :returns (ok booleanp)
+  (b* ((term (pseudo-term-fix term)))
+    (implies (not (equal term ''t))
+             (and (consp term)
+                  (equal (car term) 'if)
+                  (equal (len term) 4)
+                  (equal (cadddr term) ''nil))))
+  ///
+  (more-returns
+   (ok (implies (and ok (pseudo-termp term) (not (equal term ''t)))
+                (and (consp term)
+                     (pseudo-termp (cadr term))
+                     (pseudo-termp (caddr term))))
+       :name implies-of-is-conjunct?)
+   (ok (implies (and ok (pseudo-termp term) (not (equal term ''t)))
+                (< (acl2-count (caddr term))
+                   (acl2-count term)))
+       :name acl2-count-of-caddr-of-is-conjunct?
+       :hints (("Goal"
+                :in-theory (disable implies-of-is-conjunct?
+                                    symbol-listp)))
+       :rule-classes :linear)))
+
+;; -----------------------------------------------------------------
+;;       Define evaluators
+
+(acl2::defevaluator-fast ev-infer ev-infer-lst
+                         ((if a b c) (equal a b) (not a)
+                          (cons a b) (binary-+ a b)
+                          (typespec-check ts x)
+                          (iff a b)
+                          (implies a b)
+                          (hint-please hint)
+                          (return-last x y z)
+                          (binary-+ x y))
+                         :namedp t)
+
+(acl2::def-ev-theoremp ev-infer)
+(acl2::def-meta-extract ev-infer ev-infer-lst)
+(acl2::def-unify ev-infer ev-infer-alist)
+
+(set-state-ok t)
+
+(define eval-const-expr ((expr pseudo-termp) state)
+  :returns (val acl2::any-p)
+  (b* ((expr (pseudo-term-fix expr))
+       ((mv err val) (acl2::magic-ev expr nil state t nil))
+       ((if err)
+        (er hard? 'type-inference=>eval-const-expr val)))
+    val))
+
+(define path-cond-implies-expr-not-nil ((path-cond pseudo-termp)
+                                        (expr pseudo-termp)
+                                        state)
+  :returns (ok booleanp)
+  :guard-debug t
+  :measure (acl2-count (pseudo-term-fix path-cond))
+  (b* ((path-cond (pseudo-term-fix path-cond))
+       (expr (pseudo-term-fix expr))
+       ((unless (is-conjunct? path-cond))
+        (er hard? 'type-inference=>path-cond-implies-expr-not-nil
+            "Path condition is not a conjunction of conditions: ~q0" path-cond))
+       ((if (equal path-cond ''t)) nil)
+       ((list* & path-hd path-tl &) path-cond)
+       (path-hd-nil/expr (term-substitution path-hd expr ''nil))
+       ((if (null (eval-const-expr path-hd-nil/expr state))) t))
+    (path-cond-implies-expr-not-nil path-tl expr state)))
+
+(define exists-in-path-cond ((term pseudo-termp)
+                             (path-cond pseudo-termp))
+  :returns (ok booleanp)
+  :measure (acl2-count (pseudo-term-fix path-cond))
+  (b* ((term (pseudo-term-fix term))
+       (path-cond (pseudo-term-fix path-cond))
+       ((unless (is-conjunct? path-cond))
+        (er hard? 'type-inference=>look-up-path-cond
+            "Path condition is not a conjunction of conditions: ~q0" path-cond))
+       ((if (equal path-cond ''t)) nil)
+       ((list* & path-hd path-tl &) path-cond)
+       ((if (equal path-hd term)) t))
+    (exists-in-path-cond term path-tl)))
+
+(define look-up-path-cond ((term pseudo-termp)
+                           (path-cond pseudo-termp))
+  :returns (type-term
+            pseudo-termp
+            :hints (("Goal" :in-theory (disable symbol-listp))))
+  :measure (acl2-count (pseudo-term-fix path-cond))
+  (b* ((term (pseudo-term-fix term))
+       (path-cond (pseudo-term-fix path-cond))
+       ((unless (is-conjunct? path-cond))
+        (er hard? 'type-inference=>look-up-path-cond
+            "Path condition is not a conjunction of conditions: ~q0" path-cond))
+       ((if (equal path-cond ''t)) ''t)
+       ((list* & path-hd path-tl &) path-cond)
+       ((unless (and (equal (len path-hd) 2)
+                     (equal (cadr path-hd) term)))
+        (look-up-path-cond term path-tl)))
+    `(if ,path-hd
+         ,(look-up-path-cond term path-tl)
+       'nil)))
+
+(define shadow-path-cond ((formals symbol-listp)
+                          (path-cond pseudo-termp))
+  :returns (shadowed-path-cond pseudo-termp)
+  :measure (acl2-count (pseudo-term-fix path-cond))
+  (b* ((formals (symbol-list-fix formals))
+       (path-cond (pseudo-term-fix path-cond))
+       ((unless (is-conjunct? path-cond))
+        (er hard? 'type-inference=>shadow-path-cond
+            "Path condition is not a conjunction of conditions: ~q0"
+            path-cond))
+       ((if (equal path-cond ''t)) ''t)
+       ((list* & path-hd path-tl &) path-cond)
+       (shadowed? (dumb-occur-vars-or formals path-hd))
+       ((if shadowed?) (shadow-path-cond formals path-tl)))
+    `(if ,path-hd
+         ,(shadow-path-cond formals path-tl)
+       'nil)))
+
+;; return the topest judgement
+(define type-judgement-top ((judgements pseudo-termp))
+  :returns (judgement pseudo-termp)
+  (b* ((judgements (pseudo-term-fix judgements))
+       ((unless (is-conjunct? judgements))
+        (er hard? 'type-inference=>type-judgement-top
+            "The top of type judgement is not a conjunction of conditions: ~q0"
+            judgements))
+       ((if (equal judgements ''t))
+        (er hard? 'type-inference=>type-judgement-top
+            "The judgements is empty.~%")))
+    (cadr judgements)))
+
+;;-----------------------
+;;      subtyping
 
 ;; (defines supertype-transitive-closure
 ;;   :well-founded-relation l<
@@ -335,6 +469,7 @@
                                  (supertypes symbol-listp)
                                  (term pseudo-termp)
                                  (thms type-tuple-to-thm-alist-p)
+                                 (acc pseudo-termp)
                                  state)
   :returns (judgements pseudo-termp)
   :measure (len supertypes)
@@ -342,24 +477,28 @@
        (supertypes (symbol-list-fix supertypes))
        (term (pseudo-term-fix term))
        (thms (type-tuple-to-thm-alist-fix thms))
-       ((unless (consp supertypes)) ''t)
+       (acc (pseudo-term-fix acc))
+       ((unless (consp supertypes)) acc)
        ((cons supertypes-hd supertypes-tl) supertypes)
        ((unless
             (look-up-type-tuple-to-thm-alist root-type supertypes-hd thms state))
-        nil))
-    `(if (,supertypes-hd ,term)
-         ,(supertype-to-judgements root-type supertypes-tl term thms state)
-       'nil)))
+        nil)
+       (supertype-term `(,supertypes-hd ,term))
+       ((if (exists-in-path-cond supertype-term acc))
+        (supertype-to-judgements root-type supertypes-tl term thms acc state)))
+    (supertype-to-judgements root-type supertypes-tl term thms
+                             `(if ,supertype-term ,acc 'nil) state)))
 )
 
-(define supertype-judgement ((type-judgement pseudo-termp)
-                             (supertype-alst
-                              type-to-supertype-alist-p)
-                             (thms type-tuple-to-thm-alist-p)
-                             state)
+(define supertype-judgement-single ((type-judgement pseudo-termp)
+                                    (supertype-alst
+                                     type-to-supertype-alist-p)
+                                    (thms type-tuple-to-thm-alist-p)
+                                    (acc pseudo-termp)
+                                    state)
   :returns (judgements pseudo-termp)
-  :guard (type-predicate-p type-judgement supertype-alst)
   (b* ((type-judgement (pseudo-term-fix type-judgement))
+       (acc (pseudo-term-fix acc))
        ((unless (type-predicate-p type-judgement supertype-alst))
         (er hard? 'type-inference=>supertype-judgement
             "Type judgement ~p0 is malformed.~%" type-judgement))
@@ -368,144 +507,40 @@
        (clock (len supertype-alst))
        (supertypes
         (supertype-clocked root-type supertype-alst clock)))
-    (supertype-to-judgements root-type supertypes term thms state)))
+    (supertype-to-judgements root-type supertypes term thms acc state)))
 
-;; -----------------------------------------------------------------
-;;       Define evaluators
+(define supertype-judgements-acc ((judge pseudo-termp)
+                                  (supertype-alst
+                                   type-to-supertype-alist-p)
+                                  (thms type-tuple-to-thm-alist-p)
+                                  (acc pseudo-termp)
+                                  state)
+  :returns (judgements pseudo-termp)
+  :measure (acl2-count (pseudo-term-fix judge))
+  (b* ((judge (pseudo-term-fix judge))
+       (acc (pseudo-term-fix acc))
+       ((unless (is-conjunct? judge))
+        (er hard? 'type-inference=>supertype-judgements
+            "~p0 is not a conjunction.~%" judge))
+       ((if (equal judge ''t)) acc)
+       ((list* & cond then &) judge)
+       (first-acc
+        (supertype-judgement-single cond supertype-alst thms acc state)))
+    (supertype-judgements-acc then supertype-alst thms first-acc state)))
 
-(acl2::defevaluator-fast ev-infer ev-infer-lst
-                         ((if a b c) (equal a b) (not a)
-                          (cons a b) (binary-+ a b)
-                          (typespec-check ts x)
-                          (iff a b)
-                          (implies a b)
-                          (hint-please hint)
-                          (return-last x y z)
-                          (binary-+ x y))
-                         :namedp t)
+(define supertype-judgements ((judge pseudo-termp)
+                              (supertype-alst
+                               type-to-supertype-alist-p)
+                              (thms type-tuple-to-thm-alist-p)
+                              state)
+  :returns (judgements pseudo-termp)
+  (supertype-judgements-acc judge supertype-alst thms judge state))
 
-(acl2::def-ev-theoremp ev-infer)
-(acl2::def-meta-extract ev-infer ev-infer-lst)
-(acl2::def-unify ev-infer ev-infer-alist)
-
-(set-state-ok t)
-
-(define eval-const-expr ((expr pseudo-termp) state)
-  :returns (val acl2::any-p)
-  (b* ((expr (pseudo-term-fix expr))
-       ((mv err val) (acl2::magic-ev expr nil state t nil))
-       ((if err)
-        (er hard? 'type-inference=>eval-const-expr val)))
-    val))
-
-(define is-conjunct? ((term pseudo-termp))
-  :returns (ok booleanp)
-  (b* ((term (pseudo-term-fix term)))
-    (implies (not (equal term ''t))
-             (and (consp term)
-                  (equal (car term) 'if)
-                  (equal (len term) 4)
-                  (equal (cadddr term) ''nil))))
-  ///
-  (more-returns
-   (ok (implies (and ok (pseudo-termp term) (not (equal term ''t)))
-                (and (consp term)
-                     (pseudo-termp (cadr term))
-                     (pseudo-termp (caddr term))))
-       :name implies-of-is-conjunct?)
-   (ok (implies (and ok (pseudo-termp term) (not (equal term ''t)))
-                (< (acl2-count (caddr term))
-                   (acl2-count term)))
-       :name acl2-count-of-caddr-of-is-conjunct?
-       :hints (("Goal"
-                :in-theory (disable implies-of-is-conjunct?
-                                    symbol-listp)))
-       :rule-classes :linear)))
-
-(define path-cond-implies-expr-not-nil ((path-cond pseudo-termp)
-                                        (expr pseudo-termp)
-                                        state)
-  :returns (ok booleanp)
-  :guard-debug t
-  :measure (acl2-count (pseudo-term-fix path-cond))
-  (b* ((path-cond (pseudo-term-fix path-cond))
-       (expr (pseudo-term-fix expr))
-       ((unless (is-conjunct? path-cond))
-        (er hard? 'type-inference=>path-cond-implies-expr-not-nil
-            "Path condition is not a conjunction of conditions: ~q0" path-cond))
-       ((if (equal path-cond ''t)) nil)
-       ((list* & path-hd path-tl &) path-cond)
-       (path-hd-nil/expr (term-substitution path-hd expr ''nil))
-       ((if (null (eval-const-expr path-hd-nil/expr state))) t))
-    (path-cond-implies-expr-not-nil path-tl expr state)))
-
-(define exists-in-path-cond ((term pseudo-termp)
-                             (path-cond pseudo-termp))
-  :returns (ok booleanp)
-  :measure (acl2-count (pseudo-term-fix path-cond))
-  (b* ((term (pseudo-term-fix term))
-       (path-cond (pseudo-term-fix path-cond))
-       ((unless (is-conjunct? path-cond))
-        (er hard? 'type-inference=>look-up-path-cond
-            "Path condition is not a conjunction of conditions: ~q0" path-cond))
-       ((if (equal path-cond ''t)) nil)
-       ((list* & path-hd path-tl &) path-cond)
-       (- (cw "term: ~p0, path-hd: ~p1~%" term path-hd))
-       ((if (equal path-hd term)) t))
-    (exists-in-path-cond term path-tl)))
-
-(define look-up-path-cond ((term pseudo-termp)
-                           (path-cond pseudo-termp))
-  :returns (type-term
-            pseudo-termp
-            :hints (("Goal" :in-theory (disable symbol-listp))))
-  :measure (acl2-count (pseudo-term-fix path-cond))
-  (b* ((term (pseudo-term-fix term))
-       (path-cond (pseudo-term-fix path-cond))
-       ((unless (is-conjunct? path-cond))
-        (er hard? 'type-inference=>look-up-path-cond
-            "Path condition is not a conjunction of conditions: ~q0" path-cond))
-       ((if (equal path-cond ''t)) ''t)
-       ((list* & path-hd path-tl &) path-cond)
-       ((unless (and (equal (len path-hd) 2)
-                     (equal (cadr path-hd) term)))
-        (look-up-path-cond term path-tl)))
-    `(if ,path-hd
-         ,(look-up-path-cond term path-tl)
-       'nil)))
-
-(define shadow-path-cond ((formals symbol-listp)
-                          (path-cond pseudo-termp))
-  :returns (shadowed-path-cond pseudo-termp)
-  :measure (acl2-count (pseudo-term-fix path-cond))
-  (b* ((formals (symbol-list-fix formals))
-       (path-cond (pseudo-term-fix path-cond))
-       ((unless (is-conjunct? path-cond))
-        (er hard? 'type-inference=>shadow-path-cond
-            "Path condition is not a conjunction of conditions: ~q0"
-            path-cond))
-       ((if (equal path-cond ''t)) ''t)
-       ((list* & path-hd path-tl &) path-cond)
-       (shadowed? (dumb-occur-vars-or formals path-hd))
-       ((if shadowed?) (shadow-path-cond formals path-tl)))
-    `(if ,path-hd
-         ,(shadow-path-cond formals path-tl)
-       'nil)))
-
-;; return the topest judgement
-(define type-judgement-top ((judgements pseudo-termp))
-  :returns (judgement pseudo-termp)
-  (b* ((judgements (pseudo-term-fix judgements))
-       ((unless (is-conjunct? judgements))
-        (er hard? 'type-inference=>type-judgement-top
-            "The top of type judgement is not a conjunction of conditions: ~q0"
-            judgements))
-       ((if (equal judgements ''t))
-        (er hard? 'type-inference=>type-judgement-top
-            "The judgements is empty.~%")))
-    (cadr judgements)))
-
-;;-----------------------
+;; (defthm test (implies (integerp x) (rationalp x)))
+;; (supertype-judgements '(if (integerp x) 't 'nil)
+;;                       '((integerp . rationalp) (rationalp . nil))
+;;                       '((((type . integerp) (super-type . rationalp)) . test))
+;;                       state)
 
 (define supertype-of?-clocked ((type1 symbolp)
                                (type2 symbolp)
@@ -680,18 +715,30 @@
          nil)))
 
 (define type-judgement-quoted ((term pseudo-termp)
-                               (options type-options-p))
+                               (options type-options-p)
+                               state)
   :guard (and (not (acl2::variablep term))
               (acl2::fquotep term))
   :returns (judgements pseudo-termp)
   (b* ((term (pseudo-term-fix term))
+       (options (type-options-fix options))
        ((unless (mbt (acl2::fquotep term))) nil)
-       (const (cadr term)))
-    (cond ((integerp const) `(integerp ',const))
-          ((rationalp const) `(rationalp ',const))
+       (const (cadr term))
+       (supertype-alst (type-options->supertype options))
+       (supertype-thm-alst (type-options->supertype-thm options)))
+    (cond ((integerp const)
+           (supertype-judgements `(integerp ',const) supertype-alst
+                                 supertype-thm-alst state))
+          ((rationalp const)
+           (supertype-judgements `(rationalp ',const) supertype-alst
+                                 supertype-thm-alst state))
           ((null const) (type-judgement-nil options))
-          ((booleanp const) `(booleanp ',const))
-          ((symbolp const) `(symbolp ',const))
+          ((booleanp const)
+           (supertype-judgements `(booleanp ',const) supertype-alst
+                                 supertype-thm-alst state))
+          ((symbolp const)
+           (supertype-judgements `(symbolp ',const) supertype-alst
+                                supertype-thm-alst state))
           (t (er hard? 'type-inference=>type-judgement-quoted
                  "Type inference for constant term ~p0 is not supported.~%"
                  term)))))
@@ -781,13 +828,17 @@
          (judge-else (type-judgement else path-cond options state))
          (judge-then-top (type-judgement-top judge-then))
          (judge-else-top (type-judgement-top judge-else))
-         (judge-if-top (term-substitution judge-then-top then term))
-         ((unless (equal judge-if-top
-                         (term-substitution judge-else-top else term)))
-          (er hard? 'type-inference=>type-judgement-if
-              "Inconsistent type for then expression ~p0 and else expression ~
-               ~p1~%" then else)))
-      `(if ,judge-if-top
+         (judge-from-then (term-substitution judge-then-top then term))
+         (judge-from-else (term-substitution judge-else-top else term))
+         (supertype-alst (type-options->supertype options))
+         (supertype-thm-alst (type-options->supertype-thm options))
+         (judge-if-top (union-judgements judge-from-then judge-from-else
+                                         supertype-alst supertype-thm-alst
+                                         state))
+         (judge-if-top-extended
+          (supertype-judgements judge-if-top
+                                supertype-alst supertype-thm-alst state)))
+      `(if ,judge-if-top-extended
            (if ,judge-cond
                (if ,cond ,judge-then ,judge-else)
              nil)
@@ -847,7 +898,7 @@
          ((if (acl2::variablep term))
           (look-up-path-cond term path-cond))
          ((if (acl2::quotep term))
-          (type-judgement-quoted term options))
+          (type-judgement-quoted term options state))
          ((cons fn &) term)
          ((if (pseudo-lambdap fn))
           (type-judgement-lambda term path-cond options state))
