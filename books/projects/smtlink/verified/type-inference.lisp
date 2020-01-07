@@ -451,9 +451,8 @@
        ((if (equal path-cond ''t)) nil)
        ((list* & path-hd path-tl &) path-cond)
        (- (cw "term: ~p0, path-hd: ~p1~%" term path-hd))
-       ((unless (equal path-hd term))
-        (exists-in-path-cond term path-tl)))
-    t))
+       ((if (equal path-hd term)) t))
+    (exists-in-path-cond term path-tl)))
 
 (define look-up-path-cond ((term pseudo-termp)
                            (path-cond pseudo-termp))
@@ -505,17 +504,6 @@
         (er hard? 'type-inference=>type-judgement-top
             "The judgements is empty.~%")))
     (cadr judgements)))
-
-(define conjunction-to-list ((judge pseudo-termp))
-  :returns (judge-lst pseudo-term-listp)
-  :measure (acl2-count (pseudo-term-fix judge))
-  (b* ((judge (pseudo-term-fix judge))
-       ((unless (is-conjunct? judge))
-        (er hard? 'type-inference=>conjunction-to-list
-            "~p0 is not a conjunction.~%" judge))
-       ((if (equal judge ''t)) nil)
-       ((list* & cond then &) judge))
-    (cons cond (conjunction-to-list then))))
 
 ;;-----------------------
 
@@ -579,44 +567,52 @@
         "There exists no upper bound between ~p0 and ~p1.~%" judge1 judge2)))
 
 (define union-judgements-12lst ((judge pseudo-termp)
-                                (judge-lst pseudo-term-listp)
+                                (judge-conj pseudo-termp)
                                 (supertype-alst type-to-supertype-alist-p)
                                 (thms type-tuple-to-thm-alist-p)
                                 (acc pseudo-termp)
                                 state)
-  :measure (len (pseudo-term-list-fix judge-lst))
+  :measure (acl2-count (pseudo-term-fix judge-conj))
   :returns (union pseudo-termp)
   (b* ((judge (pseudo-term-fix judge))
-       (judge-lst (pseudo-term-list-fix judge-lst))
+       (judge-conj (pseudo-term-fix judge-conj))
        (acc (pseudo-term-fix acc))
-       ((unless (consp judge-lst)) acc)
-       ((cons judge-hd judge-tl) judge-lst)
+       ((unless (is-conjunct? judge-conj))
+        (er hard? 'type-inference=>union-judgements-12lst
+            "~p0 is not a conjunction.~%" judge-conj))
+       ((if (equal judge-conj ''t)) acc)
+       ((list* & cond then &) judge-conj)
        (upper-bound
-        (judgements-upper-bound judge judge-hd supertype-alst thms state))
+        (judgements-upper-bound judge cond supertype-alst thms state))
        ((unless upper-bound)
         (er hard? 'type-inference=>union-judgements-12lst
-            "The upper bound of ~p0 and ~p1 doesn't exist.~%" judge judge-hd))
+            "The upper bound of ~p0 and ~p1 doesn't exist.~%" judge cond))
        ((if (exists-in-path-cond upper-bound acc))
-        (union-judgements-12lst judge judge-tl supertype-alst thms acc state)))
-    (union-judgements-12lst judge judge-tl supertype-alst thms
+        (union-judgements-12lst judge then supertype-alst thms acc state)))
+    (union-judgements-12lst judge then supertype-alst thms
                             `(if ,upper-bound ,acc 'nil) state)))
 
-(define union-judgements-lst2lst ((judge1-lst pseudo-term-listp)
-                                  (judge2-lst pseudo-term-listp)
+(define union-judgements-lst2lst ((judge1 pseudo-termp)
+                                  (judge2 pseudo-termp)
                                   (supertype-alst type-to-supertype-alist-p)
                                   (thms type-tuple-to-thm-alist-p)
                                   (acc pseudo-termp)
                                   state)
-  :returns (unoin pseudo-termp)
-  (b* ((judge1-lst (pseudo-term-list-fix judge1-lst))
-       (judge2-lst (pseudo-term-list-fix judge2-lst))
+  :returns (union
+            pseudo-termp
+            :hints (("Goal" :in-theory (disable symbol-listp))))
+  :measure (acl2-count (pseudo-term-fix judge1))
+  (b* ((judge1 (pseudo-term-fix judge1))
+       (judge2 (pseudo-term-fix judge2))
        (acc (pseudo-term-fix acc))
-       ((unless (consp judge1-lst)) acc)
-       ((cons judge1-hd judge1-tl) judge1-lst)
-       (hd-acc (union-judgements-12lst judge1-hd judge2-lst supertype-alst
-                                       thms acc state)))
-    (union-judgements-lst2lst judge1-tl judge2-lst supertype-alst thms
-                              hd-acc state)))
+       (thms (type-tuple-to-thm-alist-fix thms))
+       ((unless (is-conjunct? judge1))
+        (er hard? 'type-inference=>union-judgements
+            "~p0 is not a conjunction.~%" judge1))
+       ((if (equal judge1 ''t)) acc)
+       ((list* & cond then &) judge1)
+       (hd-acc (union-judgements-12lst cond judge2 supertype-alst thms acc state)))
+    (union-judgements-lst2lst then judge2 supertype-alst thms hd-acc state)))
 
 ;; Assumes judge1 and judge2 are type judgements over the same term
 (define union-judgements ((judge1 pseudo-termp)
@@ -625,17 +621,11 @@
                           (thms type-tuple-to-thm-alist-p)
                           state)
   :returns (union pseudo-termp)
-  (b* ((judge1 (pseudo-term-fix judge1))
-       (judge2 (pseudo-term-fix judge2))
-       (thms (type-tuple-to-thm-alist-fix thms))
-       (judge1-lst (conjunction-to-list judge1))
-       (judge2-lst (conjunction-to-list judge2)))
-    (union-judgements-lst2lst judge1-lst judge2-lst supertype-alst thms ''t
-                              state)))
+  (union-judgements-lst2lst judge1 judge2 supertype-alst thms ''t state))
 
 ;; test
 ;; (defthm test (implies (integerp x) (rationalp x)))
-;; (union-judgements '(if (rationalp x) 't 'nil)
+;; (union-judgements '(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
 ;;                   '(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
 ;;                   '((integerp . rationalp) (rationalp . nil))
 ;;                   '((((type . integerp) (super-type . rationalp)) . test))
