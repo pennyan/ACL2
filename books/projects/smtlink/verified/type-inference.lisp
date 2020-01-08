@@ -84,8 +84,9 @@
   ((recognizer symbolp)
    (fixer symbolp)))
 
-(deflist basic-type-description-list
-  :elt-type basic-type-description-p
+(defalist basic-type-description-alist
+  :key-type symbolp
+  :val-type basic-type-description-p
   :true-listp t)
 
 (encapsulate ()
@@ -99,8 +100,9 @@
    (cdr-thm symbolp)
    (true-list-thm symbolp)))
 
-(deflist list-type-description-list
-  :elt-type list-type-description-p
+(defalist list-type-description-alist
+  :key-type symbolp
+  :val-type list-type-description-p
   :true-listp t)
 
 (defprod alist-type-description
@@ -112,8 +114,9 @@
    (assoc-equal-thm symbolp)
    (true-list-thm symbolp)))
 
-(deflist alist-type-description-list
-  :elt-type alist-type-description-p
+(defalist alist-type-description-alist
+  :key-type symbolp
+  :val-type alist-type-description-p
   :true-listp t)
 )
 
@@ -138,8 +141,9 @@
    (constructor-thm symbolp)
    (destructor-thms symbol-listp)))
 
-(deflist prod-type-description-list
-  :elt-type prod-type-description-p
+(defalist prod-type-description-alist
+  :key-type symbolp
+  :val-type prod-type-description-p
   :true-listp t)
 
 (defprod option-type-description
@@ -148,60 +152,64 @@
    (some-type symbolp)
    (some-constructor-thm symbolp)
    (none-constructor-thm symbolp)
-   (some-destructor-thm symbolp)))
+   (some-destructor-thm symbolp)
+   (non-nil-thm symbolp)))
 
-(deflist option-type-description-list
-  :elt-type option-type-description-p
+(defalist option-type-description-alist
+  :key-type symbolp
+  :val-type option-type-description-p
   :true-listp t)
 
 (defprod sum-type-description
-  ((prod-list prod-type-description-list-p)))
+  ((prod-list prod-type-description-alist-p)))
 
-(deflist sum-type-description-list
-  :elt-type sum-type-description-p
+(defalist sum-type-description-alist
+  :key-type symbolp
+  :val-type sum-type-description-p
   :true-listp t)
 
 (defprod abstract-type-description
   ((recognizer symbolp)
    (fixer symbolp)))
 
-(deflist abstract-type-description-list
-  :elt-type abstract-type-description-p
+(defalist abstract-type-description-alist
+  :key-type symbolp
+  :val-type abstract-type-description-p
   :true-listp t)
 
 (defprod type-options
   ((supertype type-to-supertype-alist-p)
    (supertype-thm type-tuple-to-thm-alist-p)
    (functions function-description-alist-p)
-   (basic basic-type-description-list-p)
-   (list list-type-description-list-p)
-   (alist alist-type-description-list-p)
-   (prod prod-type-description-list-p)
-   (option option-type-description-list-p)
-   (sum sum-type-description-list-p)
-   (abstract abstract-type-description-list-p)))
+   (basic basic-type-description-alist-p)
+   (list list-type-description-alist-p)
+   (alist alist-type-description-alist-p)
+   (prod prod-type-description-alist-p)
+   (option option-type-description-alist-p)
+   (sum sum-type-description-alist-p)
+   (abstract abstract-type-description-alist-p)))
 )
 
 (define is-maybe-type? ((type symbolp)
-                        (options type-options-p))
+                        (option option-type-description-alist-p))
   :returns (ok booleanp)
-  :irrelevant-formals-ok t
-  :ignore-ok t
-  nil)
+  (not (null (assoc-equal type (option-type-description-alist-fix option)))))
 
 (define get-nonnil-thm ((type symbolp)
-                        (options type-options-p))
-  :returns (thm pseudo-termp)
-  :irrelevant-formals-ok t
-  :ignore-ok t
-  nil)
+                        (option option-type-description-alist-p))
+  :returns (thm symbolp)
+  (b* ((option (option-type-description-alist-fix option))
+       (conspair (assoc-equal type option))
+       ((unless conspair)
+        (er hard? 'type-inference=>get-nonnil-thm
+            "Can't find type ~p0 in the option-type alist.~%" type))
+       (type-description (cdr conspair)))
+    (option-type-description->non-nil-thm type-description)))
 
 (define is-type? ((type symbolp)
                   (supertype-alst type-to-supertype-alist-p))
   :returns (ok booleanp)
-  :irrelevant-formals-ok t
-  :ignore-ok t
-  (or (equal type 'rationalp) (equal type 'integerp)))
+  (not (null (assoc-equal type (type-to-supertype-alist-fix supertype-alst)))))
 
 ;; ------------------------
 
@@ -833,24 +841,50 @@
   :hints (("Goal"
            :in-theory (disable pseudo-termp))))
 
-(define strengthen-judgement ((judgement pseudo-termp)
-                              (path-cond pseudo-termp)
-                              (options type-options-p)
-                              state)
-  :returns (new-judgement pseudo-termp)
+(encapsulate ()
+  (local
+   (in-theory (disable (:definition assoc-equal)
+                       (:definition symbol-listp)
+                       (:rewrite is-conjunct?-very-stupid)
+                       (:rewrite lambda-of-pseudo-lambdap)
+                       (:rewrite consp-of-pseudo-lambdap)
+                       (:rewrite pseudo-term-listp-of-symbol-listp)
+                       (:rewrite consp-of-cdr-of-pseudo-lambdap))))
+
+(define strengthen-judgement-single ((judgement pseudo-termp)
+                                     (path-cond pseudo-termp)
+                                     (options type-options-p)
+                                     state)
+  :returns (new-judgement
+            pseudo-termp
+            :hints (("Goal"
+                     :in-theory
+                     (disable (:definition pseudo-termp)
+                              (:rewrite
+                               consp-of-pseudo-lambdap)
+                              (:rewrite
+                               acl2::pseudo-lambdap-of-car-when-pseudo-lambda-listp)
+                              (:rewrite pseudo-term-listp-of-symbol-listp)
+                              (:rewrite
+                               acl2::symbol-listp-of-cdr-when-symbol-listp)
+                              (:rewrite default-cdr)
+                              (:rewrite acl2::pseudo-termp-opener)
+                              (:rewrite equal-fixed-and-x-of-pseudo-termp)))))
   :ignore-ok t ;; for var
-  (b* ((judgement (pseudo-term-fix judgement))
-       ((unless (and (equal (len judgement) 2)
-                     (symbolp (car judgement))))
+  (b* ((options (type-options-fix options))
+       (judgement (pseudo-term-fix judgement))
+       ((unless (type-predicate-p judgement (type-options->supertype options)))
         (er hard? 'type-inference=>strengthen-judgement
             "Judgement to be strengthened ~p0 is malformed.~%" judgement))
-       ((cons type term) judgement)
-       (maybe-type? (is-maybe-type? type options))
+       (option-description (type-options->option options))
+       ((list type term) judgement)
+       (maybe-type? (is-maybe-type? type option-description))
        ((unless maybe-type?) judgement)
        (not-nil?
         (path-cond-implies-expr-not-nil path-cond judgement state))
        ((unless not-nil?) judgement)
-       (nonnil-name (get-nonnil-thm type options))
+       (nonnil-name
+        (get-nonnil-thm type option-description))
        (nonnil-thm
         (acl2::meta-extract-formula-w nonnil-name (w state)))
        ((unless (pseudo-termp nonnil-thm))
@@ -863,11 +897,28 @@
                      (strengthened-type var))
            (mv t strengthened-type))
           (& (mv nil nil))))
-       ((unless ok)
+       ((unless (and ok (symbolp strengthened-type)))
         (er hard? 'type-inference=>strengthen-judgement
             "The non-nil theorem for type ~p0 is of the wrong syntactic form ~
               ~p1~%" type nonnil-thm)))
     `(,strengthened-type ,term)))
+)
+
+(define strengthen-judgements ((judgements pseudo-termp)
+                               (path-cond pseudo-termp)
+                               (options type-options-p)
+                               state)
+  :returns (new-judgements pseudo-termp)
+  :measure (acl2-count (pseudo-term-fix judgements))
+  (b* ((judgements (pseudo-term-fix judgements))
+       ((unless (is-conjunct? judgements))
+        (er hard? 'type-inference=>strengthen-judgements
+            "~p0 is not a conjunction.~%" judgements))
+       ((if (equal judgements ''t)) judgements)
+       ((list* & judge-hd judge-tl &) judgements))
+    `(if ,(strengthen-judgement-single judge-hd path-cond options state)
+         ,(strengthen-judgements judge-tl path-cond options state)
+       'nil)))
 
 ;; TODO
 (define type-judgement-nil ((options type-options-p))
@@ -1041,7 +1092,7 @@
          (weak-return-judgement
           (returns-judgement fn actuals actuals-judgements-top fn-description state))
          (return-judgement
-          (strengthen-judgement weak-return-judgement path-cond options state))
+          (strengthen-judgements weak-return-judgement path-cond options state))
          (return-judgement-extended
           (supertype-judgements return-judgement supertype-alst
                                 supertype-thm-alst state)))
