@@ -98,7 +98,7 @@
    (cons-thm symbolp)
    (car-thm symbolp)
    (cdr-thm symbolp)
-   (true-list-thm symbolp)))
+   (nil-thm symbolp)))
 
 (defalist list-type-description-alist
   :key-type symbolp
@@ -112,7 +112,7 @@
    (val-type symbolp)
    (acons-thm symbolp)
    (assoc-equal-thm symbolp)
-   (true-list-thm symbolp)))
+   (nil-thm symbolp)))
 
 (defalist alist-type-description-alist
   :key-type symbolp
@@ -153,7 +153,8 @@
    (some-constructor-thm symbolp)
    (none-constructor-thm symbolp)
    (some-destructor-thm symbolp)
-   (non-nil-thm symbolp)))
+   (non-nil-thm symbolp)
+   (nil-thm symbolp)))
 
 (defalist option-type-description-alist
   :key-type symbolp
@@ -593,11 +594,13 @@
   :returns (judgements pseudo-termp)
   (supertype-judgements-acc judge supertype-alst thms judge state))
 
-;; (defthm test (implies (integerp x) (rationalp x)))
-;; (supertype-judgements '(if (integerp x) 't 'nil)
-;;                       '((integerp . rationalp) (rationalp . nil))
-;;                       '((((type . integerp) (super-type . rationalp)) . test))
-;;                       state)
+#|
+(defthm test (implies (integerp x) (rationalp x)))
+(supertype-judgements '(if (integerp x) 't 'nil)
+                      '((integerp . rationalp) (rationalp . nil))
+                      '((((type . integerp) (super-type . rationalp)) . test))
+                      state)
+|#
 
 (define supertype-of?-clocked ((type1 symbolp)
                                (type2 symbolp)
@@ -715,13 +718,14 @@
   :returns (union pseudo-termp)
   (union-judgements-lst2lst judge1 judge2 supertype-alst thms ''t state))
 
-;; test
-;; (defthm test (implies (integerp x) (rationalp x)))
-;; (union-judgements '(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
-;;                   '(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
-;;                   '((integerp . rationalp) (rationalp . nil))
-;;                   '((((type . integerp) (super-type . rationalp)) . test))
-;;                   state)
+#|
+(defthm test (implies (integerp x) (rationalp x)))
+(union-judgements '(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
+                  '(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
+                  '((integerp . rationalp) (rationalp . nil))
+                  '((((type . integerp) (super-type . rationalp)) . test))
+                  state)
+|#
 
 ;;-----------------------
 
@@ -920,15 +924,105 @@
          ,(strengthen-judgements judge-tl path-cond options state)
        'nil)))
 
-;; TODO
-(define type-judgement-nil ((options type-options-p))
+(encapsulate ()
+  (local (in-theory (disable (:definition pseudo-termp)
+                             (:definition assoc-equal)
+                             (:definition symbol-listp)
+                             (:rewrite lambda-of-pseudo-lambdap))))
+
+(define check-nil-thm ((type symbolp)
+                       (thm-name symbolp)
+                       state)
+  :returns (ok booleanp)
+  (b* ((nil-thm
+        (acl2::meta-extract-formula-w thm-name (w state)))
+       ((unless (pseudo-termp nil-thm))
+        (er hard? 'type-inference=>check-nil-thm
+            "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
+            thm-name nil-thm))
+       (ok (case-match nil-thm
+             ((!type ''nil) t)
+             (& nil)))
+       ((unless ok)
+        (er hard? 'type-inference=>check-nil-thm
+            "Nil theorem is malformed: ~q0" nil-thm)))
+    t))
+
+(define type-judgement-nil-list ((list list-type-description-alist-p)
+                                 (acc pseudo-termp)
+                                 state)
   :returns (judgements pseudo-termp)
-  :irrelevant-formals-ok t
-  :ignore-ok t
-  `(if (booleanp nil)
-       (if (symbolp nil)
-           t
-         nil)))
+  :measure (len (list-type-description-alist-fix list))
+  (b* ((list (list-type-description-alist-fix list))
+       (acc (pseudo-term-fix acc))
+       ((unless (consp list)) acc)
+       ((cons list-hd list-tl) list)
+       ((cons type type-description) list-hd)
+       (nil-thm (list-type-description->nil-thm type-description))
+       (yes? (check-nil-thm type nil-thm state))
+       ((unless yes?)
+        (er hard? 'type-inference=>type-judgement-nil-list
+            "list type ~p0 failed the nil-thm check.~%" type))
+       (new-judge `(,type 'nil)))
+    (type-judgement-nil-list list-tl `(if ,new-judge ,acc 'nil) state)))
+
+(define type-judgement-nil-alist ((alist alist-type-description-alist-p)
+                                  (acc pseudo-termp)
+                                  state)
+  :returns (judgements pseudo-termp)
+  :measure (len (alist-type-description-alist-fix alist))
+  (b* ((alist (alist-type-description-alist-fix alist))
+       (acc (pseudo-term-fix acc))
+       ((unless (consp alist)) acc)
+       ((cons alist-hd alist-tl) alist)
+       ((cons type type-description) alist-hd)
+       (nil-thm (alist-type-description->nil-thm type-description))
+       (yes? (check-nil-thm type nil-thm state))
+       ((unless yes?)
+        (er hard? 'type-inference=>type-judgement-nil-alist
+            "alist type ~p0 failed the nil-thm check.~%" type))
+       (new-judge `(,type 'nil)))
+    (type-judgement-nil-alist alist-tl `(if ,new-judge ,acc 'nil) state)))
+
+(define type-judgement-nil-option ((option option-type-description-alist-p)
+                                   (acc pseudo-termp)
+                                   state)
+  :returns (judgements pseudo-termp)
+  :measure (len (option-type-description-alist-fix option))
+  (b* ((option (option-type-description-alist-fix option))
+       (acc (pseudo-term-fix acc))
+       ((unless (consp option)) acc)
+       ((cons option-hd option-tl) option)
+       ((cons type type-description) option-hd)
+       (nil-thm (option-type-description->nil-thm type-description))
+       (yes? (check-nil-thm type nil-thm state))
+       ((unless yes?)
+        (er hard? 'type-inference=>type-judgement-option
+            "option type ~p0 failed the nil-thm check.~%" type))
+       (new-judge `(,type 'nil)))
+    (type-judgement-nil-option option-tl `(if ,new-judge ,acc 'nil) state)))
+)
+
+;; Add list type, alist type, option type
+(define type-judgement-nil ((options type-options-p) state)
+  :returns (judgements pseudo-termp)
+  (b* ((options (type-options-fix options))
+       (list (type-options->list options))
+       (alist (type-options->alist options))
+       (option (type-options->option options))
+       (acc1 (type-judgement-nil-list list ''t state))
+       (acc2 (type-judgement-nil-alist alist acc1 state))
+       (acc3 (type-judgement-nil-option option acc2 state)))
+    `(if (booleanp nil)
+         (if (symbolp nil)
+             ,acc3
+           'nil))))
+
+(define type-judgement-t ()
+  :returns (judgements pseudo-termp)
+  `(if (symbolp 't)
+       (if (booleanp 't) 't 'nil)
+     'nil))
 
 (define type-judgement-quoted ((term pseudo-termp)
                                (options type-options-p)
@@ -948,10 +1042,10 @@
           ((rationalp const)
            (supertype-judgements `(rationalp ',const) supertype-alst
                                  supertype-thm-alst state))
-          ((null const) (type-judgement-nil options))
-          ((booleanp const)
-           (supertype-judgements `(booleanp ',const) supertype-alst
-                                 supertype-thm-alst state))
+          ((equal const t)
+           (supertype-judgements (type-judgement-t)
+                                 supertype-alst supertype-thm-alst state))
+          ((null const) (type-judgement-nil options state))
           ((symbolp const)
            (supertype-judgements `(symbolp ',const) supertype-alst
                                 supertype-thm-alst state))
@@ -1138,6 +1232,11 @@
   )
 
 (verify-guards type-judgement)
+
+#|
+test type-judgement
+
+|#
 
 (define type-judge-fn ((cl pseudo-term-listp)
                        (smtlink-hint t)
