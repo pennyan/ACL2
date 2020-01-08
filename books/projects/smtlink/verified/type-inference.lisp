@@ -335,7 +335,8 @@
     (path-cond-implies-expr-not-nil path-tl expr state)))
 
 (define look-up-path-cond ((term pseudo-termp)
-                           (path-cond pseudo-termp))
+                           (path-cond pseudo-termp)
+                           (supertype-alst type-to-supertype-alist-p))
   :returns (type-term
             pseudo-termp
             :hints (("Goal" :in-theory (disable symbol-listp))))
@@ -347,10 +348,10 @@
             "Path condition is not a conjunction of conditions: ~q0" path-cond))
        ((if (equal path-cond ''t)) ''t)
        ((list* & path-hd path-tl &) path-cond)
-       ((unless (judgement-p path-hd))
-        (look-up-path-cond term path-tl)))
+       ((unless (judgement-p path-hd supertype-alst))
+        (look-up-path-cond term path-tl supertype-alst)))
     `(if ,path-hd
-         ,(look-up-path-cond term path-tl)
+         ,(look-up-path-cond term path-tl supertype-alst)
        'nil)))
 
 (define shadow-path-cond ((formals symbol-listp)
@@ -1056,8 +1057,9 @@
     :returns (judgements pseudo-termp)
     (b* ((term (pseudo-term-fix term))
          (path-cond (pseudo-term-fix path-cond))
+         (options (type-options-fix options))
          ((if (acl2::variablep term))
-          (look-up-path-cond term path-cond))
+          (look-up-path-cond term path-cond (type-options->supertype options)))
          ((if (acl2::quotep term))
           (type-judgement-quoted term options state))
          ((cons fn &) term)
