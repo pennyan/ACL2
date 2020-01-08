@@ -347,8 +347,7 @@
             "Path condition is not a conjunction of conditions: ~q0" path-cond))
        ((if (equal path-cond ''t)) ''t)
        ((list* & path-hd path-tl &) path-cond)
-       ((unless (and (equal (len path-hd) 2)
-                     (equal (cadr path-hd) term)))
+       ((unless (judgement-p path-hd))
         (look-up-path-cond term path-tl)))
     `(if ,path-hd
          ,(look-up-path-cond term path-tl)
