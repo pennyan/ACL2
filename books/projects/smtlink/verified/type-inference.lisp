@@ -89,6 +89,18 @@
   :val-type basic-type-description-p
   :true-listp t)
 
+(defprod cons-type-description
+  ((recognizer symbolp)
+   (fixer symbolp)
+   (car-type symbolp)
+   (cdr-type symbolp)
+   (cdr-thm symbolp)))
+
+(defalist cons-type-description-alist
+  :key-type symbolp
+  :val-type cons-type-description-p
+  :true-listp t)
+
 (encapsulate ()
 (local (in-theory (disable (:rewrite default-cdr))))
 (defprod list-type-description
@@ -182,6 +194,7 @@
   ((supertype type-to-supertype-alist-p)
    (supertype-thm type-tuple-to-thm-alist-p)
    (functions function-description-alist-p)
+   (consp cons-type-description-alist-p)
    (basic basic-type-description-alist-p)
    (list list-type-description-alist-p)
    (alist alist-type-description-alist-p)
@@ -385,6 +398,7 @@
 (define type-judgement-top ((judgements pseudo-termp))
   :returns (judgement pseudo-termp)
   (b* ((judgements (pseudo-term-fix judgements))
+       (- (cw "judgements: ~q0" judgements))
        ((unless (is-conjunct? judgements))
         (er hard? 'type-inference=>type-judgement-top
             "The top of type judgement is not a conjunction of conditions: ~q0"
@@ -1063,7 +1077,7 @@
             (pseudo-termp `((lambda ,formals
                               (if ,body-judgements
                                   ,substed-actuals-judgements
-                                nil))
+                                'nil))
                             ,@actuals))))
  )
 
@@ -1107,15 +1121,15 @@
           `((lambda ,formals
               (if ,body-judgements
                   ,substed-actuals-judgements
-                nil))
+                'nil))
             ,@actuals))
          (return-judgement
           (term-substitution (type-judgement-top body-judgements) body term)))
       `(if ,return-judgement
            (if ,lambda-judgements
                ,actuals-judgements
-             nil)
-         nil)))
+             'nil)
+         'nil)))
 
   (define type-judgement-if ((term pseudo-termp)
                              (path-cond pseudo-termp)
@@ -1151,8 +1165,8 @@
       `(if ,judge-if-top-extended
            (if ,judge-cond
                (if ,cond ,judge-then ,judge-else)
-             nil)
-         nil)))
+             'nil)
+         'nil)))
 
   (define type-judgement-fn ((term pseudo-termp)
                              (path-cond pseudo-termp)
@@ -1165,6 +1179,7 @@
     :measure (list (acl2-count (pseudo-term-fix term)) 0)
     :returns (judgements pseudo-termp)
     (b* ((term (pseudo-term-fix term))
+         (- (cw "term: ~q0" term))
          (path-cond (pseudo-term-fix path-cond))
          ((unless (mbt (and (consp term)
                             (symbolp (car term))
@@ -1192,7 +1207,7 @@
                                 supertype-thm-alst state)))
       `(if ,return-judgement-extended
            ,actuals-judgements
-         nil)))
+         'nil)))
 
   (define type-judgement ((term pseudo-termp)
                           (path-cond pseudo-termp)
@@ -1201,6 +1216,7 @@
     :measure (list (acl2-count (pseudo-term-fix term)) 1)
     :returns (judgements pseudo-termp)
     (b* ((term (pseudo-term-fix term))
+         (- (cw "term: ~q0" term))
          (path-cond (pseudo-term-fix path-cond))
          (options (type-options-fix options))
          ((if (acl2::variablep term))
@@ -1228,15 +1244,215 @@
          (rest-judge (type-judgement-list rest path-cond options state)))
       `(if ,first-judge
            ,rest-judge
-         nil)))
+         'nil)))
   )
 
 (verify-guards type-judgement)
 
-#|
-test type-judgement
+;; #|
+;; test type-judgement
 
-|#
+(defalist rational-integer-alist
+  :key-type rationalp
+  :val-type integerp
+  :pred rational-integer-alistp
+  :true-listp t)
+
+(define rational-integer-cons-p ((x t))
+  (and (consp x)
+       (rationalp (car x))
+       (integerp (cdr x))))
+
+(easy-fix rational-integer-cons (cons 0 0))
+
+(defoption maybe-integerp integerp :pred maybe-integerp)
+
+(defoption maybe-rational-integer-consp rational-integer-cons-p
+  :pred maybe-rational-integer-consp)
+
+(defun supertype ()
+  `((integerp . rationalp)
+    (rationalp . nil)
+    (rational-integer-cons-p . nil)
+    (rational-integer-alistp . nil)
+    (maybe-integerp . nil)
+    (maybe-rational-integer-consp . nil)
+    ))
+
+(defthm integerp-implies-rationalp
+  (implies (integerp x) (rationalp x)))
+
+(defun supertype-thm ()
+  `((,(make-type-tuple :type 'integerp :super-type 'rationalp) . integerp-implies-rationalp)))
+
+
+(defthm return-of-assoc-equal
+  (implies (rational-integer-alistp x)
+           (maybe-rational-integer-consp (assoc-equal y x)))
+  :hints (("Goal" :in-theory (enable maybe-rational-integer-consp
+                                     rational-integer-cons-p))))
+
+(defthm return-of-cdr-maybe
+  (implies (maybe-rational-integer-consp x)
+           (maybe-integerp (cdr x)))
+  :hints (("Goal" :in-theory (enable maybe-rational-integer-consp
+                                     rational-integer-cons-p))))
+
+(defthm return-of-cdr
+  (implies (rational-integer-cons-p x)
+           (integerp (cdr x)))
+  :hints (("Goal" :in-theory (enable rational-integer-cons-p))))
+
+(defthm return-of-<
+  (implies (and (integerp x)
+                (integerp y))
+           (booleanp (< x y))))
+
+(defthm return-of-binary-+
+  (implies (and (integerp x)
+                (integerp y))
+           (integerp (binary-+ x y))))
+
+(defthm return-of-unary--
+  (implies (integerp x)
+           (integerp (unary-- x))))
+
+;; assoc-equal: rational-integer-alistp -> maybe-rational-integer-consp
+;; cdr: maybe-rational-integer-consp -> maybe-integerp &
+;;      rational-integer-consp -> integerp
+;; <: integerp integerp -> booleanp
+;; binary-+: integerp integerp -> integerp
+;; unary--: integerp -> integerp
+(defun functions ()
+  `((assoc-equal . ,(make-arg-decl-next
+                     :next `((rational-integer-alistp . ,(make-arg-decl-done
+                                                          :r (make-return-spec
+                                                              :return-type 'maybe-rational-integer-consp
+                                                              :returns-thm 'return-of-assoc-equal))))))
+    (cdr . ,(make-arg-decl-next
+             :next `((maybe-ratonal-integer-consp . ,(make-arg-decl-done
+                                                      :r (make-return-spec
+                                                          :return-type 'maybe-integerp
+                                                          :returns-thm 'return-of-cdr-maybe)))
+                     (ratonal-integer-cons-p . ,(make-arg-decl-done
+                                                 :r (make-return-spec
+                                                     :return-type 'integerp
+                                                     :returns-thm 'return-of-cdr))))))
+    (< . ,(make-arg-decl-next
+           :next `((integerp . ,(make-arg-decl-next
+                                 :next `((integerp . ,(make-arg-decl-done
+                                                       :r (make-return-spec
+                                                           :return-type 'booleanp
+                                                           :returns-thm 'return-of-<)))))))))
+    (binary-+ . ,(make-arg-decl-next
+                  :next `((integerp . ,(make-arg-decl-next
+                                        :next `((integerp .
+                                                          ,(make-arg-decl-done
+                                                            :r (make-return-spec
+                                                                :return-type 'integerp
+                                                                :returns-thm 'return-of-binary-+)))))))))
+    (unary-- . ,(make-arg-decl-next
+                 :next `((integerp . ,(make-arg-decl-done
+                                       :r (make-return-spec
+                                           :return-type 'integerp
+                                           :returns-thm 'return-of-unary--))))))))
+
+(defun basic ()
+  `((integerp . ,(make-basic-type-description :recognizer 'integerp
+                                              :fixer 'ifix))
+    (rationalp . ,(make-basic-type-description :recognizer 'rationalp
+                                               :fixer 'rfix))))
+
+(defun consp-info ()
+  `((rational-integer-cons-p . ,(make-cons-type-description :recognizer
+                                                            'rational-integer-cons-p
+                                                            :fixer
+                                                            'rational-integer-cons-fix
+                                                            :car-type 'rationalp
+                                                            :cdr-type 'integerp
+                                                            :cdr-thm nil))))
+
+(defthm nil-thm-rational-integer-alistp
+  (rational-integer-alistp nil))
+
+(defun alist ()
+  `((rational-integer-alistp . ,(make-alist-type-description :recognizer 'rational-integer-alistp
+                                                             :fixer 'rational-integer-alist-fix
+                                                             :key-type 'rationalp
+                                                             :val-type 'integerp
+                                                             :acons-thm nil
+                                                             :assoc-equal-thm nil
+                                                             :nil-thm 'nil-thm-rational-integer-alistp
+                                                             ))))
+
+(defthm nil-thm-maybe-rational-integer-consp
+  (maybe-rational-integer-consp nil))
+
+(defun option ()
+  `((maybe-rational-integer-consp . ,(make-option-type-description :recognizer 'maybe-rational-integer-consp
+                                                                   :fixer 'maybe-rational-integer-cons-fix
+                                                                   :some-type
+                                                                   'rational-integer-cons-p
+                                                                   :some-constructor-thm nil
+                                                                   :none-constructor-thm nil
+                                                                   :some-destructor-thm nil
+                                                                   :non-nil-thm nil
+                                                                   :nil-thm 'nil-thm-maybe-rational-integer-consp
+                                                                   ))))
+
+(defun options ()
+  (b* ((supertype (supertype))
+       (supertype-thm (supertype-thm))
+       (functions (functions))
+       (basic (basic))
+       (consp (consp-info))
+       (list nil)
+       (alist (alist))
+       (prod nil)
+       (option (option))
+       (sum nil)
+       (abstract nil))
+    (make-type-options
+     :supertype supertype
+     :supertype-thm supertype-thm
+     :functions functions
+     :basic basic
+     :consp consp
+     :list list
+     :alist alist
+     :prod prod
+     :option option
+     :sum sum
+     :abstract abstract)))
+
+(defun term ()
+  '(if (if (rational-integer-alistp al)
+           (if (rationalp r1)
+               (if (assoc-equal r1 a1)
+                   (if (rationalp r2)
+                       (if (assoc-equal r2 a1)
+                           (if (rationalp r3)
+                               (if (assoc-equal r3 a1)
+                                   (if (< (cdr (assoc-equal r1 a1))
+                                          (cdr (assoc-equal r2 a1)))
+                                       (< (cdr (assoc-equal r2 a1))
+                                          (cdr (assoc-equal r3 a1)))
+                                     't)
+                                 'nil)
+                             'nil)
+                         'nil)
+                     'nil)
+                 'nil)
+             'nil)
+         'nil)
+       (< (binary-+ (cdr (assoc-equal r3 a1))
+                    (unary-- (cdr (assoc-equal r1 a1))))
+          '2)
+     't))
+
+(type-judgement (term) ''t (options) state)
+stop
+;; |#
 
 (define type-judge-fn ((cl pseudo-term-listp)
                        (smtlink-hint t)
@@ -1248,7 +1464,7 @@ test type-judgement
        ((smtlink-hint h) smtlink-hint)
        (goal (disjoin cl))
        (options (construct-type-options smtlink-hint)) ;; TODO
-       (type-judgements (type-judgement goal 't options state))
+       (type-judgements (type-judgement goal ''t options state))
        (new-cl `((implies ,type-judgements ,goal)))
        (next-cp (cdr (assoc-equal 'type-judge *SMT-architecture*)))
        ((if (null next-cp)) (list cl))
