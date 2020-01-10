@@ -105,3 +105,13 @@
     (term-substitution-multi (term-substitution term subterm-hd subst-hd)
                              subterm-tl
                              subst-tl)))
+
+(define term-substitution-multi-list ((term-lst pseudo-term-listp)
+                                      (subterm-lst pseudo-term-listp)
+                                      (subst-lst pseudo-term-listp))
+  :returns (subted-term-lst pseudo-term-listp)
+  (b* ((term-lst (pseudo-term-list-fix term-lst))
+       ((unless (consp term-lst)) nil)
+       ((cons term-hd term-tl) term-lst))
+    (cons (term-substitution-multi term-hd subterm-lst subst-lst)
+          (term-substitution-multi-list term-tl subterm-lst subst-lst))))

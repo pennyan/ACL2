@@ -369,6 +369,36 @@
                  (null (eval-const-expr path-hd-nil/expr state)))) t))
     (path-cond-implies-expr-not-nil path-tl expr state)))
 
+(define path-cond-conj-implies-expr-not-nil ((path-cond-conj pseudo-termp)
+                                             (expr pseudo-termp)
+                                             state)
+  :returns (ok booleanp)
+  :measure (acl2-count (pseudo-term-fix path-cond-conj))
+  (b* ((path-cond-conj (pseudo-term-fix path-cond-conj))
+       ((unless (is-conjunct? path-cond-conj))
+        (er hard? 'type-inference=>path-cond-conj-implies-expr-not-nil
+            "Path-cond conjunction is malformed: ~q0" path-cond-conj))
+       ((if (equal path-cond-conj ''t)) nil)
+       ((list & path-cond-hd path-cond-tl &) path-cond-conj)
+       (yes? (path-cond-implies-expr-not-nil path-cond-hd expr state))
+       ((if yes?) t))
+    (path-cond-conj-implies-expr-not-nil path-cond-tl expr state)))
+
+(define path-cond-conj-implies-expr-list ((path-cond-conj pseudo-termp)
+                                          (expr-conj pseudo-termp)
+                                          state)
+  :returns (ok booleanp)
+  :measure (acl2-count (pseudo-term-fix expr-conj))
+  (b* ((path-cond-conj (pseudo-term-fix path-cond-conj))
+       (expr-conj (pseudo-term-fix expr-conj))
+       ((unless (is-conjunct? expr-conj))
+        (path-cond-conj-implies-expr-not-nil path-cond-conj expr-conj state))
+       ((if (equal expr-conj ''t)) nil)
+       ((list & expr-hd expr-tl &) expr-conj)
+       (yes? (path-cond-conj-implies-expr-not-nil path-cond-conj expr-hd state))
+       ((if yes?) (path-cond-conj-implies-expr-list path-cond-conj expr-tl state)))
+    nil))
+
 (encapsulate ()
   (local
    (in-theory (disable (:definition symbol-listp)
@@ -440,7 +470,6 @@
   :returns (judgement-lst pseudo-termp)
   :measure (acl2-count (pseudo-term-fix judgements-lst))
   (b* ((judgements-lst (pseudo-term-fix judgements-lst))
-       (- (cw "judgements-lst: ~q0" judgements-lst))
        ((unless (is-conjunct? judgements-lst))
         (er hard? 'type-inference=>type-judgement-top-list
             "The top of type judgement is not a conjunction of conditions: ~q0"
@@ -701,8 +730,7 @@
        ((if judge1>judge2?) judge1)
        (judge2>judge1? (supertype-of? type2 type1 supertype-alst thms state))
        ((if judge2>judge1?) judge2))
-    (er hard? 'type-inference=>judgements-upper-bound
-        "There exists no upper bound between ~p0 and ~p1.~%" judge1 judge2)))
+    nil))
 
 (define union-judgements-12lst ((judge pseudo-termp)
                                 (judge-conj pseudo-termp)
@@ -722,9 +750,7 @@
        ((list* & cond then &) judge-conj)
        (upper-bound
         (judgements-upper-bound judge cond supertype-alst thms state))
-       ((unless upper-bound)
-        (er hard? 'type-inference=>union-judgements-12lst
-            "The upper bound of ~p0 and ~p1 doesn't exist.~%" judge cond))
+       ((unless upper-bound) acc)
        ((if (path-cond-implies-expr-not-nil acc upper-bound state))
         (union-judgements-12lst judge then supertype-alst thms acc state)))
     (union-judgements-12lst judge then supertype-alst thms
@@ -771,7 +797,6 @@
 |#
 
 ;;-----------------------
-
 (encapsulate ()
   (local (in-theory (disable (:definition assoc-equal)
                              (:definition symbol-listp)
@@ -780,6 +805,7 @@
 
 (define construct-returns-judgement ((fn symbolp)
                                      (actuals pseudo-term-listp)
+                                     (actuals-judgements pseudo-termp)
                                      (return-spec return-spec-p)
                                      state)
   :returns (judgement pseudo-termp)
@@ -794,19 +820,32 @@
        (returns-thm
         (acl2::meta-extract-formula-w returns-name (w state)))
        ((unless (pseudo-termp returns-thm))
-        (er hard? 'type-inference=>type-judgement-fn
+        (er hard? 'type-inference=>construct-returns-judgement
             "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
             returns-name returns-thm))
        ((mv ok type)
         (case-match returns-thm
           ((!return-type (!fn . &))  (mv t return-type))
           ((('lambda r (!return-type r)) (!fn . &)) (mv t return-type))
+          (('implies type-predicates (!return-type (!fn . formals)))
+           (b* ((- (cw "type-predicates: ~q0"type-predicates))
+                (- (cw "formals: ~q0" formals))
+                (- (cw "actuals: ~q0" actuals))
+                (- (cw "actuals judgements: ~q0" actuals-judgements))
+                )
+           (if (and (symbol-listp formals)
+                    (path-cond-conj-implies-expr-list
+                     actuals-judgements
+                     (term-substitution-multi type-predicates formals actuals)
+                     state))
+               (mv t return-type)
+             (mv nil nil))))
           (& (mv nil nil))))
        ((unless ok)
-        (er hard? 'type-inference=>type-judgement-fn
+        (er hard? 'type-inference=>construct-returns-judgement
             "The returns theorem for function ~p0 is of the wrong syntactic ~
                form ~p1~%" fn returns-thm)))
-    `(,return-type (,fn ,@actuals))))
+    `(if (,return-type (,fn ,@actuals)) 't 'nil)))
 )
 
 (local
@@ -822,7 +861,9 @@
 
 (define returns-judgement-single-arg ((fn symbolp)
                                       (actuals pseudo-term-listp)
+                                      (actuals-total pseudo-term-listp)
                                       (actuals-judgements pseudo-termp)
+                                      (actuals-judgements-total pseudo-termp)
                                       (arg-check arg-check-p)
                                       state)
   :returns (judgements pseudo-termp)
@@ -847,14 +888,20 @@
        ((cons actual actuals-tl) actuals)
        ((list & actual-judge actuals-judge-tl &) actuals-judgements)
        (guard-term `(,type ,actual))
+       (- (cw "guard-term: ~q0" guard-term))
+       (- (cw "actual-judge: ~q0" actual-judge))
        (yes? (path-cond-implies-expr-not-nil actual-judge guard-term state))
        ((unless yes?)
-        (returns-judgement-single-arg fn actuals actuals-judgements check-tl state)))
-    (returns-judgement fn actuals-tl actuals-judge-tl arg-decl state)))
+        (returns-judgement-single-arg fn actuals actuals-total actuals-judgements
+                                      actuals-judgements-total check-tl state)))
+    (returns-judgement fn actuals-tl actuals-total
+                       actuals-judge-tl actuals-judgements-total arg-decl state)))
 
 (define returns-judgement ((fn symbolp)
                            (actuals pseudo-term-listp)
+                           (actuals-total pseudo-term-listp)
                            (actuals-judgements pseudo-termp)
+                           (actuals-judgements-total pseudo-termp)
                            (arg-decl arg-decl-p)
                            state)
   :returns (judgements pseudo-termp)
@@ -868,9 +915,12 @@
        ((if (and (equal (arg-decl-kind arg-decl) :done)
                  (null actuals)
                  (equal actuals-judgements ''t)))
-        (construct-returns-judgement fn actuals
+        (progn$ (cw "fn: ~p0, actuals: ~p1~%" fn actuals)
+               (cw "actuals-judgements-total: ~p0~%" actuals-judgements-total)
+        (construct-returns-judgement fn actuals-total
+                                     actuals-judgements-total
                                      (arg-decl-done->r arg-decl)
-                                     state))
+                                     state)))
        ((if (and (equal (arg-decl-kind arg-decl) :done)
                  (or actuals (not (equal actuals-judgements ''t)))))
         (er hard? 'type-inference=>returns-judgement
@@ -880,8 +930,8 @@
         (er hard? 'type-inference=>returns-judgement
             "Run out of actuals or actuals-judgements.~%"))
        (arg-check (arg-decl-next->next arg-decl)))
-    (returns-judgement-single-arg fn actuals actuals-judgements arg-check
-                                  state)))
+    (returns-judgement-single-arg fn actuals actuals-total actuals-judgements
+                                  actuals-judgements-total arg-check state)))
 )
 
 (verify-guards returns-judgement
@@ -920,15 +970,19 @@
   :ignore-ok t ;; for var
   (b* ((options (type-options-fix options))
        (judgement (pseudo-term-fix judgement))
+       (- (cw "judgement: ~q0" judgement))
+       (- (cw "path-cond: ~q0" path-cond))
        ((unless (type-predicate-p judgement (type-options->supertype options)))
         (er hard? 'type-inference=>strengthen-judgement
             "Judgement to be strengthened ~p0 is malformed.~%" judgement))
        (option-description (type-options->option options))
        ((list type term) judgement)
        (maybe-type? (is-maybe-type? type option-description))
+       (- (cw "maybe-type?: ~q0" maybe-type?))
        ((unless maybe-type?) judgement)
        (not-nil?
-        (path-cond-implies-expr-not-nil path-cond judgement state))
+        (path-cond-implies-expr-not-nil path-cond term state))
+       (- (cw "non-nil?: ~q0" not-nil?))
        ((unless not-nil?) judgement)
        (nonnil-name
         (get-nonnil-thm type option-description))
@@ -938,9 +992,10 @@
         (er hard? 'type-inference=>strengthen-judgement
             "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
             nonnil-name nonnil-thm))
+       (- (cw "non-nil-thm: ~q0" nonnil-thm))
        ((mv ok strengthened-type)
         (case-match nonnil-thm
-          (('implies ('and (!type var) ('not ('null var)))
+          (('implies ('if (!type var) ('not ('null var)) ''nil)
                      (strengthened-type var))
            (mv t strengthened-type))
           (& (mv nil nil))))
@@ -1056,8 +1111,8 @@
        (acc1 (type-judgement-nil-list list ''t state))
        (acc2 (type-judgement-nil-alist alist acc1 state))
        (acc3 (type-judgement-nil-option option acc2 state)))
-    `(if (booleanp nil)
-         (if (symbolp nil)
+    `(if (booleanp 'nil)
+         (if (symbolp 'nil)
              ,acc3
            'nil)
        'nil)))
@@ -1081,21 +1136,22 @@
        (supertype-alst (type-options->supertype options))
        (supertype-thm-alst (type-options->supertype-thm options)))
     (cond ((integerp const)
-           (supertype-judgements `(if (integerp ',const) 't 'nil)
+           (supertype-judgements `(if (if (integerp ',const) 't 'nil) 't 'nil)
                                  supertype-alst supertype-thm-alst state))
           ((rationalp const)
-           (supertype-judgements `(if (rationalp ',const) 't 'nil)
+           (supertype-judgements `(if (if (rationalp ',const) 't 'nil) 't 'nil)
                                  supertype-alst supertype-thm-alst state))
           ((equal const t)
-           (supertype-judgements (type-judgement-t)
-                                 supertype-alst supertype-thm-alst state))
-          ((null const) (type-judgement-nil options state))
+           `(if ,(supertype-judgements (type-judgement-t)
+                                       supertype-alst supertype-thm-alst state)
+                't 'nil))
+          ((null const) `(if ,(type-judgement-nil options state) 't 'nil))
           ((symbolp const)
-           (supertype-judgements `(if (symbolp ',const) 't 'nil) supertype-alst
+           (supertype-judgements `(if (if (symbolp ',const) 't 'nil) 't 'nil) supertype-alst
                                 supertype-thm-alst state))
           (t (er hard? 'type-inference=>type-judgement-quoted
                  "Type inference for constant term ~p0 is not supported.~%"
-                 term)))))x
+                 term)))))
 
 (local
  (defthm pseudo-termp-of-lambda
@@ -1177,15 +1233,21 @@
           (er hard? 'type-inference=>type-judgement-if
               "Mangled if term: ~q0" term))
          ((list cond then else) actuals)
+         (- (cw "cond: ~p0, then: ~p1, else: ~p2~%" cond then else))
          (judge-cond (type-judgement cond path-cond options state))
          (judge-then (type-judgement then `(if ,cond ,path-cond 'nil) options state))
-         (judge-else (type-judgement else `(if (not ,cond) ,path-cond 'nil) options state))
+         (judge-else (type-judgement else `(if (not ,cond) ,path-cond 'nil)
+                                     options state))
+         (- (cw "judge-cond: ~p0, judge-then: ~p1, judge-else: ~p2~%"
+                             judge-cond judge-then judge-else))
          (judge-then-top (type-judgement-top judge-then))
          (judge-else-top (type-judgement-top judge-else))
          (judge-from-then (term-substitution judge-then-top then term))
          (judge-from-else (term-substitution judge-else-top else term))
          (supertype-alst (type-options->supertype options))
          (supertype-thm-alst (type-options->supertype-thm options))
+         (- (cw "judge-from-then: ~q0" judge-from-then))
+         (- (cw "judge-from-else: ~q0" judge-from-else))
          (judge-if-top (union-judgements judge-from-then judge-from-else
                                          supertype-alst supertype-thm-alst
                                          state))
@@ -1220,9 +1282,7 @@
          ((if (is-type? fn (type-options->supertype options))) ''t)
          (actuals-judgements
           (type-judgement-list actuals path-cond options state))
-         (- (cw "term before: ~q0" term))
          (actuals-judgements-top (type-judgement-top-list actuals-judgements))
-         (- (cw "actuals-judgements-top:~q0" actuals-judgements-top))
          (functions (type-options->functions options))
          (conspair (assoc-equal fn functions))
          ((unless conspair)
@@ -1231,12 +1291,17 @@
          (fn-description (cdr conspair))
          (supertype-alst (type-options->supertype options))
          (supertype-thm-alst (type-options->supertype-thm options))
+         (- (cw "fn: ~q0" fn))
+         (- (cw "actuals: ~q0" actuals))
+         (- (cw "actuals-judgements-top: ~q0" actuals-judgements-top))
          (weak-return-judgement
-          (returns-judgement fn actuals actuals-judgements-top fn-description
-                             state))
+          (returns-judgement fn actuals actuals actuals-judgements-top
+                             actuals-judgements-top fn-description state))
          (- (cw "weak-return-judgement: ~q0" weak-return-judgement))
          (return-judgement
-          (strengthen-judgements weak-return-judgement path-cond options state))
+          (strengthen-judgements weak-return-judgement path-cond options
+                                 state))
+         (- (cw "strengthened return-judgement: ~q0" return-judgement))
          (return-judgement-extended
           (supertype-judgements return-judgement supertype-alst
                                 supertype-thm-alst state)))
@@ -1251,9 +1316,7 @@
     :measure (list (acl2-count (pseudo-term-fix term)) 1)
     :returns (judgements pseudo-termp)
     (b* ((term (pseudo-term-fix term))
-         (- (cw "term: ~q0" term))
          (path-cond (pseudo-term-fix path-cond))
-         (- (cw "path-cond: ~q0" path-cond))
          (options (type-options-fix options))
          ((if (acl2::variablep term))
           `(if ,(supertype-judgements
@@ -1368,16 +1431,17 @@
 ;; unary--: integerp -> integerp
 (defun functions ()
   `((assoc-equal . ,(make-arg-decl-next
-                     :next `((rational-integer-alistp . ,(make-arg-decl-done
-                                                          :r (make-return-spec
-                                                              :return-type 'maybe-rational-integer-consp
-                                                              :returns-thm 'return-of-assoc-equal))))))
+                     :next `((rationalp . ,(make-arg-decl-next
+                                            :next `((rational-integer-alistp . ,(make-arg-decl-done
+                                                                                 :r (make-return-spec
+                                                                                     :return-type 'maybe-rational-integer-consp
+                                                                                     :returns-thm 'return-of-assoc-equal)))))))))
     (cdr . ,(make-arg-decl-next
-             :next `((maybe-ratonal-integer-consp . ,(make-arg-decl-done
+             :next `((maybe-rational-integer-consp . ,(make-arg-decl-done
                                                       :r (make-return-spec
                                                           :return-type 'maybe-integerp
                                                           :returns-thm 'return-of-cdr-maybe)))
-                     (ratonal-integer-cons-p . ,(make-arg-decl-done
+                     (rational-integer-cons-p . ,(make-arg-decl-done
                                                  :r (make-return-spec
                                                      :return-type 'integerp
                                                      :returns-thm 'return-of-cdr))))))
@@ -1435,15 +1499,38 @@
 (defthm nil-thm-maybe-rational-integer-consp
   (maybe-rational-integer-consp nil))
 
+(defthm non-nil-thm-maybe-rational-integer-consp
+  (implies (and (maybe-rational-integer-consp x)
+                (not (null x)))
+           (rational-integer-cons-p x)))
+
+(defthm nil-thm-maybe-integerp
+  (maybe-integerp nil))
+
+(defthm non-nil-thm-maybe-integerp
+  (implies (and (maybe-integerp x)
+                (not (null x)))
+           (integerp x)))
+
 (defun option ()
-  `((maybe-rational-integer-consp . ,(make-option-type-description :recognizer 'maybe-rational-integer-consp
+  `((maybe-integerp . ,(make-option-type-description :recognizer
+                                                     'maybe-integerp
+                                                     :fixer 'maybe-integer-fix
+                                                     :some-type 'integerp
+                                                     :some-constructor-thm nil
+                                                     :none-constructor-thm nil
+                                                     :some-destructor-thm nil
+                                                     :non-nil-thm 'non-nil-thm-maybe-integerp
+                                                     :nil-thm 'nil-thm-maybe-integerp
+                                                     ))
+    (maybe-rational-integer-consp . ,(make-option-type-description :recognizer 'maybe-rational-integer-consp
                                                                    :fixer 'maybe-rational-integer-cons-fix
                                                                    :some-type
                                                                    'rational-integer-cons-p
                                                                    :some-constructor-thm nil
                                                                    :none-constructor-thm nil
                                                                    :some-destructor-thm nil
-                                                                   :non-nil-thm nil
+                                                                   :non-nil-thm 'non-nil-thm-maybe-rational-integer-consp
                                                                    :nil-thm 'nil-thm-maybe-rational-integer-consp
                                                                    ))))
 
@@ -1475,24 +1562,10 @@
 (defun term ()
   '(if (if (rational-integer-alistp al)
            (if (rationalp r1)
-               (if (assoc-equal r1 al)
-                   (if (rationalp r2)
-                       (if (assoc-equal r2 al)
-                           (if (rationalp r3)
-                               (if (assoc-equal r3 al)
-                                   (if (< (cdr (assoc-equal r1 al))
-                                          (cdr (assoc-equal r2 al)))
-                                       (< (cdr (assoc-equal r2 al))
-                                          (cdr (assoc-equal r3 al)))
-                                     't)
-                                 'nil)
-                             'nil)
-                         'nil)
-                     'nil)
-                 'nil)
+               (assoc-equal r1 al)
              'nil)
          'nil)
-       (< (binary-+ (cdr (assoc-equal r3 al))
+       (< (binary-+ (cdr (assoc-equal r1 al))
                     (unary-- (cdr (assoc-equal r1 al))))
           '2)
      't))
