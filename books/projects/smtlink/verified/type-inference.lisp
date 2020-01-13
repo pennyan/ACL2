@@ -364,7 +364,7 @@
             "Path condition is not a conjunction of conditions: ~q0" path-cond))
        ((if (equal path-cond ''t)) nil)
        ((list* & path-hd path-tl &) path-cond)
-       (path-hd-nil/expr (term-substitution path-hd expr ''nil))
+       (path-hd-nil/expr (term-substitution path-hd expr ''nil t))
        ((if (and (null (all-vars path-hd-nil/expr))
                  (null (eval-const-expr path-hd-nil/expr state)))) t))
     (path-cond-implies-expr-not-nil path-tl expr state)))
@@ -630,7 +630,7 @@
   (b* ((type-judgement (pseudo-term-fix type-judgement))
        (acc (pseudo-term-fix acc))
        ((unless (type-predicate-p type-judgement supertype-alst))
-        (er hard? 'type-inference=>supertype-judgement
+        (er hard? 'type-inference=>supertype-judgement-single
             "Type judgement ~p0 is malformed.~%" type-judgement))
        ((list root-type term) type-judgement)
        (supertype-alst (type-to-supertype-alist-fix supertype-alst))
@@ -649,6 +649,7 @@
   :measure (acl2-count (pseudo-term-fix judge))
   (b* ((judge (pseudo-term-fix judge))
        (acc (pseudo-term-fix acc))
+       (- (cw "supertype-judgments-acc judge: ~q0" judge))
        ((unless (is-conjunct? judge))
         (er hard? 'type-inference=>supertype-judgements
             "~p0 is not a conjunction.~%" judge))
@@ -722,14 +723,15 @@
             "~p0 or ~p1 are not type-predicate(s).~%" judge1 judge2))
        ((list* type1 term1) judge1)
        ((list* type2 term2) judge2)
+       (- (cw "union type1 ~p0 and type2 ~p1~%" type1 type2))
        ((unless (equal term1 term2))
         (er hard? 'type-inference=>supertype-of?
             "Predicate ~p0 and ~p1 are for difference terms.~%"
             judge1 judge2))
-       (judge1>judge2? (supertype-of? type1 type2 supertype-alst thms state))
-       ((if judge1>judge2?) judge1)
-       (judge2>judge1? (supertype-of? type2 type1 supertype-alst thms state))
-       ((if judge2>judge1?) judge2))
+       (judge1>=judge2? (supertype-of? type1 type2 supertype-alst thms state))
+       ((if judge1>=judge2?) judge1)
+       (judge2>=judge1? (supertype-of? type2 type1 supertype-alst thms state))
+       ((if judge2>=judge1?) judge2))
     nil))
 
 (define union-judgements-12lst ((judge pseudo-termp)
@@ -750,7 +752,8 @@
        ((list* & cond then &) judge-conj)
        (upper-bound
         (judgements-upper-bound judge cond supertype-alst thms state))
-       ((unless upper-bound) acc)
+       ((unless upper-bound)
+        (union-judgements-12lst judge then supertype-alst thms acc state))
        ((if (path-cond-implies-expr-not-nil acc upper-bound state))
         (union-judgements-12lst judge then supertype-alst thms acc state)))
     (union-judgements-12lst judge then supertype-alst thms
@@ -794,6 +797,41 @@
                   '((integerp . rationalp) (rationalp . nil))
                   '((((type . integerp) (super-type . rationalp)) . test))
                   state)
+
+(union-judgements '(IF (MAYBE-RATIONAL-INTEGER-CONSP (IF (RATIONALP R1)
+                                                         (ASSOC-EQUAL R1 AL)
+                                                         'NIL))
+                       'T
+                       'NIL)
+                  '(IF
+                  (BOOLEANP (IF (RATIONALP R1)
+                                (ASSOC-EQUAL R1 AL)
+                                'NIL))
+                  (IF
+                   (SYMBOLP (IF (RATIONALP R1)
+                                (ASSOC-EQUAL R1 AL)
+                                'NIL))
+                   (IF
+                     (MAYBE-RATIONAL-INTEGER-CONSP (IF (RATIONALP R1)
+                                                       (ASSOC-EQUAL R1 AL)
+                                                       'NIL))
+                     (IF (MAYBE-INTEGERP (IF (RATIONALP R1)
+                                             (ASSOC-EQUAL R1 AL)
+                                             'NIL))
+                         (IF (RATIONAL-INTEGER-ALISTP (IF (RATIONALP R1)
+                                                          (ASSOC-EQUAL R1 AL)
+                                                          'NIL))
+                             'T
+                             'NIL)
+                         'NIL)
+                     'NIL)
+                   'NIL)
+                  'NIL)
+                  '((maybe-rational-integer-consp . nil) (booleanp . nil)
+                    (symbolp . nil) (maybe-integerp . nil)
+                    (rational-integer-alistp . nil))
+                  '()
+                  state)
 |#
 
 ;;-----------------------
@@ -836,7 +874,7 @@
            (if (and (symbol-listp formals)
                     (path-cond-conj-implies-expr-list
                      actuals-judgements
-                     (term-substitution-multi type-predicates formals actuals)
+                     (term-substitution-multi type-predicates formals actuals t)
                      state))
                (mv t return-type)
              (mv nil nil))))
@@ -1136,18 +1174,17 @@
        (supertype-alst (type-options->supertype options))
        (supertype-thm-alst (type-options->supertype-thm options)))
     (cond ((integerp const)
-           (supertype-judgements `(if (if (integerp ',const) 't 'nil) 't 'nil)
+           (supertype-judgements `(if (integerp ',const) 't 'nil)
                                  supertype-alst supertype-thm-alst state))
           ((rationalp const)
-           (supertype-judgements `(if (if (rationalp ',const) 't 'nil) 't 'nil)
+           (supertype-judgements `(if (rationalp ',const) 't 'nil)
                                  supertype-alst supertype-thm-alst state))
           ((equal const t)
-           `(if ,(supertype-judgements (type-judgement-t)
-                                       supertype-alst supertype-thm-alst state)
-                't 'nil))
-          ((null const) `(if ,(type-judgement-nil options state) 't 'nil))
+           (supertype-judgements (type-judgement-t)
+                                 supertype-alst supertype-thm-alst state))
+          ((null const) (type-judgement-nil options state))
           ((symbolp const)
-           (supertype-judgements `(if (if (symbolp ',const) 't 'nil) 't 'nil) supertype-alst
+           (supertype-judgements `(if (symbolp ',const) 't 'nil) supertype-alst
                                 supertype-thm-alst state))
           (t (er hard? 'type-inference=>type-judgement-quoted
                  "Type inference for constant term ~p0 is not supported.~%"
@@ -1202,7 +1239,7 @@
          (actuals-judgements
           (type-judgement-list actuals path-cond options state))
          (substed-actuals-judgements
-          (term-substitution-multi actuals-judgements actuals formals))
+          (term-substitution-multi actuals-judgements actuals formals t))
          (lambda-judgements
           `((lambda ,formals
               (if ,body-judgements
@@ -1210,7 +1247,7 @@
                 'nil))
             ,@actuals))
          (return-judgement
-          (term-substitution (type-judgement-top body-judgements) body term)))
+          (term-substitution (type-judgement-top body-judgements) body term t)))
       `(if ,return-judgement
            (if ,lambda-judgements
                ,actuals-judgements
@@ -1242,8 +1279,8 @@
                              judge-cond judge-then judge-else))
          (judge-then-top (type-judgement-top judge-then))
          (judge-else-top (type-judgement-top judge-else))
-         (judge-from-then (term-substitution judge-then-top then term))
-         (judge-from-else (term-substitution judge-else-top else term))
+         (judge-from-then (term-substitution judge-then-top then term t))
+         (judge-from-else (term-substitution judge-else-top else term t))
          (supertype-alst (type-options->supertype options))
          (supertype-thm-alst (type-options->supertype-thm options))
          (- (cw "judge-from-then: ~q0" judge-from-then))
@@ -1251,6 +1288,7 @@
          (judge-if-top (union-judgements judge-from-then judge-from-else
                                          supertype-alst supertype-thm-alst
                                          state))
+         (- (cw "judge-if-top: ~q0" judge-if-top))
          (judge-if-top-extended
           (supertype-judgements judge-if-top
                                 supertype-alst supertype-thm-alst state)))
@@ -1326,7 +1364,8 @@
                  state)
                't 'nil))
          ((if (acl2::quotep term))
-          (type-judgement-quoted term options state))
+          `(if ,(type-judgement-quoted term options state)
+               't 'nil))
          ((cons fn &) term)
          ((if (pseudo-lambdap fn))
           (type-judgement-lambda term path-cond options state))

@@ -33,13 +33,38 @@
                                      pseudo-term-fix))))
 )
 
+(local
+ (defthm acl2-count-of-cadr-of-pseudo-term-fix
+   (implies (equal (len (cdr (pseudo-term-fix term))) 3)
+            (< (acl2-count (pseudo-term-fix (cadr (pseudo-term-fix term))))
+               (1+ (acl2-count (cdr (pseudo-term-fix term))))))
+   :hints (("Goal" :in-theory (enable pseudo-term-fix))))
+ )
+
+(local
+ (defthm acl2-count-of-caddr-of-pseudo-term-fix
+   (implies (equal (len (cdr (pseudo-term-fix term))) 3)
+            (< (acl2-count (pseudo-term-fix (caddr (pseudo-term-fix term))))
+               (1+ (acl2-count (cdr (pseudo-term-fix term))))))
+   :hints (("Goal" :in-theory (enable pseudo-term-fix))))
+ )
+
+(local
+ (defthm pseudo-term-listp-of-cdddr-symbolp
+   (implies (and (equal (len (cdr (pseudo-term-fix term))) 3)
+                 (symbolp (car (pseudo-term-fix term))))
+            (pseudo-term-listp (cdddr (pseudo-term-fix term))))
+   :hints (("Goal" :in-theory (enable pseudo-term-fix pseudo-termp)))))
+
 (defines term-substitution
   :well-founded-relation l<
   :verify-guards nil
+  :hints (("Goal" :in-theory (disable len)))
 
   (define term-substitution ((term pseudo-termp)
                              (subterm pseudo-termp)
-                             (subst pseudo-termp))
+                             (subst pseudo-termp)
+                             (skip-conj booleanp))
     :returns (substed-term pseudo-termp)
     :short "Substitute subterm in term with subst."
     :measure (acl2-count (pseudo-term-fix term))
@@ -50,23 +75,38 @@
          ((if (acl2::variablep term)) term)
          ((if (acl2::fquotep term)) term)
          ((cons fn actuals) term)
+         ((if (and skip-conj
+                   (equal fn 'if)
+                   (equal (len actuals) 3)
+                   (equal (cadr actuals) ''t)
+                   (equal (caddr actuals) ''nil)))
+          `(,fn ,(term-substitution (car actuals) subterm subst skip-conj)
+                ,@(cdr actuals)))
+         ((if (and skip-conj
+                   (equal fn 'if)
+                   (equal (len actuals) 3)
+                   (equal (caddr actuals) ''nil)))
+          `(,fn ,(term-substitution (car actuals) subterm subst skip-conj)
+                ,(term-substitution (cadr actuals) subterm subst skip-conj)
+                ,(caddr actuals)))
          ((if (pseudo-lambdap fn))
           (b* ((actuals-substed
-                (term-substitution-list actuals subterm subst))
+                (term-substitution-list actuals subterm subst skip-conj))
                (formals (lambda-formals fn))
                ((unless (mbt (equal (len formals) (len actuals-substed)))) nil)
                (shadowed? (dumb-occur-vars-or formals subterm))
                ((if shadowed?) `(,fn ,@actuals-substed))
                (body (lambda-body fn))
                (body-substed
-                (term-substitution body subterm subst))
+                (term-substitution body subterm subst skip-conj))
                (new-fn `(lambda ,formals ,body-substed)))
             `(,new-fn ,@actuals-substed))))
-      `(,fn ,@(term-substitution-list actuals subterm subst))))
+      `(,fn ,@(term-substitution-list actuals subterm subst skip-conj))))
 
   (define term-substitution-list ((term-lst pseudo-term-listp)
                                   (subterm pseudo-termp)
-                                  (subst pseudo-termp))
+                                  (subst pseudo-termp)
+                                  (skip-conj booleanp))
     :returns (substed-term-lst pseudo-term-listp)
     :measure (acl2-count (pseudo-term-list-fix term-lst))
     (b* ((term-lst (pseudo-term-list-fix term-lst))
@@ -74,25 +114,26 @@
          (subst (pseudo-term-fix subst))
          ((unless (consp term-lst)) nil)
          ((cons first-term rest-terms) term-lst))
-      (cons (term-substitution first-term subterm subst)
-            (term-substitution-list rest-terms subterm subst))))
+      (cons (term-substitution first-term subterm subst skip-conj)
+            (term-substitution-list rest-terms subterm subst skip-conj))))
   )
 
 (defthm term-substitution-list-maintain-length
   (implies (and (pseudo-term-listp term-lst)
                 (pseudo-termp subterm)
                 (pseudo-termp subst))
-           (equal (len (term-substitution-list term-lst subterm subst))
+           (equal (len (term-substitution-list term-lst subterm subst conj))
                   (len term-lst)))
   :hints (("Goal"
            :in-theory (enable term-substitution term-substitution-list)
-           :expand (term-substitution-list term-lst subterm subst))))
+           :expand (term-substitution-list term-lst subterm subst conj))))
 
 (verify-guards term-substitution)
 
 (define term-substitution-multi ((term pseudo-termp)
                                  (subterm-lst pseudo-term-listp)
-                                 (subst-lst pseudo-term-listp))
+                                 (subst-lst pseudo-term-listp)
+                                 (skip-conj booleanp))
   :returns (substed-term pseudo-termp)
   (b* ((term (pseudo-term-fix term))
        (subterm-lst (pseudo-term-list-fix subterm-lst))
@@ -102,16 +143,19 @@
         term)
        ((cons subterm-hd subterm-tl) subterm-lst)
        ((cons subst-hd subst-tl) subst-lst))
-    (term-substitution-multi (term-substitution term subterm-hd subst-hd)
+    (term-substitution-multi (term-substitution term subterm-hd subst-hd skip-conj)
                              subterm-tl
-                             subst-tl)))
+                             subst-tl
+                             skip-conj)))
 
 (define term-substitution-multi-list ((term-lst pseudo-term-listp)
                                       (subterm-lst pseudo-term-listp)
-                                      (subst-lst pseudo-term-listp))
+                                      (subst-lst pseudo-term-listp)
+                                      (skip-conj booleanp))
   :returns (subted-term-lst pseudo-term-listp)
   (b* ((term-lst (pseudo-term-list-fix term-lst))
        ((unless (consp term-lst)) nil)
        ((cons term-hd term-tl) term-lst))
-    (cons (term-substitution-multi term-hd subterm-lst subst-lst)
-          (term-substitution-multi-list term-tl subterm-lst subst-lst))))
+    (cons (term-substitution-multi term-hd subterm-lst subst-lst skip-conj)
+          (term-substitution-multi-list term-tl subterm-lst subst-lst skip-conj))))
+
