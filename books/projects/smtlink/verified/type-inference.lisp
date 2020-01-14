@@ -24,6 +24,7 @@
 ;; 1. change strengthen-judgements to subtype-judgements
 ;; 2. make sure supertype-judgements and union-judgements treats supertypes
 ;; with forks
+;; 3. test lambda
 
 ;; ---------------------------------------------------
 
@@ -290,13 +291,9 @@
                            (term pseudo-termp)
                            (supertype-alst type-to-supertype-alist-p))
   :returns (ok booleanp)
-  (b* ((new-judge
-        (case-match judge
-          (('not ('not new-judge)) new-judge)
-          (& judge))))
-  (or (equal new-judge term)
-      (type-predicate-of-term new-judge term supertype-alst)
-      (single-var-fncall-of-term new-judge term))))
+  (or (equal judge term)
+      (type-predicate-of-term judge term supertype-alst)
+      (single-var-fncall-of-term judge term)))
 
 #|
 (judgement-of-term '(rationalp r1)
@@ -489,18 +486,6 @@
 
 (look-up-path-cond 'x
                    '(if (if (not x)
-                            (if (maybe-integerp x)
-                                't
-                              'nil)
-                          'nil)
-                        't
-                      'nil)
-                   '((integerp . rationalp)
-                     (rationalp)
-                     (maybe-integerp)))
-
-(look-up-path-cond 'x
-                   '(if (if (not (not x))
                             (if (maybe-integerp x)
                                 't
                               'nil)
@@ -1197,6 +1182,16 @@
     (supertype-judgements (strengthen-judgements judgements path-cond options state)
                           supertype-alst supertype-thm-alst state)))
 
+;; reduce not's in term
+(define simple-transformer ((term pseudo-termp))
+  :returns (new-term pseudo-termp)
+  (b* ((term (pseudo-term-fix term))
+       (new-term
+        (case-match term
+          (('not ('not term1)) term1)
+          (& term))))
+    new-term))
+
 (encapsulate ()
   (local (in-theory (disable (:definition pseudo-termp)
                              (:definition assoc-equal)
@@ -1395,8 +1390,8 @@
               "Mangled if term: ~q0" term))
          ((list cond then else) actuals)
          (judge-cond (type-judgement cond path-cond options state))
-         (judge-then (type-judgement then `(if ,cond ,path-cond 'nil) options state))
-         (judge-else (type-judgement else `(if (not ,cond) ,path-cond 'nil)
+         (judge-then (type-judgement then `(if ,(simple-transformer cond) ,path-cond 'nil) options state))
+         (judge-else (type-judgement else `(if ,(simple-transformer `(not ,cond)) ,path-cond 'nil)
                                      options state))
          (judge-then-top (type-judgement-top judge-then))
          (judge-else-top (type-judgement-top judge-else))
