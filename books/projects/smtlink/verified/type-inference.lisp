@@ -21,18 +21,9 @@
 (include-book "partial-eval")
 
 ;; TODO
-;; 1. add a function called extend-judgements that will take the judgements of
-;; a single term, first it calculate subtypes of it then it calculates the
-;; supertype of it.
-;; 2. This extend-judgements function should be applied to all type judgement
-;; results
-;; 3. Should make sure guards of args to a function can be t, and when it is t,
-;; the judgements implies t trivially holds, therefore we can directly look at
-;; the returns theorem. This should allow type inference of '(rationalp x) to
-;; be '(if (extend-judgements (booleanp (rationalp x))) 't 'nil)
-;; 4. union-judgements should be updated so that it can handle types with
-;; multiple supertypes.
-;; 5. Shape of type-judgements?
+;; 1. change strengthen-judgements to subtype-judgements
+;; 2. make sure supertype-judgements and union-judgements treats supertypes
+;; with forks
 
 ;; ---------------------------------------------------
 
@@ -1060,6 +1051,9 @@
         nil)
        ((cons actual actuals-tl) actuals)
        ((list & actual-judge actuals-judge-tl &) actuals-judgements)
+       ((if (equal type 't))
+        (returns-judgement fn actuals-tl actuals-total
+                           actuals-judge-tl actuals-judgements-total arg-decl state))
        (guard-term `(,type ,actual))
        (yes? (path-test actual-judge guard-term state))
        ((unless yes?)
@@ -1188,6 +1182,21 @@
          ,(strengthen-judgements judge-tl path-cond options state)
        'nil)))
 
+;; extend-judgements first calcualte the subtypes then it calculate the
+;; supertypes based on the subtypes
+(define extend-judgements ((judgements pseudo-termp)
+                           (path-cond pseudo-termp)
+                           (options type-options-p)
+                           state)
+  :returns (new-judgements pseudo-termp)
+  (b* ((judgements (pseudo-term-fix judgements))
+       (path-cond (pseudo-term-fix path-cond))
+       (options (type-options-fix options))
+       (supertype-alst (type-options->supertype options))
+       (supertype-thm-alst (type-options->supertype-thm options)))
+    (supertype-judgements (strengthen-judgements judgements path-cond options state)
+                          supertype-alst supertype-thm-alst state)))
+
 (encapsulate ()
   (local (in-theory (disable (:definition pseudo-termp)
                              (:definition assoc-equal)
@@ -1277,22 +1286,16 @@
   (b* ((term (pseudo-term-fix term))
        (options (type-options-fix options))
        ((unless (mbt (acl2::fquotep term))) nil)
-       (const (cadr term))
-       (supertype-alst (type-options->supertype options))
-       (supertype-thm-alst (type-options->supertype-thm options)))
+       (const (cadr term)))
     (cond ((integerp const)
-           (supertype-judgements `(if (integerp ',const) 't 'nil)
-                                 supertype-alst supertype-thm-alst state))
+           (extend-judgements `(if (integerp ',const) 't 'nil) ''t options state))
           ((rationalp const)
-           (supertype-judgements `(if (rationalp ',const) 't 'nil)
-                                 supertype-alst supertype-thm-alst state))
+           (extend-judgements `(if (rationalp ',const) 't 'nil) ''t options state))
           ((equal const t)
-           (supertype-judgements (type-judgement-t)
-                                 supertype-alst supertype-thm-alst state))
+           (extend-judgements (type-judgement-t) ''t options state))
           ((null const) (type-judgement-nil options state))
           ((symbolp const)
-           (supertype-judgements `(if (symbolp ',const) 't 'nil) supertype-alst
-                                supertype-thm-alst state))
+           (extend-judgements `(if (symbolp ',const) 't 'nil) ''t options state))
           (t (er hard? 'type-inference=>type-judgement-quoted
                  "Type inference for constant term ~p0 is not supported.~%"
                  term)))))
@@ -1310,6 +1313,20 @@
                                 'nil))
                             ,@actuals))))
  )
+
+(define type-judgement-variable ((term pseudo-termp)
+                                 (path-cond pseudo-termp)
+                                 (options type-options-p)
+                                 state)
+  :returns (judgements pseudo-termp)
+  (b* ((term (pseudo-term-fix term))
+       (path-cond (pseudo-term-fix path-cond))
+       (options (type-options-fix options))
+       (supertype (type-options->supertype options))
+       (judge-from-path-cond (look-up-path-cond term path-cond supertype))
+       (extended-judge
+        (extend-judgements judge-from-path-cond path-cond options state)))
+    `(if ,extended-judge 't 'nil)))
 
 (defines type-judgements
   :well-founded-relation l<
@@ -1391,8 +1408,7 @@
                                          supertype-alst supertype-thm-alst
                                          state))
          (judge-if-top-extended
-          (supertype-judgements judge-if-top
-                                supertype-alst supertype-thm-alst state)))
+          (extend-judgements judge-if-top path-cond options state)))
       `(if ,judge-if-top-extended
            (if ,judge-cond
                (if ,cond ,judge-then ,judge-else)
@@ -1418,13 +1434,6 @@
                             (not (equal (car term) 'if)))))
           nil)
          ((cons fn actuals) term)
-         (supertype-alst (type-options->supertype options))
-         (supertype-thm-alst (type-options->supertype-thm options))
-         ((if (is-type? fn supertype-alst))
-          (supertype-judgements
-           (strengthen-judgements `(if ,term 't 'nil) path-cond options
-                                  state)
-           supertype-alst supertype-thm-alst state))
          (actuals-judgements
           (type-judgement-list actuals path-cond options state))
          (actuals-judgements-top (type-judgement-top-list actuals-judgements))
@@ -1434,15 +1443,11 @@
           (er hard? 'type-inference=>type-judgement-fn
               "There exists no function description for function ~p0. ~%" fn))
          (fn-description (cdr conspair))
-         (weak-return-judgement
+         (return-judgement
           (returns-judgement fn actuals actuals actuals-judgements-top
                              actuals-judgements-top fn-description state))
-         (return-judgement
-          (strengthen-judgements weak-return-judgement path-cond options
-                                 state))
          (return-judgement-extended
-          (supertype-judgements return-judgement supertype-alst
-                                supertype-thm-alst state)))
+          (extend-judgements return-judgement path-cond options state)))
       `(if ,return-judgement-extended
            ,actuals-judgements
          'nil)))
@@ -1459,12 +1464,7 @@
          (- (cw "term: ~q0" term))
          (- (cw "path-cond: ~q0" path-cond))
          ((if (acl2::variablep term))
-          `(if ,(supertype-judgements
-                 (look-up-path-cond term path-cond (type-options->supertype options))
-                 (type-options->supertype options)
-                 (type-options->supertype-thm options)
-                 state)
-               't 'nil))
+          (type-judgement-variable term path-cond options state))
          ((if (acl2::quotep term))
           `(if ,(type-judgement-quoted term options state)
                't 'nil))
@@ -1570,6 +1570,12 @@
   (implies (integerp x)
            (integerp (unary-- x))))
 
+(defthm return-of-rational-integer-alistp
+  (booleanp (rational-integer-alistp x)))
+
+(defthm return-of-rationalp
+  (booleanp (rationalp x)))
+
 ;; assoc-equal: rational-integer-alistp -> maybe-rational-integer-consp
 ;; cdr: maybe-rational-integer-consp -> maybe-integerp &
 ;;      rational-integer-consp -> integerp
@@ -1609,7 +1615,21 @@
                  :next `((integerp . ,(make-arg-decl-done
                                        :r (make-return-spec
                                            :return-type 'integerp
-                                           :returns-thm 'return-of-unary--))))))))
+                                           :returns-thm
+                                           'return-of-unary--))))))
+    (rational-integer-alistp . ,(make-arg-decl-next
+                                 :next `((t . ,(make-arg-decl-done
+                                                :r (make-return-spec
+                                                    :return-type 'booleanp
+                                                    :returns-thm
+                                                    'return-of-rational-integer-alistp))))))
+    (rationalp . ,(make-arg-decl-next
+                   :next `((t . ,(make-arg-decl-done
+                                  :r (make-return-spec
+                                      :return-type 'booleanp
+                                      :returns-thm
+                                      'return-of-rationalp))))))
+    ))
 
 (defun basic ()
   `((integerp . ,(make-basic-type-description :recognizer 'integerp
@@ -1640,7 +1660,6 @@
                                                              :val-type 'integerp
                                                              :acons-thm nil
                                                              :assoc-equal-thm nil
-                                                             :nil-thm 'nil-thm-rational-integer-alistp
                                                              ))))
 
 (defthm nil-thm-maybe-rational-integer-consp
@@ -1668,7 +1687,6 @@
                                                      :none-constructor-thm nil
                                                      :some-destructor-thm nil
                                                      :non-nil-thm 'non-nil-thm-maybe-integerp
-                                                     :nil-thm 'nil-thm-maybe-integerp
                                                      ))
     (maybe-rational-integer-consp . ,(make-option-type-description :recognizer 'maybe-rational-integer-consp
                                                                    :fixer 'maybe-rational-integer-cons-fix
@@ -1678,7 +1696,6 @@
                                                                    :none-constructor-thm nil
                                                                    :some-destructor-thm nil
                                                                    :non-nil-thm 'non-nil-thm-maybe-rational-integer-consp
-                                                                   :nil-thm 'nil-thm-maybe-rational-integer-consp
                                                                    ))))
 
 (defun options ()
