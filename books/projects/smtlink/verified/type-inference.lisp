@@ -355,9 +355,7 @@
        ((mv err eval-cond) (partial-eval substed-cond nil state))
        ((if err) nil)
        ((unless eval-cond) t))
-    (er hard? 'type-inference=>path-test
-        "Evaluation has no error, but doesn't return nil. Path-cond: ~p0, ~
-         expr: ~p1~%" path-cond expr)))
+    nil))
 
 (define path-test-list ((path-cond pseudo-termp)
                         (expr-conj pseudo-termp)
@@ -1355,7 +1353,13 @@
                             (not (equal (car term) 'if)))))
           nil)
          ((cons fn actuals) term)
-         ((if (is-type? fn (type-options->supertype options))) ''t)
+         (supertype-alst (type-options->supertype options))
+         (supertype-thm-alst (type-options->supertype-thm options))
+         ((if (is-type? fn supertype-alst))
+          (supertype-judgements
+           (strengthen-judgements `(if ,term 't 'nil) path-cond options
+                                  state)
+           supertype-alst supertype-thm-alst state))
          (- (cw "actuals: ~p0, path-cond: ~p1, options: ~p2~%" actuals
                 path-cond options))
          (actuals-judgements
@@ -1367,8 +1371,6 @@
           (er hard? 'type-inference=>type-judgement-fn
               "There exists no function description for function ~p0. ~%" fn))
          (fn-description (cdr conspair))
-         (supertype-alst (type-options->supertype options))
-         (supertype-thm-alst (type-options->supertype-thm options))
          (- (cw "fn: ~q0" fn))
          (- (cw "actuals: ~q0" actuals))
          (- (cw "actuals-judgements: ~q0" actuals-judgements))
@@ -1459,7 +1461,7 @@
     (rationalp . nil)
     (symbolp . nil)
     (booleanp . nil)
-    (rational-integer-cons-p . nil)
+    (rational-integer-cons-p . maybe-rational-integer-consp)
     (rational-integer-alistp . nil)
     (maybe-integerp . nil)
     (maybe-rational-integer-consp . nil)
@@ -1468,9 +1470,15 @@
 (defthm integerp-implies-rationalp
   (implies (integerp x) (rationalp x)))
 
-(defun supertype-thm ()
-  `((,(make-type-tuple :type 'integerp :super-type 'rationalp) . integerp-implies-rationalp)))
+(defthm rational-integer-cons-p-implies-maybe-rational-integer-consp
+  (implies (rational-integer-cons-p x) (maybe-rational-integer-consp x)))
 
+(defun supertype-thm ()
+  `((,(make-type-tuple :type 'integerp :super-type 'rationalp) .
+     integerp-implies-rationalp)
+    (,(make-type-tuple :type 'rational-integer-cons-p
+                       :super-type 'maybe-rational-integer-consp) .
+                       rational-integer-cons-p-implies-maybe-rational-integer-consp)))
 
 (defthm return-of-assoc-equal
   (implies (rational-integer-alistp x)
