@@ -41,13 +41,13 @@
 ;;                 (assoc-equal y x))
 ;;            (consp (assoc-equal y x))))
 
-(defalist type-to-supertype-alist
+(defalist type-to-type-alist
   :key-type symbolp
   :val-type symbolp
   :true-listp t)
 
-(defthm assoc-equal-of-type-to-supertype-alist
-  (implies (and (type-to-supertype-alist-p x)
+(defthm assoc-equal-of-type-to-type-alist
+  (implies (and (type-to-type-alist-p x)
                 (assoc-equal y x))
            (consp (assoc-equal y x))))
 
@@ -195,8 +195,10 @@
   :true-listp t)
 
 (defprod type-options
-  ((supertype type-to-supertype-alist-p)
+  ((supertype type-to-type-alist-p)
    (supertype-thm type-tuple-to-thm-alist-p)
+   (subtype type-to-type-alist-p)
+   (subtype-thm type-tuple-to-thm-alist-p)
    (functions function-description-alist-p)
    (consp cons-type-description-alist-p)
    (basic basic-type-description-alist-p)
@@ -225,9 +227,9 @@
     (option-type-description->non-nil-thm type-description)))
 
 (define is-type? ((type symbolp)
-                  (supertype-alst type-to-supertype-alist-p))
+                  (supertype-alst type-to-type-alist-p))
   :returns (ok booleanp)
-  (not (null (assoc-equal type (type-to-supertype-alist-fix supertype-alst)))))
+  (not (null (assoc-equal type (type-to-type-alist-fix supertype-alst)))))
 
 ;; ------------------------
 
@@ -252,7 +254,7 @@
   (only-one-var-acc term-lst term 0))
 
 (define type-predicate-p ((judge pseudo-termp)
-                          (supertype-alst type-to-supertype-alist-p))
+                          (supertype-alst type-to-type-alist-p))
   :returns (ok booleanp)
   (and (pseudo-termp judge)
        (equal (len judge) 2)
@@ -269,7 +271,7 @@
 
 (define type-predicate-of-term ((judge pseudo-termp)
                                 (term pseudo-termp)
-                                (supertype-alst type-to-supertype-alist-p))
+                                (supertype-alst type-to-type-alist-p))
   :returns (ok booleanp)
   (and (pseudo-termp judge)
        (equal (len judge) 2)
@@ -289,7 +291,7 @@
 
 (define judgement-of-term ((judge pseudo-termp)
                            (term pseudo-termp)
-                           (supertype-alst type-to-supertype-alist-p))
+                           (supertype-alst type-to-type-alist-p))
   :returns (ok booleanp)
   (or (equal judge term)
       (type-predicate-of-term judge term supertype-alst)
@@ -424,7 +426,7 @@
 ;; level and's
 (define look-up-path-cond-acc ((term pseudo-termp)
                                (path-cond pseudo-termp)
-                               (supertype-alst type-to-supertype-alist-p)
+                               (supertype-alst type-to-type-alist-p)
                                (acc pseudo-termp))
   :returns (type-term pseudo-termp)
   :measure (acl2-count (pseudo-term-fix path-cond))
@@ -444,7 +446,7 @@
 
 (define look-up-path-cond ((term pseudo-termp)
                            (path-cond pseudo-termp)
-                           (supertype-alst type-to-supertype-alist-p))
+                           (supertype-alst type-to-type-alist-p))
   :returns (type-term pseudo-termp)
   (look-up-path-cond-acc term path-cond supertype-alst ''t))
 
@@ -632,19 +634,18 @@
 ;;
 ;; (verify-guards supertype)
 
-(defthm symbolp-of-cdr-of-assoc-equal-from-type-to-supertype-alist
-  (implies (and (type-to-supertype-alist-p x)
+(defthm symbolp-of-cdr-of-assoc-equal-from-type-to-type-alist
+  (implies (and (type-to-type-alist-p x)
                 (assoc-equal y x))
            (symbolp (cdr (assoc-equal y x)))))
 
 (define supertype-clocked ((type symbolp)
-                           (supertype-alst
-                            type-to-supertype-alist-p)
+                           (supertype-alst type-to-type-alist-p)
                            (clock natp))
   :returns (supertypes symbol-listp)
   :measure (nfix clock)
   (b* ((type (symbol-fix type))
-       (supertype-alst (type-to-supertype-alist-fix supertype-alst))
+       (supertype-alst (type-to-type-alist-fix supertype-alst))
        (clock (nfix clock))
        ((if (zp clock))
         (er hard? 'type-inference=>supertype
@@ -724,8 +725,7 @@
 )
 
 (define supertype-judgement-single ((type-judgement pseudo-termp)
-                                    (supertype-alst
-                                     type-to-supertype-alist-p)
+                                    (supertype-alst type-to-type-alist-p)
                                     (thms type-tuple-to-thm-alist-p)
                                     (acc pseudo-termp)
                                     state)
@@ -736,15 +736,14 @@
         (er hard? 'type-inference=>supertype-judgement-single
             "Type judgement ~p0 is malformed.~%" type-judgement))
        ((list root-type term) type-judgement)
-       (supertype-alst (type-to-supertype-alist-fix supertype-alst))
+       (supertype-alst (type-to-type-alist-fix supertype-alst))
        (clock (len supertype-alst))
        (supertypes
         (supertype-clocked root-type supertype-alst clock)))
     (supertype-to-judgements root-type supertypes term thms acc state)))
 
 (define supertype-judgements-acc ((judge pseudo-termp)
-                                  (supertype-alst
-                                   type-to-supertype-alist-p)
+                                  (supertype-alst type-to-type-alist-p)
                                   (thms type-tuple-to-thm-alist-p)
                                   (acc pseudo-termp)
                                   state)
@@ -762,8 +761,7 @@
     (supertype-judgements-acc then supertype-alst thms first-acc state)))
 
 (define supertype-judgements ((judge pseudo-termp)
-                              (supertype-alst
-                               type-to-supertype-alist-p)
+                              (supertype-alst type-to-type-alist-p)
                               (thms type-tuple-to-thm-alist-p)
                               state)
   :returns (judgements pseudo-termp)
@@ -794,7 +792,7 @@
 
 (define supertype-of?-clocked ((type1 symbolp)
                                (type2 symbolp)
-                               (supertype-alst type-to-supertype-alist-p)
+                               (supertype-alst type-to-type-alist-p)
                                (thms type-tuple-to-thm-alist-p)
                                (clock natp)
                                state)
@@ -819,7 +817,7 @@
 
 (define supertype-of? ((type1 symbolp)
                        (type2 symbolp)
-                       (supertype-alst type-to-supertype-alist-p)
+                       (supertype-alst type-to-type-alist-p)
                        (thms type-tuple-to-thm-alist-p)
                        state)
   :returns (ok booleanp)
@@ -828,7 +826,7 @@
 
 (define judgements-upper-bound ((judge1 pseudo-termp)
                                 (judge2 pseudo-termp)
-                                (supertype-alst type-to-supertype-alist-p)
+                                (supertype-alst type-to-type-alist-p)
                                 (thms type-tuple-to-thm-alist-p)
                                 state)
   :returns (upper-bound pseudo-termp)
@@ -852,7 +850,7 @@
 
 (define union-judgements-12lst ((judge pseudo-termp)
                                 (judge-conj pseudo-termp)
-                                (supertype-alst type-to-supertype-alist-p)
+                                (supertype-alst type-to-type-alist-p)
                                 (thms type-tuple-to-thm-alist-p)
                                 (acc pseudo-termp)
                                 state)
@@ -877,7 +875,7 @@
 
 (define union-judgements-lst2lst ((judge1 pseudo-termp)
                                   (judge2 pseudo-termp)
-                                  (supertype-alst type-to-supertype-alist-p)
+                                  (supertype-alst type-to-type-alist-p)
                                   (thms type-tuple-to-thm-alist-p)
                                   (acc pseudo-termp)
                                   state)
@@ -900,7 +898,7 @@
 ;; Assumes judge1 and judge2 are type judgements over the same term
 (define union-judgements ((judge1 pseudo-termp)
                           (judge2 pseudo-termp)
-                          (supertype-alst type-to-supertype-alist-p)
+                          (supertype-alst type-to-type-alist-p)
                           (thms type-tuple-to-thm-alist-p)
                           state)
   :returns (union pseudo-termp)
