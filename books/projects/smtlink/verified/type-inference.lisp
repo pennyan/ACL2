@@ -18,6 +18,7 @@
 (include-book "basics")
 (include-book "hint-please")
 (include-book "term-substitution")
+(include-book "partial-eval")
 
 ;; ---------------------------------------------------
 
@@ -344,60 +345,61 @@
 
 (set-state-ok t)
 
-(define eval-const-expr ((expr pseudo-termp) state)
-  :returns (val acl2::any-p)
-  (b* ((expr (pseudo-term-fix expr))
-       ((mv err val) (acl2::magic-ev expr nil state t nil))
-       ((if err)
-        (er hard? 'type-inference=>eval-const-expr val)))
-    val))
-
-(define path-cond-implies-expr-not-nil ((path-cond pseudo-termp)
-                                        (expr pseudo-termp)
-                                        state)
+(define path-test ((path-cond pseudo-termp)
+                   (expr pseudo-termp)
+                   state)
   :returns (ok booleanp)
-  :measure (acl2-count (pseudo-term-fix path-cond))
   (b* ((path-cond (pseudo-term-fix path-cond))
        (expr (pseudo-term-fix expr))
-       ((unless (is-conjunct? path-cond))
-        (er hard? 'type-inference=>path-cond-implies-expr-not-nil
-            "Path condition is not a conjunction of conditions: ~q0" path-cond))
-       ((if (equal path-cond ''t)) nil)
-       ((list* & path-hd path-tl &) path-cond)
-       (path-hd-nil/expr (term-substitution path-hd expr ''nil t))
-       ((if (and (null (all-vars path-hd-nil/expr))
-                 (null (eval-const-expr path-hd-nil/expr state)))) t))
-    (path-cond-implies-expr-not-nil path-tl expr state)))
+       (substed-cond (term-substitution path-cond expr ''nil t))
+       ((mv err eval-cond) (partial-eval substed-cond nil state))
+       ((if err) nil)
+       ((unless eval-cond) t))
+    (er hard? 'type-inference=>path-test
+        "Evaluation has no error, but doesn't return nil. Path-cond: ~p0, ~
+         expr: ~p1~%" path-cond expr)))
 
-(define path-cond-conj-implies-expr-not-nil ((path-cond-conj pseudo-termp)
-                                             (expr pseudo-termp)
-                                             state)
-  :returns (ok booleanp)
-  :measure (acl2-count (pseudo-term-fix path-cond-conj))
-  (b* ((path-cond-conj (pseudo-term-fix path-cond-conj))
-       ((unless (is-conjunct? path-cond-conj))
-        (er hard? 'type-inference=>path-cond-conj-implies-expr-not-nil
-            "Path-cond conjunction is malformed: ~q0" path-cond-conj))
-       ((if (equal path-cond-conj ''t)) nil)
-       ((list & path-cond-hd path-cond-tl &) path-cond-conj)
-       (yes? (path-cond-implies-expr-not-nil path-cond-hd expr state))
-       ((if yes?) t))
-    (path-cond-conj-implies-expr-not-nil path-cond-tl expr state)))
-
-(define path-cond-conj-implies-expr-list ((path-cond-conj pseudo-termp)
-                                          (expr-conj pseudo-termp)
-                                          state)
+(define path-test-list ((path-cond pseudo-termp)
+                        (expr-conj pseudo-termp)
+                        state)
   :returns (ok booleanp)
   :measure (acl2-count (pseudo-term-fix expr-conj))
-  (b* ((path-cond-conj (pseudo-term-fix path-cond-conj))
+  (b* ((path-cond (pseudo-term-fix path-cond))
        (expr-conj (pseudo-term-fix expr-conj))
        ((unless (is-conjunct? expr-conj))
-        (path-cond-conj-implies-expr-not-nil path-cond-conj expr-conj state))
-       ((if (equal expr-conj ''t)) nil)
+        (path-test path-cond expr-conj state))
+       ((if (equal expr-conj ''t)) t)
        ((list & expr-hd expr-tl &) expr-conj)
-       (yes? (path-cond-conj-implies-expr-not-nil path-cond-conj expr-hd state))
-       ((if yes?) (path-cond-conj-implies-expr-list path-cond-conj expr-tl state)))
+       (yes? (path-test path-cond expr-hd state))
+       ((if yes?) (path-test-list path-cond expr-tl state)))
     nil))
+
+#|
+(path-test-list '(if (integerp x) (if (null x) 't 'nil) 'nil)
+                '(if (integerp x) 't 'nil)
+                state)
+(path-test-list '(if (integerp x) (if (null x) 't 'nil) 'nil)
+                '(if (rationalp x) 't 'nil)
+                state)
+(path-test-list '(if (integerp x) (if (null x) 't 'nil) 'nil)
+                '(if x 't 'nil)
+                state)
+(path-test-list '(if (if (integerp x)
+                         (if (null x) 't 'nil) 'nil)
+                     (rationalp x)
+                   'nil)
+                '(if x (if (integerp x) 't 'nil) 'nil)
+                state)
+(path-test-list '(IF (IF (RATIONALP R1) 'T 'NIL)
+                     (IF (IF (RATIONAL-INTEGER-ALISTP AL)
+                             'T
+                             'NIL)
+                         'T
+                         'NIL)
+                     'NIL)
+                '(rational-integer-alistp al)
+                state)
+|#
 
 (encapsulate ()
   (local
@@ -434,6 +436,27 @@
            'nil)))
     (look-up-path-cond term path-tl supertype-alst)))
 )
+
+;; #|
+
+(look-up-path-cond 'r1
+                   '(if (if (rational-integer-alistp al)
+                            (if (rationalp r1)
+                                (assoc-equal r1 al)
+                              'nil)
+                          'nil)
+                        't
+                      'nil)
+                   '((integerp . rationalp)
+                     (rationalp)
+                     (symbolp)
+                     (booleanp)
+                     (rational-integer-cons-p)
+                     (rational-integer-alistp)
+                     (maybe-integerp)
+                     (maybe-rational-integer-consp)))
+
+;; |#
 
 (define shadow-path-cond ((formals symbol-listp)
                           (path-cond pseudo-termp))
@@ -614,7 +637,7 @@
             (look-up-type-tuple-to-thm-alist root-type supertypes-hd thms state))
         nil)
        (supertype-term `(,supertypes-hd ,term))
-       ((if (path-cond-implies-expr-not-nil acc supertype-term state))
+       ((if (path-test acc supertype-term state))
         (supertype-to-judgements root-type supertypes-tl term thms acc state)))
     (supertype-to-judgements root-type supertypes-tl term thms
                              `(if ,supertype-term ,acc 'nil) state)))
@@ -649,7 +672,7 @@
   :measure (acl2-count (pseudo-term-fix judge))
   (b* ((judge (pseudo-term-fix judge))
        (acc (pseudo-term-fix acc))
-       (- (cw "supertype-judgments-acc judge: ~q0" judge))
+       (- (cw "supertype-judgements-acc judge: ~q0" judge))
        ((unless (is-conjunct? judge))
         (er hard? 'type-inference=>supertype-judgements
             "~p0 is not a conjunction.~%" judge))
@@ -667,13 +690,28 @@
   :returns (judgements pseudo-termp)
   (supertype-judgements-acc judge supertype-alst thms judge state))
 
-#|
+;; #|
 (defthm test (implies (integerp x) (rationalp x)))
 (supertype-judgements '(if (integerp x) 't 'nil)
                       '((integerp . rationalp) (rationalp . nil))
                       '((((type . integerp) (super-type . rationalp)) . test))
                       state)
-|#
+
+(supertype-judgements '(IF (MAYBE-RATIONAL-INTEGER-CONSP
+                            (IF (RATIONAL-INTEGER-ALISTP AL)
+                                (IF (RATIONALP R1)
+                                    (ASSOC-EQUAL R1 AL)
+                                    'NIL)
+                                'NIL))
+                           'T
+                           'NIL)
+                      '((maybe-rational-integer-consp . nil) (booleanp . nil)
+                        (symbolp . nil) (maybe-integerp . nil)
+                        (rational-integer-alistp . nil))
+                      '()
+                      state
+                      )
+;; |#
 
 (define supertype-of?-clocked ((type1 symbolp)
                                (type2 symbolp)
@@ -754,7 +792,7 @@
         (judgements-upper-bound judge cond supertype-alst thms state))
        ((unless upper-bound)
         (union-judgements-12lst judge then supertype-alst thms acc state))
-       ((if (path-cond-implies-expr-not-nil acc upper-bound state))
+       ((if (path-test acc upper-bound state))
         (union-judgements-12lst judge then supertype-alst thms acc state)))
     (union-judgements-12lst judge then supertype-alst thms
                             `(if ,upper-bound ,acc 'nil) state)))
@@ -872,7 +910,7 @@
                 (- (cw "actuals judgements: ~q0" actuals-judgements))
                 )
            (if (and (symbol-listp formals)
-                    (path-cond-conj-implies-expr-list
+                    (path-test-list
                      actuals-judgements
                      (term-substitution-multi type-predicates formals actuals t)
                      state))
@@ -928,7 +966,7 @@
        (guard-term `(,type ,actual))
        (- (cw "guard-term: ~q0" guard-term))
        (- (cw "actual-judge: ~q0" actual-judge))
-       (yes? (path-cond-implies-expr-not-nil actual-judge guard-term state))
+       (yes? (path-test actual-judge guard-term state))
        ((unless yes?)
         (returns-judgement-single-arg fn actuals actuals-total actuals-judgements
                                       actuals-judgements-total check-tl state)))
@@ -1019,7 +1057,7 @@
        (- (cw "maybe-type?: ~q0" maybe-type?))
        ((unless maybe-type?) judgement)
        (not-nil?
-        (path-cond-implies-expr-not-nil path-cond term state))
+        (path-test path-cond term state))
        (- (cw "non-nil?: ~q0" not-nil?))
        ((unless not-nil?) judgement)
        (nonnil-name
@@ -1318,6 +1356,8 @@
           nil)
          ((cons fn actuals) term)
          ((if (is-type? fn (type-options->supertype options))) ''t)
+         (- (cw "actuals: ~p0, path-cond: ~p1, options: ~p2~%" actuals
+                path-cond options))
          (actuals-judgements
           (type-judgement-list actuals path-cond options state))
          (actuals-judgements-top (type-judgement-top-list actuals-judgements))
@@ -1331,6 +1371,7 @@
          (supertype-thm-alst (type-options->supertype-thm options))
          (- (cw "fn: ~q0" fn))
          (- (cw "actuals: ~q0" actuals))
+         (- (cw "actuals-judgements: ~q0" actuals-judgements))
          (- (cw "actuals-judgements-top: ~q0" actuals-judgements-top))
          (weak-return-judgement
           (returns-judgement fn actuals actuals actuals-judgements-top
