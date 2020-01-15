@@ -53,7 +53,7 @@
 
 (defprod type-tuple
   ((type symbolp)
-   (super-type symbolp)))
+   (neighbour-type symbolp)))
 
 (defalist type-tuple-to-thm-alist
   :key-type type-tuple-p
@@ -665,7 +665,7 @@
   :ignore-ok t
   (b* ((thms (type-tuple-to-thm-alist-fix thms))
        (tuple (make-type-tuple :type root-type
-                               :super-type super-type))
+                               :neighbour-type super-type))
        (conspair (assoc-equal tuple thms))
        ((unless conspair)
         (er hard? 'type-inference=>supertype-to-judgements
@@ -685,7 +685,8 @@
              (& nil)))
        ((unless ok)
         (er hard? 'type-inference=>supertype-to-judgements
-            "Supertype theorem is malformed: ~q0" supertype-thm)))
+            "Type: ~p0, supertype: ~p1, supertype theorem is malformed: ~p2~%"
+            root-type super-type supertype-thm)))
     t))
 
 
@@ -1510,6 +1511,7 @@
 
 (defun supertype ()
   `((integerp . rationalp)
+    (integerp . maybe-integerp)
     (rationalp . nil)
     (symbolp . nil)
     (booleanp . nil)
@@ -1519,6 +1521,20 @@
     (maybe-rational-integer-consp . nil)
     ))
 
+(defun subtype ()
+  `((rationalp . integerp)
+    (maybe-integerp . integerp)
+    (integerp . nil)
+    (symbolp . nil)
+    (booleanp . nil)
+    (maybe-rational-integer-consp . rational-integer-cons-p)
+    (rational-integer-alistp . nil)
+    (rational-integer-cons-p . nil)
+    ))
+
+(defthm integerp-implies-maybe-integerp
+  (implies (integerp x) (maybe-integerp x)))
+
 (defthm integerp-implies-rationalp
   (implies (integerp x) (rationalp x)))
 
@@ -1526,11 +1542,30 @@
   (implies (rational-integer-cons-p x) (maybe-rational-integer-consp x)))
 
 (defun supertype-thm ()
-  `((,(make-type-tuple :type 'integerp :super-type 'rationalp) .
+  `((,(make-type-tuple :type 'integerp :neighbour-type 'maybe-integerp) .
+     integerp-implies-maybe-integerp)
+    (,(make-type-tuple :type 'integerp :neighbour-type 'rationalp) .
      integerp-implies-rationalp)
     (,(make-type-tuple :type 'rational-integer-cons-p
-                       :super-type 'maybe-rational-integer-consp) .
+                       :neighbour-type 'maybe-rational-integer-consp) .
                        rational-integer-cons-p-implies-maybe-rational-integer-consp)))
+
+(defthm maybe-integerp-can-be-integerp
+  (implies (and (maybe-integerp x)
+                (not (null x)))
+           (integerp x)))
+
+(defthm maybe-rational-integer-consp-can-be-rational-integer-cons-p
+  (implies (and (maybe-rational-integer-consp x)
+                (not (null x)))
+           (rational-integer-cons-p x)))
+
+(defun subtype-thm ()
+  `((,(make-type-tuple :type 'maybe-integerp :neighbour-type 'integerp) .
+     maybe-integerp-can-be-integerp)
+    (,(make-type-tuple :type 'maybe-rational-integer-consp
+                       :neighbour-type 'rational-integer-cons-p) .
+                       maybe-rational-integer-consp-can-be-rational-integer-cons-p)))
 
 (defthm return-of-assoc-equal
   (implies (rational-integer-alistp x)
@@ -1694,6 +1729,8 @@
 (defun options ()
   (b* ((supertype (supertype))
        (supertype-thm (supertype-thm))
+       (subtype (subtype))
+       (subtype-thm (subtype-thm))
        (functions (functions))
        (basic (basic))
        (consp (consp-info))
@@ -1706,6 +1743,8 @@
     (make-type-options
      :supertype supertype
      :supertype-thm supertype-thm
+     :subtype subtype
+     :subtype-thm subtype-thm
      :functions functions
      :basic basic
      :consp consp
