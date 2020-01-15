@@ -1352,12 +1352,14 @@
          (formals (lambda-formals fn))
          (body (lambda-body fn))
          (shadowed-path-cond (shadow-path-cond formals path-cond))
-         (body-judgements
-          (type-judgement body shadowed-path-cond options state))
          (actuals-judgements
           (type-judgement-list actuals path-cond options state))
          (substed-actuals-judgements
           (term-substitution-multi actuals-judgements actuals formals t))
+         (body-judgements
+          (type-judgement body `(if ,shadowed-path-cond
+                                    ,substed-actuals-judgements 'nil)
+                          options state))
          (lambda-judgements
           `((lambda ,formals
               (if ,body-judgements
@@ -1389,9 +1391,13 @@
               "Mangled if term: ~q0" term))
          ((list cond then else) actuals)
          (judge-cond (type-judgement cond path-cond options state))
-         (judge-then (type-judgement then `(if ,(simple-transformer cond) ,path-cond 'nil) options state))
-         (judge-else (type-judgement else `(if ,(simple-transformer `(not ,cond)) ,path-cond 'nil)
-                                     options state))
+         (judge-then
+          (type-judgement then `(if ,(simple-transformer cond) ,path-cond 'nil)
+                          options state))
+         (judge-else
+          (type-judgement else
+                          `(if ,(simple-transformer `(not ,cond)) ,path-cond 'nil)
+                          options state))
          (judge-then-top (type-judgement-top judge-then))
          (judge-else-top (type-judgement-top judge-else))
          (judge-from-then (term-substitution judge-then-top then term t))
@@ -1766,7 +1772,21 @@
           '2)
      't))
 
+(defun term2 ()
+  '(if (if (rational-integer-alistp al)
+           (if (rationalp r1)
+               (assoc-equal r1 al)
+             'nil)
+         'nil)
+       ((lambda (x y)
+          (< (binary-+ (cdr (assoc-equal y x))
+                       (unary-- (cdr (assoc-equal y x))))
+             '2))
+        al r1)
+     't))
+
 (type-judgement (term) ''t (options) state)
+(type-judgement (term2) ''t (options) state)
 stop
 ;; |#
 
