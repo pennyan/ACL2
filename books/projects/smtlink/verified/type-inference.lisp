@@ -1097,10 +1097,10 @@
                        (:rewrite pseudo-term-listp-of-symbol-listp)
                        (:rewrite consp-of-cdr-of-pseudo-lambdap))))
 
-(define strengthen-judgement-single ((judgement pseudo-termp)
-                                     (path-cond pseudo-termp)
-                                     (options type-options-p)
-                                     state)
+(define subtype-judgement-single ((judgement pseudo-termp)
+                                  (path-cond pseudo-termp)
+                                  (options type-options-p)
+                                  state)
   :returns (new-judgement
             pseudo-termp
             :hints (("Goal"
@@ -1120,7 +1120,7 @@
   (b* ((options (type-options-fix options))
        (judgement (pseudo-term-fix judgement))
        ((unless (type-predicate-p judgement (type-options->supertype options)))
-        (er hard? 'type-inference=>strengthen-judgement
+        (er hard? 'type-inference=>subtype-judgement-single
             "Judgement to be strengthened ~p0 is malformed.~%" judgement))
        (option-description (type-options->option options))
        ((list type term) judgement)
@@ -1134,7 +1134,7 @@
        (nonnil-thm
         (acl2::meta-extract-formula-w nonnil-name (w state)))
        ((unless (pseudo-termp nonnil-thm))
-        (er hard? 'type-inference=>strengthen-judgement
+        (er hard? 'type-inference=>subtype-judgement-single
             "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
             nonnil-name nonnil-thm))
        ((mv ok strengthened-type)
@@ -1144,26 +1144,26 @@
            (mv t strengthened-type))
           (& (mv nil nil))))
        ((unless (and ok (symbolp strengthened-type)))
-        (er hard? 'type-inference=>strengthen-judgement
+        (er hard? 'type-inference=>subtype-judgement-single
             "The non-nil theorem for type ~p0 is of the wrong syntactic form ~
               ~p1~%" type nonnil-thm)))
     `(,strengthened-type ,term)))
 )
 
-(define strengthen-judgements ((judgements pseudo-termp)
-                               (path-cond pseudo-termp)
-                               (options type-options-p)
-                               state)
+(define subtype-judgements ((judgements pseudo-termp)
+                            (path-cond pseudo-termp)
+                            (options type-options-p)
+                            state)
   :returns (new-judgements pseudo-termp)
   :measure (acl2-count (pseudo-term-fix judgements))
   (b* ((judgements (pseudo-term-fix judgements))
        ((unless (is-conjunct? judgements))
-        (er hard? 'type-inference=>strengthen-judgements
+        (er hard? 'type-inference=>subtype-judgements
             "~p0 is not a conjunction.~%" judgements))
        ((if (equal judgements ''t)) judgements)
        ((list* & judge-hd judge-tl &) judgements))
-    `(if ,(strengthen-judgement-single judge-hd path-cond options state)
-         ,(strengthen-judgements judge-tl path-cond options state)
+    `(if ,(subtype-judgement-single judge-hd path-cond options state)
+         ,(subtype-judgements judge-tl path-cond options state)
        'nil)))
 
 ;; extend-judgements first calcualte the subtypes then it calculate the
@@ -1178,7 +1178,7 @@
        (options (type-options-fix options))
        (supertype-alst (type-options->supertype options))
        (supertype-thm-alst (type-options->supertype-thm options)))
-    (supertype-judgements (strengthen-judgements judgements path-cond options state)
+    (supertype-judgements (subtype-judgements judgements path-cond options state)
                           supertype-alst supertype-thm-alst state)))
 
 ;; reduce not's in term
