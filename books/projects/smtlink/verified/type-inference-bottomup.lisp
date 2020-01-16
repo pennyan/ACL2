@@ -223,11 +223,11 @@
   :returns (judgement pseudo-termp)
   (b* ((judgements (pseudo-term-fix judgements))
        ((unless (is-conjunct? judgements))
-        (er hard? 'type-inference=>type-judgement-top
+        (er hard? 'type-inference-bottomup=>type-judgement-top
             "The top of type judgement is not a conjunction of conditions: ~q0"
             judgements))
        ((if (equal judgements ''t))
-        (er hard? 'type-inference=>type-judgement-top
+        (er hard? 'type-inference-bottomup=>type-judgement-top
             "The judgements is empty.~%")))
     (cadr judgements)))
 
@@ -236,7 +236,7 @@
   :measure (acl2-count (pseudo-term-fix judgements-lst))
   (b* ((judgements-lst (pseudo-term-fix judgements-lst))
        ((unless (is-conjunct? judgements-lst))
-        (er hard? 'type-inference=>type-judgement-top-list
+        (er hard? 'type-inference-bottomup=>type-judgement-top-list
             "The top of type judgement is not a conjunction of conditions: ~q0"
             judgements-lst))
        ((if (equal judgements-lst ''t)) ''t)
@@ -307,7 +307,7 @@
          (new-closure (cons type closure))
          (item (assoc-equal type type-alst))
          ((unless item)
-          (er hard? 'type-inference=>super/subtype
+          (er hard? 'type-inference-bottomup=>super/subtype
               "Type ~p0 doesn't exist in the supertype alist.~%" type))
          ((unless (cdr item)) new-closure)
          (type-lst (cdr item)))
@@ -379,19 +379,14 @@
        (type-thm
         (acl2::meta-extract-formula-w thm-name (w state)))
        ((unless (pseudo-termp type-thm))
-        (er hard? 'type-inference=>look-up-type-tuple-to-thm-alist
+        (er hard? 'type-inference-bottomup=>look-up-type-tuple-to-thm-alist
             "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
             thm-name type-thm))
        (ok (case-match type-thm
              (('implies (!root-type var) (!type var)) t)
              (('implies type-predicates (!type var))
               (b* (((if (equal type 'quote)) nil)
-                   (- (cw "type: ~q0" type))
-                   (- (cw "type-predicates: ~q0" type-predicates))
-                   (- (cw "term: ~q0" term))
-                   (substed (term-substitution type-predicates var term t))
-                   (- (cw "substed: ~q0" substed))
-                   (- (cw "(if (,root-type ,term) ,path-cond 'nil): ~q0" `(if (,root-type ,term) ,path-cond 'nil))))
+                   (substed (term-substitution type-predicates var term t)))
                 (path-test-list `(if (,root-type ,term) ,path-cond 'nil)
                                 substed state)))
              (& nil))))
@@ -583,9 +578,8 @@
        (return-type (return-spec->return-type return-spec))
        (returns-thm
         (acl2::meta-extract-formula-w returns-name (w state)))
-       (- (cw "returns-thm: ~q0" returns-thm))
        ((unless (pseudo-termp returns-thm))
-        (er hard? 'type-inference=>construct-returns-judgement
+        (er hard? 'type-inference-bottomup=>construct-returns-judgement
             "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
             returns-name returns-thm))
        ((mv ok type)
@@ -601,7 +595,7 @@
              (mv nil nil)))
           (& (mv nil nil))))
        ((unless ok)
-        (er hard? 'type-inference=>construct-returns-judgement
+        (er hard? 'type-inference-bottomup=>construct-returns-judgement
             "The returns theorem for function ~p0 is of the wrong syntactic ~
                form ~p1~%" fn returns-thm)))
     `(,return-type (,fn ,@actuals))))
@@ -637,13 +631,11 @@
        (actuals-judgements (pseudo-term-fix actuals-judgements))
        (acc (pseudo-term-fix acc))
        ((unless (is-conjunct? actuals-judgements))
-        (er hard? 'type-inference=>returns-judgement-single-arg
+        (er hard? 'type-inference-bottomup=>returns-judgement-single-arg
             "Actuals judgements is not a conjunct ~p0.~%" actuals-judgements))
        (arg-check (arg-check-fix arg-check))
        ((unless (consp arg-check)) acc)
        ((cons check-hd check-tl) arg-check)
-       (- (cw "check-hd: ~q0" check-hd))
-       (- (cw "check-tl: ~q0" check-tl))
        ((cons type arg-decl) check-hd)
        ((unless (mbt (and (consp actuals)
                           (not (equal actuals-judgements ''t)))))
@@ -655,8 +647,6 @@
                            actuals-judge-tl actuals-judgements-total arg-decl
                            acc state))
        (guard-term `(,type ,actual))
-       (- (cw "actual-judge: ~q0" actual-judge))
-       (- (cw "guard-term: ~q0" guard-term))
        (yes? (path-test actual-judge guard-term state))
        ((unless yes?)
         (returns-judgement-single-arg fn actuals actuals-total actuals-judgements
@@ -697,11 +687,11 @@
              ,acc 'nil)))
        ((if (and (equal (arg-decl-kind arg-decl) :done)
                  (or actuals (not (equal actuals-judgements ''t)))))
-        (er hard? 'type-inference=>returns-judgement
+        (er hard? 'type-inference-bottomup=>returns-judgement
             "Run out of arg-decls.~%"))
        ((if (or (null actuals)
                 (equal actuals-judgements ''t)))
-        (er hard? 'type-inference=>returns-judgement
+        (er hard? 'type-inference-bottomup=>returns-judgement
             "Run out of actuals or actuals-judgements.~%"))
        (arg-check (arg-decl-next->next arg-decl)))
     (returns-judgement-single-arg fn actuals actuals-total actuals-judgements
@@ -733,7 +723,7 @@
        ((cons type &) list-hd)
        ((mv & yes?) (acl2::magic-ev-fncall type '(nil) state t nil))
        ((unless yes?)
-        (er hard? 'type-inference=>type-judgement-nil-list
+        (er hard? 'type-inference-bottomup=>type-judgement-nil-list
             "list type ~p0 failed the nil check.~%" type))
        (new-judge `(,type 'nil)))
     (type-judgement-nil-list list-tl `(if ,new-judge ,acc 'nil) state)))
@@ -750,7 +740,7 @@
        ((cons type &) alist-hd)
        ((mv & yes?) (acl2::magic-ev-fncall type '(nil) state t nil))
        ((unless yes?)
-        (er hard? 'type-inference=>type-judgement-nil-alist
+        (er hard? 'type-inference-bottomup=>type-judgement-nil-alist
             "alist type ~p0 failed the nil check.~%" type))
        (new-judge `(,type 'nil)))
     (type-judgement-nil-alist alist-tl `(if ,new-judge ,acc 'nil) state)))
@@ -767,7 +757,7 @@
        ((cons type &) option-hd)
        ((mv & yes?) (acl2::magic-ev-fncall type '(nil) state t nil))
        ((unless yes?)
-        (er hard? 'type-inference=>type-judgement-option
+        (er hard? 'type-inference-bottomup=>type-judgement-option
             "option type ~p0 failed the nil check.~%" type))
        (new-judge `(,type 'nil)))
     (type-judgement-nil-option option-tl `(if ,new-judge ,acc 'nil) state)))
@@ -814,7 +804,7 @@
           ((null const) (type-judgement-nil options state))
           ((symbolp const)
            (extend-judgements `(if (symbolp ',const) 't 'nil) ''t options state))
-          (t (er hard? 'type-inference=>type-judgement-quoted
+          (t (er hard? 'type-inference-bottomup=>type-judgement-quoted
                  "Type inference for constant term ~p0 is not supported.~%"
                  term)))))
 
@@ -882,7 +872,6 @@
          (formals (lambda-formals fn))
          (body (lambda-body fn))
          (shadowed-path-cond (shadow-path-cond formals path-cond))
-         (- (cw "shadowed-path-cond: ~q0" shadowed-path-cond))
          (actuals-judgements
           (type-judgement-list actuals path-cond options state))
          (substed-actuals-judgements
@@ -918,7 +907,7 @@
          ((unless (mbt (and (consp term) (equal (car term) 'if)))) nil)
          ((cons & actuals) term)
          ((unless (equal (len actuals) 3))
-          (er hard? 'type-inference=>type-judgement-if
+          (er hard? 'type-inference-bottomup=>type-judgement-if
               "Mangled if term: ~q0" term))
          ((list cond then else) actuals)
          (judge-cond (type-judgement cond path-cond options state))
@@ -967,13 +956,17 @@
          (functions (type-options->functions options))
          (conspair (assoc-equal fn functions))
          ((unless conspair)
-          (er hard? 'type-inference=>type-judgement-fn
+          (er hard? 'type-inference-bottomup=>type-judgement-fn
               "There exists no function description for function ~p0. ~%" fn))
          (fn-description (cdr conspair))
          ;; return-judgement could be ''t which means it could be anything
          (return-judgement
           (returns-judgement fn actuals actuals actuals-judgements-top
                              actuals-judgements-top fn-description ''t state))
+         ((if (equal return-judgement ''t))
+          (er hard? 'type-inference-bottomup=>judge-judgement-fn
+              "Failed to find type judgements for return of function call ~
+               ~p0~%" term))
          (return-judgement-extended
           (extend-judgements return-judgement path-cond options state)))
       `(if ,return-judgement-extended
@@ -989,8 +982,6 @@
     (b* ((term (pseudo-term-fix term))
          (path-cond (pseudo-term-fix path-cond))
          (options (type-options-fix options))
-         (- (cw "term: ~q0" term))
-         (- (cw "path-cond: ~q0" path-cond))
          ((if (acl2::variablep term))
           (type-judgement-variable term path-cond options state))
          ((if (acl2::quotep term))

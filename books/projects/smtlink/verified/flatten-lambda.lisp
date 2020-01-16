@@ -118,4 +118,18 @@
            ((lambda (y) (+ x y)) '2))))
    '1)
  t)
+
+(flatten-lambda-top
+ '(if (if (rational-integer-alistp al)
+          (if (rationalp r1)
+              (assoc-equal r1 al)
+            'nil)
+        'nil)
+      ((lambda (x y)
+         (< (binary-+ (cdr (assoc-equal y x))
+                      (unary-- (cdr (assoc-equal y x))))
+            '2))
+       al r1)
+    't)
+ t)
 |#

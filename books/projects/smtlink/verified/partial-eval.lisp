@@ -93,7 +93,7 @@
          ((cons fn actuals) term)
          ((if (equal fn 'if))
           (b* (((unless (equal (len actuals) 3))
-                (prog2$ (er hard? 'type-inference=>simplify
+                (prog2$ (er hard? 'partial-eval=>simplify
                             "If statement is malformed: ~p0~%" term)
                         (mv t nil)))
                ((list cond then else) actuals)
@@ -117,7 +117,7 @@
          ((mv err evaled)
           (acl2::magic-ev-fncall fn eval-actuals state t nil))
          ((if err)
-          (prog2$ (er hard? 'type-inference=>partial-eval
+          (prog2$ (er hard? 'partial-eval=>partial-eval
                       "partial-eval's use of acl2::magic-ev-fncall resulted ~
                        in an error. The call is (acl2::magic-ev-fncall ~p0 ~
                        ~p1 state t nil).~%" fn eval-actuals)
