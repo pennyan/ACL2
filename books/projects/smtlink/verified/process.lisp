@@ -1292,12 +1292,24 @@
 ;; (defsection process-smtlink-hints
 ;;   :parents (Smtlink-process-user-hint)
 
+(local (in-theory (disable symbol-listp
+                           pseudo-term-listp
+                           true-list-listp
+                           pseudo-term-listp-of-symbol-listp
+                           pseudo-term-listp-of-cdr-of-pseudo-termp
+                           acl2::pseudo-lambdap-of-car-when-pseudo-termp
+                           acl2::symbol-listp-of-cdr-when-symbol-listp
+                           symbolp-of-fn-call-of-pseudo-termp
+                           acl2::true-listp-of-car-when-true-list-listp
+                           acl2::pseudo-term-listp-cdr)))
+
   (define construct-argument-list ((content argument-lst-syntax-p))
     :returns (decls decl-list-p)
     :short "Translate arguments into smtlink-hint structure."
     :measure (len content)
-    :guard-hints (("Goal" :in-theory (enable argument-syntax-p
-                                             smt-typep)))
+    :guard-hints (("Goal" :in-theory (e/d (argument-syntax-p
+                                           smt-typep)
+                                          ())))
     (b* ((content (argument-lst-syntax-fix content))
          ((unless (consp content)) nil)
          ((cons first rest) content)

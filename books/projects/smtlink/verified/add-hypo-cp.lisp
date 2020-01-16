@@ -102,7 +102,8 @@
                    b))
              (ev-smtcp (disjoin cl) b))
     :hints (("Goal"
-             :in-theory (disable add-hypo-subgoals-correctness)
+             :in-theory (disable add-hypo-subgoals-correctness
+                                 ev-smtcp-of-disjoin)
              :use ((:instance add-hypo-subgoals-correctness
                               (g (disjoin cl))
                               (hinted-hypos (smtlink-hint->hypotheses smtlink-hint))
