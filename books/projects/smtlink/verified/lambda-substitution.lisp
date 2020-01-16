@@ -22,19 +22,7 @@
 
 ;; Include SMT books
 (include-book "hint-interface")
-
-(acl2::defevaluator-fast lambdaev lambdaev-lst
-                         ((if a b c) (equal a b) (not a)
-                          (cons a b) (binary-+ a b)
-                          (typespec-check ts x)
-                          (iff a b)
-                          (implies a b)
-                          (return-last x y z))
-                         :namedp t)
-
-(acl2::def-ev-theoremp lambdaev)
-(acl2::def-meta-extract lambdaev lambdaev-lst)
-(acl2::def-unify lambdaev lambdaev-alist)
+(include-book "evaluator")
 
 (defthm alistp-of-pairlis$
   (alistp (acl2::pairlis$ a b)))
@@ -78,16 +66,16 @@
       (acl2::substitute-into-term body (pairlis$ formals fn-actuals)))))
 
 (local (defthm lambda-alist-of-pairlis$
-         (equal (lambdaev-alist (pairlis$ x y) a)
-                (pairlis$ x (lambdaev-lst y a)))))
+         (equal (ev-smtcp-alist (pairlis$ x y) a)
+                (pairlis$ x (ev-smtcp-lst y a)))))
 
 (defthm lambda-substitution-correct
-  (implies (and (lambdaev-meta-extract-global-facts)
+  (implies (and (ev-smtcp-meta-extract-global-facts)
                 (alistp a)
                 (pseudo-lambdap fn-call)
                 (pseudo-term-listp fn-actuals))
            (equal
-            (lambdaev (lambda-substitution fn-call fn-actuals) a)
-            (lambdaev (cons fn-call fn-actuals) a)))
+            (ev-smtcp (lambda-substitution fn-call fn-actuals) a)
+            (ev-smtcp (cons fn-call fn-actuals) a)))
   :hints (("Goal"
            :in-theory (enable lambda-substitution))))

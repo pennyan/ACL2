@@ -15,6 +15,7 @@
 (include-book "smt-hint-table")
 (include-book "hint-please")
 (include-book "basics")
+(include-book "evaluator")
 (include-book "../config")
 
 (defsection Smtlink-process-user-hint
@@ -1985,23 +1986,18 @@
 (defsection process-hint-clause-processor
   :parents (Smtlink-process-user-hint)
 
-  (defevaluator ev-process-hint ev-lst-process-hint
-    ((not x) (if x y z) (hint-please hint)))
-
-  (def-join-thms ev-process-hint)
-
   (encapsulate ()
     (local (in-theory (enable process-hint-cp process-hint)))
 
     (defthm correctness-of-process-hint
       (implies (and (pseudo-term-listp cl)
                     (alistp b)
-                    (ev-process-hint
+                    (ev-smtcp
                      (conjoin-clauses
                       (acl2::clauses-result
                        (process-hint-cp cl hint state)))
                      b))
-               (ev-process-hint (disjoin cl) b))
+               (ev-smtcp (disjoin cl) b))
       :rule-classes :clause-processor))
   ;; Smtlink is a macro that generates a clause processor hint. This clause
   ;;   processor hint generates a clause, with which a new smt-hint is attached.

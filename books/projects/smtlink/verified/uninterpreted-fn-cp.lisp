@@ -18,6 +18,7 @@
 (include-book "computed-hints")
 (include-book "expand-cp")
 (include-book "return-type")
+(include-book "evaluator")
 
 (include-book "ordinals/lexicographic-ordering" :dir :system)
 (set-state-ok t)
@@ -26,77 +27,6 @@
   :parents (verified)
   :short "Verified clause-processor for proving return types of uninterpreted
   functions."
-
-  (acl2::defevaluator-fast unev unev-lst
-                           ((if a b c) (equal a b) (not a)
-                            (cons a b) (binary-+ a b)
-                            (typespec-check ts x)
-                            (iff a b)
-                            (implies a b)
-                            (hint-please hint)
-                            (return-last x y z)
-                            (binary-+ x y))
-                           :namedp t)
-
-  (acl2::def-ev-theoremp unev)
-  (acl2::def-meta-extract unev unev-lst)
-  (acl2::def-unify unev unev-alist)
-
-  (encapsulate ()
-    (local
-     (defthm type-thm-full-correct-uninterpreted-1
-       (implies (not (unev acl2::x acl2::a))
-                (not (unev acl2::x (unev-falsify acl2::x))))
-       :hints (("Goal"
-                :use ((:functional-instance unev-falsify))
-                )))
-     )
-
-    (local
-     (defthm type-thm-full-correct-uninterpreted-2
-       (implies
-        (unev
-         (meta-extract-global-fact+
-          (mv-nth 0
-                  (unev-meta-extract-global-badguy state))
-          (mv-nth 1
-                  (unev-meta-extract-global-badguy state))
-          state)
-         (unev-falsify (meta-extract-global-fact+
-                        (mv-nth 0
-                                (unev-meta-extract-global-badguy state))
-                        (mv-nth 1
-                                (unev-meta-extract-global-badguy state))
-                        state)))
-        (unev
-         (meta-extract-global-fact+ acl2::obj acl2::st state)
-         (unev-falsify (meta-extract-global-fact+ acl2::obj acl2::st state))))
-       :hints (("Goal"
-                :use ((:functional-instance unev-meta-extract-global-badguy)))))
-     )
-
-
-    (defthm type-thm-full-correct-uninterpreted
-      (implies (and (unev-meta-extract-global-facts)
-                    (alistp a)
-                    (pseudo-termp term))
-               (or (null (type-thm-full term func state))
-                   (unev (type-thm-full term func state) a)))
-      :hints (("Goal"
-               :do-not-induct t
-               :in-theory (e/d (unev-of-fncall-args)
-                               (type-thm-full-correct))
-               :use ((:functional-instance
-                      type-thm-full-correct
-                      (rtev unev)
-                      (rtev-lst unev-lst)
-                      (rtev-alist unev-alist)
-                      (rtev-falsify unev-falsify)
-                      (rtev-meta-extract-global-badguy
-                       unev-meta-extract-global-badguy)))
-               )))
-    )
-
 
   (define fix-thm-meta-extract ((func smt-function-p)
                                 (fixtypes smt-fixtype-list-p)
@@ -124,14 +54,14 @@
       fix-thm))
 
   (defthm fix-thm-meta-extract-correct
-    (implies (and (unev-meta-extract-global-facts)
+    (implies (and (ev-smtcp-meta-extract-global-facts)
                   (alistp a))
              (or (null (fix-thm-meta-extract func fixtypes fixinfo state))
-                 (unev (fix-thm-meta-extract func fixtypes fixinfo state) a)))
+                 (ev-smtcp (fix-thm-meta-extract func fixtypes fixinfo state) a)))
     :hints (("Goal"
              :do-not-induct t
              :in-theory (e/d (fix-thm-meta-extract
-                              unev-of-fncall-args)
+                              ev-smtcp-of-fncall-args)
                              (pseudo-term-listp
                               pseudo-termp
                               car-cdr-elim
@@ -157,11 +87,11 @@
       (acl2::substitute-into-term fix-thm (pairlis$ vars (list term)))))
 
   (defthm fix-thm-full-correct
-    (implies (and (unev-meta-extract-global-facts)
+    (implies (and (ev-smtcp-meta-extract-global-facts)
                   (alistp a)
                   (pseudo-termp term))
              (or (null (fix-thm-full term func fixtypes fixinfo state))
-                 (unev (fix-thm-full term func fixtypes fixinfo state) a)))
+                 (ev-smtcp (fix-thm-full term func fixtypes fixinfo state) a)))
     :hints (("Goal"
              :do-not-induct t
              :in-theory (e/d (fix-thm-full)
@@ -175,7 +105,7 @@
                                               (acl2::simple-term-vars
                                                (fix-thm-meta-extract
                                                 func fixtypes fixinfo state))))
-                                        (unev term a))))))
+                                        (ev-smtcp term a))))))
              )))
 
   (define find-fixer ((term pseudo-termp)
@@ -204,26 +134,25 @@
       fixed))
 
   (defthm find-fixer-correct
-    (implies (and (unev-meta-extract-global-facts)
+    (implies (and (ev-smtcp-meta-extract-global-facts)
                   (alistp a)
                   (pseudo-termp term))
              (or (null (find-fixer term func fixtypes fixinfo state))
-                 (equal (unev (find-fixer term func fixtypes fixinfo state) a)
-                        (unev term a))))
+                 (equal (ev-smtcp (find-fixer term func fixtypes fixinfo state) a)
+                        (ev-smtcp term a))))
     :hints (("Goal"
              :in-theory (e/d (find-fixer
-                              unev-of-fncall-args)
+                              ev-smtcp-of-fncall-args)
                              (pseudo-term-listp
                               pseudo-termp
                               car-cdr-elim
                               w
-                              fix-thm-full-correct
-                              type-thm-full-correct-uninterpreted))
+                              fix-thm-full-correct))
              :use ((:instance fix-thm-full-correct
                               (a a)
                               (term term)
                               (func func))
-                   (:instance type-thm-full-correct-uninterpreted
+                   (:instance type-thm-full-correct
                               (a a)
                               (term term)
                               (func func)))
@@ -305,14 +234,14 @@ defined the uninterpreted function: ~q0" fn-call)
 
   (defthm-uninterpreted
     (defthm uninterpreted-term
-      (implies (and (unev-meta-extract-global-facts)
+      (implies (and (ev-smtcp-meta-extract-global-facts)
                     (alistp a)
                     (pseudo-termp term))
-               (equal (unev
+               (equal (ev-smtcp
                        (uninterpreted term fn-lst fixtypes fixinfo state) a)
-                      (unev term a)))
+                      (ev-smtcp term a)))
       :hints ('(:expand ((uninterpreted term fn-lst fixtypes fixinfo state))
-                        :in-theory (e/d (unev-of-fncall-args)
+                        :in-theory (e/d (ev-smtcp-of-fncall-args)
                                         (find-fixer-correct
                                          member-equal
                                          pseudo-term-listp
@@ -324,13 +253,13 @@ defined the uninterpreted function: ~q0" fn-call)
                                          (func (is-function (car term) fn-lst))))))
       :flag uninterpreted)
     (defthm uninterpreted-term-lst
-      (implies (and (unev-meta-extract-global-facts)
+      (implies (and (ev-smtcp-meta-extract-global-facts)
                     (alistp a)
                     (pseudo-term-listp term-lst))
-               (equal (unev-lst
+               (equal (ev-smtcp-lst
                        (uninterpreted-list term-lst fn-lst fixtypes fixinfo state)
                        a)
-                      (unev-lst term-lst a)))
+                      (ev-smtcp-lst term-lst a)))
       :hints ('(:expand ((uninterpreted-list term-lst fn-lst fixtypes fixinfo state)
                          (uninterpreted-list nil fn-lst fixtypes fixinfo state))))
       :flag uninterpreted-list))
@@ -365,13 +294,13 @@ defined the uninterpreted function: ~q0" fn-call)
   (local (in-theory (enable uninterpreted-fn-cp uninterpreted-fn)))
 
   (defthm uninterpreted-fn-correct
-    (implies (and (unev-meta-extract-global-facts)
+    (implies (and (ev-smtcp-meta-extract-global-facts)
                   (pseudo-term-listp clause)
                   (alistp a)
-                  (unev (conjoin-clauses
+                  (ev-smtcp (conjoin-clauses
                          (acl2::clauses-result
                           (uninterpreted-fn-cp clause hints state)))
                         a))
-             (unev (disjoin clause) a))
+             (ev-smtcp (disjoin clause) a))
     :rule-classes :clause-processor)
   )

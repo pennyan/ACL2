@@ -19,7 +19,13 @@
 (include-book "type-inference-topdown")
 
 (set-state-ok t)
-stop
+
+(define construct-type-options ((smtlink-hint smtlink-hint-p))
+  :returns (type-options type-options-p)
+  :irrelevant-formals-ok t
+  :ignore-ok t
+  (b* ((smtlink-hint (smtlink-hint-fix smtlink-hint)))
+    (make-type-options)))
 
 (define type-judge-fn ((cl pseudo-term-listp)
                        (smtlink-hint t)
@@ -30,7 +36,8 @@ stop
         (list cl))
        ((smtlink-hint h) smtlink-hint)
        (goal (disjoin cl))
-       (options (construct-type-options smtlink-hint)) ;; TODO
+       ;; (options (construct-type-options smtlink-hint)) ;; TODO
+       (options (construct-type-options smtlink-hint))
        (type-judgements (type-judgement goal ''t options state))
        (new-cl `((implies ,type-judgements ,goal)))
        (next-cp (cdr (assoc-equal 'type-judge *SMT-architecture*)))
@@ -50,14 +57,14 @@ stop
 
 (skip-proofs
  (defthm correctness-of-type-judge-cp
-   (implies (and (ev-infer-meta-extract-global-facts)
+   (implies (and (ev-smtcp-meta-extract-global-facts)
                  (pseudo-term-listp cl)
                  (alistp a)
-                 (ev-infer
+                 (ev-smtcp
                   (conjoin-clauses
                    (acl2::clauses-result
                     (type-judge-cp cl hint state)))
                   a))
-            (ev-infer (disjoin cl) a))
+            (ev-smtcp (disjoin cl) a))
    :rule-classes :clause-processor)
  )

@@ -115,10 +115,12 @@
    )
 
   (define sum-lvls ((fn-lvls sym-nat-alistp))
-    :returns (sum natp
-                  :hints (("Goal"
-                           :use ((:instance natp-of-sum-lvls-lemma
-                                            (x (sum-lvls (cdr (sym-nat-alist-fix fn-lvls)))))))))
+    :returns
+    (sum natp
+         :hints (("Goal"
+                  :use ((:instance
+                         natp-of-sum-lvls-lemma
+                         (x (sum-lvls (cdr (sym-nat-alist-fix fn-lvls)))))))))
     :measure (len fn-lvls)
     :hints (("Goal" :in-theory (enable sym-nat-alist-fix)))
     (b* ((fn-lvls (sym-nat-alist-fix fn-lvls))
@@ -155,6 +157,8 @@
                                                             (nth 2 state))))))
                               (term (pseudo-term-fix term))
                               (alist nil))))))
+    :guard-hints (("Goal"
+                   :in-theory (disable symbol-listp assoc-equal)))
     (b* ((term (pseudo-term-fix term))
          ((unless (and (not (acl2::variablep term))
                        (not (acl2::fquotep term))
@@ -192,26 +196,24 @@
     (local (in-theory (e/d (function-substitution) (w))))
 
     (defthm function-substitution-correct
-      (implies (and (expev-meta-extract-global-facts)
+      (implies (and (ev-smtcp-meta-extract-global-facts)
                     (pseudo-termp term)
                     (alistp a)
                     (function-substitution term state))
-               (expev (function-substitution term state) a))
+               (ev-smtcp (function-substitution term state) a))
       :hints (("Goal"
                :in-theory (e/d ()
-                               (expev-meta-extract-formula))
+                               (ev-smtcp-meta-extract-formula))
                :use ((:instance
-                      expev-meta-extract-formula
+                      ev-smtcp-meta-extract-formula
                       (name (car term))
                       (st state)
-                      (a (expev-alist
+                      (a (ev-smtcp-alist
                           (mv-nth 1
                                   (acl2::simple-one-way-unify
                                    (cadr (meta-extract-formula (car term) state))
                                    term nil))
-                          a))))
-               ))
-      )
+                          a)))))))
     )
 
   (encapsulate ()
@@ -326,30 +328,7 @@ definition fact of that term.</p>
                              (ex-args->wrld-fn-len expand-args))
                       (equal (sum-lvls (ex-args->fn-lvls new-args))
                              (sum-lvls (ex-args->fn-lvls expand-args)))))
-        :name fact-finder-same-3)
-       )
-      )
-    )
-
-  (encapsulate ()
-
-    ;; BOZO: Should be able to do functional-instantiation of
-    ;; lambda-substitution-correct, but I got lost at the symbols from package acl2
-    ;; and current package
-    (local (defthm expev-alist-of-pairlis$
-             (equal (expev-alist (pairlis$ x y) a)
-                    (pairlis$ x (expev-lst y a)))))
-
-    (defthm lambda-substitution-correct-expand
-      (implies (and (expev-meta-extract-global-facts)
-                    (alistp a)
-                    (pseudo-lambdap fn-call)
-                    (pseudo-term-listp fn-actuals))
-               (equal
-                (expev (lambda-substitution fn-call fn-actuals) a)
-                (expev (cons fn-call fn-actuals) a)))
-      :hints (("Goal"
-               :in-theory (enable lambda-substitution))))
+        :name fact-finder-same-3)))
     )
 
   (encapsulate ()
@@ -430,7 +409,11 @@ definition fact of that term.</p>
                                       (cadr (car term))
                                       (transform (caddr (car term))))))
        :hints (("Goal"
-                :in-theory (enable pseudo-lambdap)))))
+                :in-theory (e/d (pseudo-lambdap)
+                                (symbol-listp
+                                 pseudo-term-listp-of-cdr-of-pseudo-termp
+                                 pseudo-term-listp
+                                 pseudo-term-listp-of-symbol-listp))))))
 
     (local
      (defthm pseudo-termp-of-car-of-last-of-return-last
@@ -464,7 +447,11 @@ definition fact of that term.</p>
         :measure (acl2-count (pseudo-term-fix term))
         :hints (("Goal"
                  :in-theory (e/d ()
-                                 (acl2-count-of-last-of-consp-decrease))
+                                 (acl2-count-of-last-of-consp-decrease
+                                  symbol-listp
+                                  acl2::pseudo-lambdap-of-car-when-pseudo-termp
+                                  consp-of-sym-nat-alist-fix
+                                  sym-nat-alist-fix-when-sym-nat-alistp))
                  :use ((:instance acl2-count-of-last-of-consp-decrease
                                   (x (cdr (pseudo-term-fix term)))))))
         (b* ((term (pseudo-term-fix term))
@@ -482,7 +469,7 @@ definition fact of that term.</p>
                 (lambda-substitution
                  (induction-scheme body
                                    (pairlis$ formal-lst
-                                             (expev-lst fn-actuals al)))
+                                             (ev-smtcp-lst fn-actuals al)))
                  (induction-scheme-list fn-actuals al))))
              ;; If fn-call is neither a lambda expression nor a function call
              ((unless (mbt (symbolp fn-call))) nil)
@@ -524,32 +511,26 @@ definition fact of that term.</p>
 
     (defthm-induction-scheme-flag
       (defthm transform-pseudo-termp
-        (implies (and (expev-meta-extract-global-facts)
+        (implies (and (ev-smtcp-meta-extract-global-facts)
                       (pseudo-termp term)
                       (alistp a))
-                 (equal (expev (transform term) a)
-                        (expev term a)))
+                 (equal (ev-smtcp (transform term) a)
+                        (ev-smtcp term a)))
         :hints ('(:expand ((transform term))
-                          :in-theory (e/d (expev-of-fncall-args)
+                          :in-theory (e/d (ev-smtcp-of-fncall-args)
                                           (lambda-substitution
-                                           ;;lambda-substitution-correct-expand
-                                           )
-                                          )
-                          ;; :use ((:instance
-                          ;;        lambda-substitution-correct-expand
-                          ;;        (fn-call (list 'lambda
-                          ;;                       (cadr (car term))
-                          ;;                       (transform (caddr (car term)))))
-                          ;;        (fn-actuals (transform-list (cdr term)))
-                          ;;        (a a)))
-                          ))
+                                           symbol-listp
+                                           acl2::symbolp-of-car-when-symbol-listp
+                                           acl2::symbol-listp-of-cdr-when-symbol-listp
+                                           acl2::true-listp-of-car-when-true-list-listp
+                                           true-list-listp))))
         :flag induction-scheme)
       (defthm transform-pseudo-term-listp
-        (implies (and (expev-meta-extract-global-facts)
+        (implies (and (ev-smtcp-meta-extract-global-facts)
                       (pseudo-term-listp term-lst)
                       (alistp a))
-                 (equal (expev-lst (transform-list term-lst) a)
-                        (expev-lst term-lst a)))
+                 (equal (ev-smtcp-lst (transform-list term-lst) a)
+                        (ev-smtcp-lst term-lst a)))
         :hints ('(:expand ((transform-list term-lst)
                            (transform-list nil))))
         :flag induction-scheme-list)
@@ -564,11 +545,11 @@ definition fact of that term.</p>
                                ()))))
 
     (defthm transform-function-substitution-correct
-      (implies (and (expev-meta-extract-global-facts)
+      (implies (and (ev-smtcp-meta-extract-global-facts)
                     (pseudo-termp term)
                     (alistp a)
                     (transform (function-substitution term state)))
-               (expev (transform (function-substitution term state)) a))
+               (ev-smtcp (transform (function-substitution term state)) a))
       :hints (("Goal"
                :in-theory (e/d (transform) ()))))
 
@@ -577,6 +558,31 @@ definition fact of that term.</p>
       :flag-local nil
       :verify-guards nil
       :flag-defthm-macro defthm-expand
+      :hints (("Goal"
+               :in-theory (e/d ()
+                               (fact-finder-decrease-1
+                                fact-finder-decrease-2
+                                fact-finder-same-3
+                                pseudo-termp
+                                symbol-listp
+                                pseudo-term-listp-of-symbol-listp
+                                consp-of-sym-nat-alist-fix
+                                pseudo-term-listp
+                                acl2::pseudo-termp-opener
+                                rational-listp
+                                integer-listp))
+               :use ((:instance fact-finder-decrease-1
+                                (term (pseudo-term-fix term))
+                                (expand-args (ex-args-fix expand-args)))
+                     (:instance fact-finder-decrease-2
+                                (term (pseudo-term-fix term))
+                                (expand-args (ex-args-fix expand-args)))
+                     (:instance fact-finder-same-3
+                                (term (pseudo-term-fix term))
+                                (expand-args (ex-args-fix expand-args)))
+                     (:instance acl2-count-of-last-of-consp-decrease
+                                (x (cdr (pseudo-term-fix term))))
+                     )))
 
       (define expand-list ((term-lst pseudo-term-listp)
                            (expand-args ex-args-p)
@@ -600,23 +606,6 @@ definition fact of that term.</p>
         :measure (list (ex-args->wrld-fn-len expand-args)
                        (sum-lvls (ex-args->fn-lvls expand-args))
                        (acl2-count (pseudo-term-fix term)))
-        :hints (("Goal"
-                 :in-theory (e/d ()
-                                 (fact-finder-decrease-1
-                                  fact-finder-decrease-2
-                                  fact-finder-same-3))
-                 :use ((:instance fact-finder-decrease-1
-                                  (term (pseudo-term-fix term))
-                                  (expand-args (ex-args-fix expand-args)))
-                       (:instance fact-finder-decrease-2
-                                  (term (pseudo-term-fix term))
-                                  (expand-args (ex-args-fix expand-args)))
-                       (:instance fact-finder-same-3
-                                  (term (pseudo-term-fix term))
-                                  (expand-args (ex-args-fix expand-args)))
-                       (:instance acl2-count-of-last-of-consp-decrease
-                                  (x (cdr (pseudo-term-fix term))))
-                       )))
         (b* ((term (pseudo-term-fix term))
              (expand-args (ex-args-fix expand-args))
              ((ex-args a) expand-args)
@@ -666,17 +655,10 @@ definition fact of that term.</p>
          ((smt-function f) first))
       (cons (cons f.name f.expansion-depth) (initialize-fn-lvls rest))))
 
-  ;; (local
-  ;;  (defthm func-p-of-cdr-assoc-equal-of-func-alistp
-  ;;    (implies (and (func-alistp fn-lst)
-  ;;                  (cdr (assoc-equal key fn-lst)))
-  ;;             (func-p (cdr (assoc-equal key fn-lst))))))
-
   (define generate-type ((term pseudo-termp)
                          (fn-lst smt-function-list-p)
                          state)
     :returns (new-term pseudo-termp)
-    :guard-debug t
     (b* ((term (pseudo-term-fix term))
          (fn-lst (smt-function-list-fix fn-lst))
          ((unless (consp term))
@@ -692,70 +674,17 @@ definition fact of that term.</p>
                        hint: ~q0" fn)))
       (type-thm-full term fc state)))
 
-  (encapsulate ()
-    (local
-     (defthm type-thm-full-correct-extract-1
-       (implies (not (expev acl2::x acl2::a))
-                (not (expev acl2::x (expev-falsify acl2::x))))
-       :hints (("Goal"
-                :use ((:functional-instance expev-falsify)))))
-     )
-
-    (local
-     (defthm type-thm-full-correct-extract-2
-       (implies
-        (expev
-         (meta-extract-global-fact+
-          (mv-nth 0
-                  (expev-meta-extract-global-badguy state))
-          (mv-nth 1
-                  (expev-meta-extract-global-badguy state))
-          state)
-         (expev-falsify (meta-extract-global-fact+
-                         (mv-nth 0
-                                 (expev-meta-extract-global-badguy state))
-                         (mv-nth 1
-                                 (expev-meta-extract-global-badguy state))
-                         state)))
-        (expev
-         (meta-extract-global-fact+ acl2::obj acl2::st state)
-         (expev-falsify (meta-extract-global-fact+ acl2::obj acl2::st state))))
-       :hints (("Goal"
-                :use ((:functional-instance expev-meta-extract-global-badguy)))))
-     )
-
-    (defthm type-thm-full-correct-extract
-      (implies (and (expev-meta-extract-global-facts)
-                    (alistp a)
-                    (pseudo-termp term))
-               (or (null (type-thm-full term func state))
-                   (expev (type-thm-full term func state) a)))
-      :hints (("Goal"
-               :do-not-induct t
-               :in-theory (e/d (expev-of-fncall-args)
-                               (type-thm-full-correct))
-               :use ((:functional-instance
-                      type-thm-full-correct
-                      (rtev expev)
-                      (rtev-lst expev-lst)
-                      (rtev-alist expev-alist)
-                      (rtev-falsify expev-falsify)
-                      (rtev-meta-extract-global-badguy
-                       expev-meta-extract-global-badguy)))
-               )))
-    )
-
   (defthm generate-type-correct
-    (implies (and (expev-meta-extract-global-facts)
+    (implies (and (ev-smtcp-meta-extract-global-facts)
                   (pseudo-termp term)
                   (alistp a)
                   (generate-type term fn-lst state))
-             (expev (generate-type term fn-lst state) a))
+             (ev-smtcp (generate-type term fn-lst state) a))
     :hints (("Goal"
              :in-theory (e/d (generate-type)
-                             (type-thm-full-correct-extract))
+                             (type-thm-full-correct))
              :use ((:instance
-                    type-thm-full-correct-extract
+                    type-thm-full-correct
                     (term term)
                     (func (is-function (car term)
                                        (smt-function-list-fix fn-lst)))
@@ -789,25 +718,18 @@ definition fact of that term.</p>
   (encapsulate ()
     (local (in-theory (e/d (compose-goal) ())))
 
-    (local
-     (defthm expev-of-disjoin
-       (iff (expev (disjoin clause) a)
-            (acl2::or-list (expev-lst clause a)))
-       :hints(("Goal" :in-theory (enable acl2::or-list len)
-               :induct (len clause)))))
-
     (defthm compose-goal-correct
-      (implies (and (expev-meta-extract-global-facts)
+      (implies (and (ev-smtcp-meta-extract-global-facts)
                     (pseudo-term-listp clause)
                     (alistp a)
-                    (expev (disjoin
-                            (compose-goal clause to-be-learnt fn-lst state))
-                           a))
-               (expev (disjoin clause) a))
+                    (ev-smtcp (disjoin
+                               (compose-goal clause to-be-learnt fn-lst state))
+                              a))
+               (ev-smtcp (disjoin clause) a))
       :hints (("Goal"
                :expand (compose-goal clause to-be-learnt fn-lst state)
                :in-theory (e/d ()
-                               (expev-of-disjoin
+                               (ev-smtcp-of-disjoin
                                 transform-pseudo-termp))
                :use
                ((:instance transform-pseudo-termp
@@ -817,15 +739,15 @@ definition fact of that term.</p>
                            (a a))))))
 
     (defthm compose-transformed-goal-correct
-      (implies (and (expev-meta-extract-global-facts)
+      (implies (and (ev-smtcp-meta-extract-global-facts)
                     (pseudo-term-listp clause)
                     (alistp a)
-                    (expev
+                    (ev-smtcp
                      (disjoin
                       (compose-goal (transform-list clause)
                                     to-be-learnt fn-lst state))
                      a))
-               (expev (disjoin clause) a)))
+               (ev-smtcp (disjoin clause) a)))
     )
 
   (encapsulate ()
@@ -868,16 +790,16 @@ definition fact of that term.</p>
     )
 
   (defthm expand-cp-helper-correct
-    (implies (and (expev-meta-extract-global-facts)
+    (implies (and (ev-smtcp-meta-extract-global-facts)
                   (pseudo-term-listp cl)
                   (alistp a)
-                  (expev
+                  (ev-smtcp
                    (disjoin
                     (mv-nth 0 (expand-cp-helper cl hint state)))
                    a))
-             (expev (disjoin cl) a))
+             (ev-smtcp (disjoin cl) a))
     :hints (("Goal"
-             :in-theory (enable expand-cp-helper))))
+             :in-theory (e/d (expand-cp-helper) (ev-smtcp-of-disjoin)))))
 
   (define expand-cp-generalize ((cl pseudo-term-listp)
                                 (smtlink-hint t)
@@ -908,17 +830,19 @@ definition fact of that term.</p>
       ))
 
   (defthm expand-cp-generalize-correct
-    (implies (and (expev-meta-extract-global-facts)
+    (implies (and (ev-smtcp-meta-extract-global-facts)
                   (pseudo-term-listp cl)
                   (alistp a)
-                  (expev (conjoin-clauses (expand-cp-generalize cl hint state))
-                         (expand-cp-alist cl hint state a)))
-             (expev (disjoin cl) a))
+                  (ev-smtcp
+                   (conjoin-clauses (expand-cp-generalize cl hint state))
+                   (expand-cp-alist cl hint state a)))
+             (ev-smtcp (disjoin cl) a))
     :hints (("Goal"
              :do-not-induct t
              :in-theory (e/d (expand-cp-generalize expand-cp-alist)
                              (acl2::generalize-termlist-alist
-                              generalize-termlist-cp-correct-expand))
+                              generalize-termlist-cp-correct-expand
+                              ev-smtcp-of-disjoin))
              :use ((:instance generalize-termlist-cp-correct-expand
                               (clause (mv-nth 0 (expand-cp-helper cl hint state)))
                               (acl2::hint (cons (mv-nth 1 (expand-cp-helper cl hint state))
@@ -934,16 +858,17 @@ definition fact of that term.</p>
       (value expanded-clause)))
 
   (defthm correctness-of-expand-cp
-    (implies (and (expev-meta-extract-global-facts)
+    (implies (and (ev-smtcp-meta-extract-global-facts)
                   (pseudo-term-listp cl)
                   (alistp a)
-                  (expev
+                  (ev-smtcp
                    (conjoin-clauses
                     (acl2::clauses-result
                      (expand-cp cl hint state)))
                    (expand-cp-alist cl hint state a)))
-             (expev (disjoin cl) a))
+             (ev-smtcp (disjoin cl) a))
     :hints (("Goal"
+             :in-theory (disable ev-smtcp-of-disjoin)
              :expand ((expand-cp cl hint state))))
     :rule-classes :clause-processor)
   )

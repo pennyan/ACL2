@@ -15,28 +15,7 @@
 
 (include-book "hint-please")
 (include-book "basics")
-;; -----------------------------------------------------------------
-;;       Define evaluators
-;; I might be able to merge evaluators into a single file and use the same
-;;       evaluator across clause-processors.
-
-(acl2::defevaluator-fast ev-decorate ev-decorate-lst
-                         ((if a b c) (equal a b) (not a)
-                          (cons a b) (binary-+ a b)
-                          (typespec-check ts x)
-                          (iff a b)
-                          (implies a b)
-                          (hint-please hint)
-                          (return-last x y z)
-                          (binary-+ x y))
-                         :namedp t)
-
-(acl2::def-ev-theoremp ev-decorate)
-(acl2::def-meta-extract ev-decorate ev-decorate-lst)
-(acl2::def-unify ev-decorate ev-decorate-alist)
-
-;; -----------------------------------------------------------------
-
+(include-book "evaluator")
 
 (define type-decorate-fn ((cl pseudo-term-listp)
                           (smtlink-hint t)
@@ -65,14 +44,13 @@
 (local (in-theory (enable type-decorate-cp type-decorate-fn)))
 
 (defthm correctness-of-type-decorate-cp
-  (implies (and (ev-decorate-meta-extract-global-facts)
+  (implies (and (ev-smtcp-meta-extract-global-facts)
                 (pseudo-term-listp cl)
                 (alistp a)
-                (ev-decorate
+                (ev-smtcp
                  (conjoin-clauses
                   (acl2::clauses-result
                    (type-decorate-cp cl hint state)))
                  a))
-           (ev-decorate (disjoin cl) a))
+           (ev-smtcp (disjoin cl) a))
   :rule-classes :clause-processor)
-

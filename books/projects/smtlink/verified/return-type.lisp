@@ -17,31 +17,10 @@
 (include-book "hint-interface")
 (include-book "computed-hints")
 (include-book "lambda-substitution")
+(include-book "evaluator")
 
 (include-book "ordinals/lexicographic-ordering" :dir :system)
 (set-state-ok t)
-
-(acl2::defevaluator-fast rtev rtev-lst
-                         ((if a b c) (equal a b) (not a)
-                          (cons a b) (binary-+ a b)
-                          (typespec-check ts x)
-                          (iff a b)
-                          (implies a b)
-                          (hint-please hint)
-                          (return-last x y z)
-                          (binary-+ x y))
-                         :namedp t)
-
-(acl2::def-ev-theoremp rtev)
-(acl2::def-meta-extract rtev rtev-lst)
-(acl2::def-unify rtev rtev-alist)
-
-(local
- (defthm rtev-of-disjoin
-   (iff (rtev (disjoin clause) a)
-        (acl2::or-list (rtev-lst clause a)))
-   :hints(("Goal" :in-theory (enable acl2::or-list len)
-           :induct (len clause)))))
 
 (define type-thm-remove-lambda ((func smt-function-p)
                                 state)
@@ -68,30 +47,30 @@
 ;; BOZO: Should be able to do functional-instantiation of
 ;; lambda-substitution-correct, but I got lost at the symbols from package acl2
 ;; and current package
-(local (defthm rtev-alist-of-pairlis$
-         (equal (rtev-alist (pairlis$ x y) a)
-                (pairlis$ x (rtev-lst y a)))))
+(local (defthm ev-smtcp-alist-of-pairlis$
+         (equal (ev-smtcp-alist (pairlis$ x y) a)
+                (pairlis$ x (ev-smtcp-lst y a)))))
 
 (defthm lambda-substitution-correct-uninterpreted
-  (implies (and (rtev-meta-extract-global-facts)
+  (implies (and (ev-smtcp-meta-extract-global-facts)
                 (alistp a)
                 (pseudo-lambdap fn-call)
                 (pseudo-term-listp fn-actuals))
            (equal
-            (rtev (lambda-substitution fn-call fn-actuals) a)
-            (rtev (cons fn-call fn-actuals) a)))
+            (ev-smtcp (lambda-substitution fn-call fn-actuals) a)
+            (ev-smtcp (cons fn-call fn-actuals) a)))
   :hints (("Goal"
            :in-theory (enable lambda-substitution))))
 
 (defthm type-thm-remove-lambda-correct
-  (implies (and (rtev-meta-extract-global-facts)
+  (implies (and (ev-smtcp-meta-extract-global-facts)
                 (alistp a))
            (or (null (type-thm-remove-lambda func state))
-               (rtev (type-thm-remove-lambda func state) a)))
+               (ev-smtcp (type-thm-remove-lambda func state) a)))
   :hints (("Goal"
            :do-not-induct t
            :in-theory (e/d (type-thm-remove-lambda
-                            rtev-of-fncall-args)
+                            ev-smtcp-of-fncall-args)
                            (pseudo-term-listp
                             pseudo-termp
                             car-cdr-elim
@@ -144,14 +123,14 @@
                 nil)))
     type-thm))
 
-(local (defthm alistp-of-unev-alist (alistp (rtev-alist x a))))
+(local (defthm alistp-of-unev-alist (alistp (ev-smtcp-alist x a))))
 
 (defthm type-thm-full-correct
-  (implies (and (rtev-meta-extract-global-facts)
+  (implies (and (ev-smtcp-meta-extract-global-facts)
                 (alistp a)
                 (pseudo-termp term))
            (or (null (type-thm-full term func state))
-               (rtev (type-thm-full term func state) a)))
+               (ev-smtcp (type-thm-full term func state) a)))
   :hints (("Goal"
            :do-not-induct t
            :in-theory (e/d (type-thm-full
@@ -162,5 +141,5 @@
                             (a (pairlis$
                                 (reverse (acl2::simple-term-vars
                                           (type-thm-remove-lambda func state)))
-                                (rtev-lst (cdr term) a)))))
+                                (ev-smtcp-lst (cdr term) a)))))
            )))

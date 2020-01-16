@@ -20,6 +20,7 @@
 (include-book "term-substitution")
 (include-book "partial-eval")
 (include-book "judgements")
+(include-book "evaluator")
 
 (set-state-ok t)
 
