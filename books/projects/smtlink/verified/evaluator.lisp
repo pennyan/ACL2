@@ -41,26 +41,27 @@
   (equal (ev-smtcp-alist (pairlis$ x y) a)
          (pairlis$ x (ev-smtcp-lst y a))))
 
-;; ;; Function for removing hint-please from the clause.
-;; (define remove-hint-please ((cl pseudo-term-listp))
-;;   :returns (cl-removed pseudo-term-list-listp
-;;                        :hints (("Goal"
-;;                                 :in-theory (enable pseudo-term-listp
-;;                                                    pseudo-term-list-fix))))
-;;   (b* ((cl (pseudo-term-list-fix cl))
-;;        ((unless (consp cl)) (list cl)))
-;;     (case-match cl
-;;       ((('hint-please &) . term) (list term))
-;;       (& (list cl)))))
+;; Function for removing hint-please from the clause.
+(define remove-hint-please ((cl pseudo-term-listp))
+  :returns (cl-removed pseudo-term-list-listp
+                       :hints (("Goal"
+                                :in-theory (enable pseudo-term-listp
+                                                   pseudo-term-list-fix))))
+  (b* ((cl (pseudo-term-list-fix cl))
+       ((unless (consp cl)) (list cl)))
+    (case-match cl
+      ((('hint-please &) . term) (list term))
+      (& (list cl)))))
 
-;; (local (in-theory (enable remove-hint-please)))
+(local (in-theory (enable remove-hint-please)))
 
-;; (defthm correctness-of-remove-hint-please
-;;   (implies (and (pseudo-term-listp cl)
-;;                 (alistp b)
-;;                 (ev-smtcp
-;;                  (conjoin-clauses (remove-hint-please cl))
-;;                  b))
-;;            (ev-smtcp (disjoin cl) b))
-;;   :hints (("Goal"
-;;            :in-theory (enable hint-please remove-hint-please))))
+(defthm correctness-of-remove-hint-please
+  (implies (and (pseudo-term-listp cl)
+                (alistp b)
+                (ev-smtcp
+                 (conjoin-clauses (remove-hint-please cl))
+                 b))
+           (ev-smtcp (disjoin cl) b))
+  :hints (("Goal"
+           :in-theory (enable hint-please remove-hint-please)))
+  :rule-classes :clause-processor)

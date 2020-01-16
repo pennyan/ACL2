@@ -78,6 +78,14 @@
            (symbolp (car x)))
   :hints (("Goal" :in-theory (enable pseudo-lambdap))))
 
+(defthm pseudo-lambdap-of-fn-call-of-pseudo-termp
+  (implies (and (pseudo-termp x)
+                (consp x)
+                (not (acl2::fquotep x))
+                (not (symbolp (car x))))
+           (pseudo-lambdap (car x)))
+  :hints (("Goal" :in-theory (enable pseudo-lambdap))))
+
 (define pseudo-term-list-fix ((x pseudo-term-listp))
   :returns (new-x pseudo-term-listp)
   (mbe :logic (if (consp x)
