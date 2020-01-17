@@ -116,7 +116,7 @@
                                     symbol-listp)))
        :rule-classes :linear)))
 
-(defthm is-conjunct?-very-stupid
+(defthm is-conjunct?-unbearable
   (implies (and (pseudo-termp actuals-judgements)
                 (not (equal actuals-judgements ''t))
                 (is-conjunct? actuals-judgements))
@@ -125,3 +125,13 @@
   :hints (("Goal"
            :in-theory (enable is-conjunct?)))
   )
+
+(define is-conjunct-list? ((term pseudo-termp))
+  :returns (ok booleanp)
+  :measure (acl2-count (pseudo-term-fix term))
+  (b* ((term (pseudo-term-fix term))
+       ((unless (is-conjunct? term)) nil)
+       ((if (equal term ''t)) t)
+       ((list & & then &) term))
+    (is-conjunct-list? then)))
+

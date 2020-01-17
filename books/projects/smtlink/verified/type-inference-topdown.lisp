@@ -15,6 +15,6 @@
 (include-book "clause-processors/meta-extract-user" :dir :system)
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 
-(include-book "evaluator")
+(include-book "typed-term")
 
 
