@@ -19,26 +19,19 @@
 (include-book "evaluator")
 (include-book "judgements")
 
-(deftagsum pseudo-term-sum
-  (:term ((term pseudo-termp)))
-  (:list ((term-list pseudo-term-listp))))
-stop
-(defprod typed-term
-  ((term pseudo-term-sum-p)
-   (path-cond pseudo-termp)
-   (judgements pseudo-termp)))
+(encapsulate ()
+  (local (in-theory (disable pseudo-termp)))
 
-(deflist typed-term-list
-  :elt-type typed-term-p
-  :true-listp t)
+  (defprod typed-term
+    ((term pseudo-termp)
+     (path-cond pseudo-termp)
+     (judgements pseudo-termp)))
 
-(fty::deftypes typed-term
-  (deftagsum arg-decl
-    (:next ((next arg-check-p)))
-    (:done ((r return-spec-p))))
-  (defalist arg-check
-    :key-type symbolp
-    :val-type arg-decl-p))
+  (defprod typed-term-list
+    ((term-lst pseudo-term-listp)
+     (path-cond pseudo-termp)
+     (judgements pseudo-termp)))
+  )
 
 ;; ---------------------------------------------
 ;;       Recognizers
@@ -86,8 +79,6 @@ stop
                                    'nil)))
 |#
 
-stop
-
 (defines good-typed-term
 
 (define good-typed-lambda-p ((tterm typed-term-p))
@@ -115,10 +106,13 @@ stop
        ((if (equal fn 'if)) (good-typed-if-p tt)))
     (good-typed-fncall-p tt)))
 
-(define good-typed-term-list-p ((tterm typed-termp))
+(define good-typed-term-list-p ((tterm-lst typed-term-list-p))
   :returns (ok booleanp)
-  (b* ((tterm (typed-term-fix tterm))
-       (() )
+  (b* ((tterm-lst (typed-term-list-fix tterm-lst))
+       ((typed-term-list ttl) tterm-lst)
+       ((unless (consp ttl.term-lst)) t)
+       ((cons term-hd term-tl) ttl.term-lst)
+       ;; ...
        )
     ()))
 )
