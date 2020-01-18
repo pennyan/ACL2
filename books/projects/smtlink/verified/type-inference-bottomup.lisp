@@ -219,30 +219,31 @@
 ;; ------------------------------------------------------------
 ;; Return the topest judgement
 
-(define type-judgement-top ((judgements pseudo-termp))
+(define type-judgement-top ((judgements pseudo-termp)
+                            (term pseudo-termp)
+                            (options type-options-p))
   :returns (judgement pseudo-termp)
   (b* ((judgements (pseudo-term-fix judgements))
-       ((unless (is-conjunct? judgements))
-        (er hard? 'type-inference-bottomup=>type-judgement-top
-            "The top of type judgement is not a conjunction of conditions: ~q0"
-            judgements))
-       ((if (equal judgements ''t))
-        (er hard? 'type-inference-bottomup=>type-judgement-top
-            "The judgements is empty.~%")))
-    (cadr judgements)))
+       (options (type-options-fix options))
+       (supertype-alst (type-options->supertype options)))
+    (look-up-path-cond term judgements supertype-alst)))
 
-(define type-judgement-top-list ((judgements-lst pseudo-termp))
+(define type-judgement-top-list ((judgements-lst pseudo-termp)
+                                 (term-lst pseudo-term-listp)
+                                 (options type-options-p))
   :returns (judgement-lst pseudo-termp)
   :measure (acl2-count (pseudo-term-fix judgements-lst))
   (b* ((judgements-lst (pseudo-term-fix judgements-lst))
+       (term-lst (pseudo-term-list-fix term-lst))
        ((unless (is-conjunct? judgements-lst))
         (er hard? 'type-inference-bottomup=>type-judgement-top-list
             "The top of type judgement is not a conjunction of conditions: ~q0"
             judgements-lst))
-       ((if (equal judgements-lst ''t)) ''t)
-       ((list & judgements-hd judgements-tl &) judgements-lst))
-    `(if ,(type-judgement-top judgements-hd)
-         ,(type-judgement-top-list judgements-tl)
+       ((if (or (equal judgements-lst ''t) (null term-lst))) ''t)
+       ((list & judgements-hd judgements-tl &) judgements-lst)
+       ((cons term-hd term-tl) term-lst))
+    `(if ,(type-judgement-top judgements-hd term-hd options)
+         ,(type-judgement-top-list judgements-tl term-tl options)
        'nil)))
 
 ;;-------------------------------------------------------
@@ -820,10 +821,8 @@
        (path-cond (pseudo-term-fix path-cond))
        (options (type-options-fix options))
        (supertype (type-options->supertype options))
-       (judge-from-path-cond (look-up-path-cond term path-cond supertype))
-       (extended-judge
-        (extend-judgements judge-from-path-cond path-cond options state)))
-    `(if ,extended-judge 't 'nil)))
+       (judge-from-path-cond (look-up-path-cond term path-cond supertype)))
+    (extend-judgements judge-from-path-cond path-cond options state)))
 
 ;; ------------------------------------------------------------------
 ;;    The main type-judgements
@@ -887,7 +886,8 @@
                 'nil))
             ,@actuals))
          (return-judgement
-          (term-substitution (type-judgement-top body-judgements) body term t)))
+          (term-substitution (type-judgement-top body-judgements body options)
+                             body term t)))
       `(if ,return-judgement
            (if ,lambda-judgements
                ,actuals-judgements
@@ -918,8 +918,8 @@
           (type-judgement else
                           `(if ,(simple-transformer `(not ,cond)) ,path-cond 'nil)
                           options state))
-         (judge-then-top (type-judgement-top judge-then))
-         (judge-else-top (type-judgement-top judge-else))
+         (judge-then-top (type-judgement-top judge-then then options))
+         (judge-else-top (type-judgement-top judge-else else options))
          (judge-from-then (term-substitution judge-then-top then term t))
          (judge-from-else (term-substitution judge-else-top else term t))
          (judge-if-top (union-judgements judge-from-then judge-from-else state))
@@ -952,7 +952,8 @@
          ((cons fn actuals) term)
          (actuals-judgements
           (type-judgement-list actuals path-cond options state))
-         (actuals-judgements-top (type-judgement-top-list actuals-judgements))
+         (actuals-judgements-top
+          (type-judgement-top-list actuals-judgements actuals options))
          (functions (type-options->functions options))
          (conspair (assoc-equal fn functions))
          ((unless conspair)
@@ -964,7 +965,7 @@
           (returns-judgement fn actuals actuals actuals-judgements-top
                              actuals-judgements-top fn-description ''t state))
          ((if (equal return-judgement ''t))
-          (er hard? 'type-inference-bottomup=>judge-judgement-fn
+          (er hard? 'type-inference-bottomup=>type-judgement-fn
               "Failed to find type judgements for return of function call ~
                ~p0~%" term))
          (return-judgement-extended
@@ -985,8 +986,7 @@
          ((if (acl2::variablep term))
           (type-judgement-variable term path-cond options state))
          ((if (acl2::quotep term))
-          `(if ,(type-judgement-quoted term options state)
-               't 'nil))
+          (type-judgement-quoted term options state))
          ((cons fn &) term)
          ((if (pseudo-lambdap fn))
           (type-judgement-lambda term path-cond options state))
