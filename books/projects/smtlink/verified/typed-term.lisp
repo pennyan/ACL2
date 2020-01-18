@@ -16,8 +16,18 @@
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 
 (include-book "../utils/basics")
+(include-book "path-cond")
 (include-book "evaluator")
-(include-book "judgements")
+
+;; reduce not's in term
+(define simple-transformer ((term pseudo-termp))
+  :returns (new-term pseudo-termp)
+  (b* ((term (pseudo-term-fix term))
+       (new-term
+        (case-match term
+          (('not ('not term1)) term1)
+          (& term))))
+    new-term))
 
 (encapsulate ()
   (local (in-theory (disable pseudo-termp)))
@@ -80,20 +90,91 @@
 |#
 
 (defines good-typed-term
+  :well-founded-relation l<
+  :verify-guards nil
 
 (define good-typed-lambda-p ((tterm typed-term-p))
   :returns (ok booleanp)
-  :guard (and (consp tterm)
-              (pseudo-lambdap (car tterm)))
+  :guard (and (consp (typed-term->term tterm))
+              (pseudo-lambdap (car (typed-term->term tterm))))
   (b* ((tterm (typed-term-fix tterm))
        ((typed-term tt) tterm)
-       ()
-       )
-    ()))
+       ((cons fn actuals) tt.term)
+       (formals (lambda-formals fn))
+       (body (lambda-body fn))
+       ((unless (consp tt.judgements)) nil)
+       (match?
+        (case-match tt.judgements
+          (('if return-judge
+               ('if (('lambda !formals body-judge))
+                   actuals-judge
+                 ''nil)
+             ''nil)
+           (and (is-conjunct-list? return-judge)
+                (good-typed-term-list-p
+                 (make-typed-term-list :term-lst actuals
+                                       :path-cond tt.path-cond
+                                       :judgements actuals-judge))
+                (b* ((shadowed-path-cond (shadow-path-cond formals tt.path-cond)))
+                  (good-typed-term-p
+                   (make-typed-term :term body
+                                    :path-cond shadowed-path-cond
+                                    :judgements body-judge)))))
+          (& nil))))
+    (if match? t nil)))
 
-(define good-typed-if-p)
+(define good-typed-if-p ((tterm typed-term-p))
+  :returns (ok booleanp)
+  :guard (and (consp (typed-term->term tterm))
+              (equal (car (typed-term->term tterm)) 'if))
+  (b* ((tterm (pseudo-term-fix tterm))
+       ((typed-term tt) tterm)
+       ((list & cond then else) tt.term)
+       ((unless (consp tt.judgements)) nil)
+       (match?
+        (case-match tt.judgements
+          (('if judge-if-top
+               ('if judge-cond
+                   ('if !cond judge-then judge-else))
+             ''nil)
+           (and (is-conjunct? judge-if-top)
+                (good-typed-term-p
+                 (make-typed-term :term cond
+                                  :path-cond tt.path-cond
+                                  :judgements judge-cond))
+                (good-typed-term-p
+                 (make-typed-term :term then
+                                  :path-cond
+                                  `(if ,(simple-transformer cond)
+                                       ,tt.path-cond 'nil)
+                                  :judgements judge-then))
+                (good-typed-term-p
+                 (make-typed-term :term else
+                                  :path-cond
+                                  `(if ,(simple-transformer `(not ,cond))
+                                       ,tt.path-cond 'nil)
+                                  :judgements judge-else))))
+          (& nil))))
+    (if match? t nil)))
 
-(define good-typed-fncall-p)
+(define good-typed-fncall-p ((tterm typed-term-p))
+  :returns (ok booleanp)
+  :guard (and (consp (typed-term->term tterm))
+              (symbolp (car (typed-term->term tterm))))
+  (b* ((tterm (pseudo-term-fix tterm))
+       ((typed-term tt) tterm)
+       ((cons & actuals) tt.term)
+       ((unless (consp tt.judgements)) nil)
+       (match?
+        (case-match tt.judgements
+          (('if return-judge actuals-judge ''nil)
+           (and (is-conjunct-list? return-judge)
+                (good-typed-term-list-p
+                 (make-typed-term-list :term-lst actuals
+                                       :path-cond tt.path-cond
+                                       :judgements actuals-judge))))
+          (& nil))))
+    (if match? t nil)))
 
 (define good-typed-term-p ((tterm typed-term-p))
   :returns (ok booleanp)
@@ -101,7 +182,7 @@
        ((typed-term tt) tterm)
        ((if (acl2::variablep tt.term)) (good-typed-variable-p tt))
        ((if (acl2::quotep tt.term)) (good-typed-quote-p tt))
-       ((cons fn actuals) tt.term)
+       ((cons fn &) tt.term)
        ((if (pseudo-lambdap fn)) (good-typed-lambda-p tt))
        ((if (equal fn 'if)) (good-typed-if-p tt)))
     (good-typed-fncall-p tt)))
@@ -110,13 +191,31 @@
   :returns (ok booleanp)
   (b* ((tterm-lst (typed-term-list-fix tterm-lst))
        ((typed-term-list ttl) tterm-lst)
-       ((unless (consp ttl.term-lst)) t)
+       ((unless (is-conjunct? ttl.judgements))
+        (er hard? 'typed-term=>good-typed-term-list-p
+            "Judgements ~p0 is not a conjunct.~%" ttl.judgements))
+       ((if (and (null ttl.term-lst) (equal ttl.judgements ''t))) t)
+       ((if (null ttl.term-lst))
+        (er hard? 'typed-term=>good-typed-term-list-p
+            "Term runs out but there are judgements left ~p0.~%"
+            ttl.judgements))
+       ((if (equal ttl.judgements ''t))
+        (er hard? 'typed-term=>good-typed-term-list-p
+            "Judgements runs out but there are terms left ~p0.~%"
+            ttl.term-lst))
        ((cons term-hd term-tl) ttl.term-lst)
-       ;; ...
-       )
-    ()))
+       ((list & judge-hd judge-tl &) ttl.judgements))
+    (and (good-typed-term-p
+          (make-typed-term :term term-hd
+                           :path-cond ttl.path-cond
+                           :judgements judge-hd))
+         (good-typed-term-list-p
+          (make-typed-term :term term-tl
+                           :path-cond ttl.path-cond
+                           :judgements judge-tl)))))
 )
 
+stop
 ;; ---------------------------------------------
 ;;       Destructors for judgements
 
