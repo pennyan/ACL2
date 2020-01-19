@@ -11,7 +11,7 @@
 (include-book "std/util/defines" :dir :system)
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 
-(include-book "../utils/basics")
+(include-book "../utils/pseudo-term")
 
 (local
  (defthm acl2-count-of-car-of-pseudo-term-list-fix

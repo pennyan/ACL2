@@ -15,7 +15,7 @@
 (include-book "clause-processors/meta-extract-user" :dir :system)
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 
-(include-book "../utils/basics")
+(include-book "../utils/pseudo-term")
 (include-book "path-cond")
 (include-book "evaluator")
 
@@ -92,13 +92,24 @@
 (defines good-typed-term
   :well-founded-relation l<
   :verify-guards nil
+  :hints (("Goal"
+           :in-theory (disable pseudo-termp
+                               equal-fixed-and-x-of-pseudo-termp
+                               symbol-listp
+                               pseudo-term-listp
+                               acl2::pseudo-termp-cadr-from-pseudo-term-listp)))
 
 (define good-typed-lambda-p ((tterm typed-term-p))
   :returns (ok booleanp)
   :guard (and (consp (typed-term->term tterm))
               (pseudo-lambdap (car (typed-term->term tterm))))
+  :measure (list (acl2-count (typed-term->term (typed-term-fix tterm)))
+                 0)
   (b* ((tterm (typed-term-fix tterm))
        ((typed-term tt) tterm)
+       ((unless (mbt (and (consp tt.term)
+                          (pseudo-lambdap (car tt.term)))))
+        nil)
        ((cons fn actuals) tt.term)
        (formals (lambda-formals fn))
        (body (lambda-body fn))
@@ -127,8 +138,16 @@
   :returns (ok booleanp)
   :guard (and (consp (typed-term->term tterm))
               (equal (car (typed-term->term tterm)) 'if))
-  (b* ((tterm (pseudo-term-fix tterm))
+  :measure (list (acl2-count (typed-term->term (typed-term-fix tterm)))
+                 0)
+  (b* ((tterm (typed-term-fix tterm))
        ((typed-term tt) tterm)
+       ((unless (mbt (and (consp tt.term)
+                          (equal (car tt.term) 'if))))
+        nil)
+       ((unless (equal (len (cdr tt.term)) 3))
+        (er hard? 'typed-term=>good-typed-if-p
+            "Malformed if term: ~q0" tt.term))
        ((list & cond then else) tt.term)
        ((unless (consp tt.judgements)) nil)
        (match?
@@ -160,9 +179,13 @@
 (define good-typed-fncall-p ((tterm typed-term-p))
   :returns (ok booleanp)
   :guard (and (consp (typed-term->term tterm))
+              (not (equal (car (typed-term->term tterm)) 'quote))
               (symbolp (car (typed-term->term tterm))))
-  (b* ((tterm (pseudo-term-fix tterm))
+  :measure (list (acl2-count (typed-term->term (typed-term-fix tterm)))
+                 0)
+  (b* ((tterm (typed-term-fix tterm))
        ((typed-term tt) tterm)
+       ((unless (mbt (consp tt.term))) nil)
        ((cons & actuals) tt.term)
        ((unless (consp tt.judgements)) nil)
        (match?
@@ -178,6 +201,10 @@
 
 (define good-typed-term-p ((tterm typed-term-p))
   :returns (ok booleanp)
+  :measure (list (acl2-count
+                  (typed-term->term
+                   (typed-term-fix tterm)))
+                 1)
   (b* ((tterm (typed-term-fix tterm))
        ((typed-term tt) tterm)
        ((if (acl2::variablep tt.term)) (good-typed-variable-p tt))
@@ -189,13 +216,17 @@
 
 (define good-typed-term-list-p ((tterm-lst typed-term-list-p))
   :returns (ok booleanp)
+  :measure (list (acl2-count
+                  (typed-term-list->term-lst
+                   (typed-term-list-fix tterm-lst)))
+                 1)
   (b* ((tterm-lst (typed-term-list-fix tterm-lst))
        ((typed-term-list ttl) tterm-lst)
        ((unless (is-conjunct? ttl.judgements))
         (er hard? 'typed-term=>good-typed-term-list-p
             "Judgements ~p0 is not a conjunct.~%" ttl.judgements))
        ((if (and (null ttl.term-lst) (equal ttl.judgements ''t))) t)
-       ((if (null ttl.term-lst))
+       ((unless (consp ttl.term-lst))
         (er hard? 'typed-term=>good-typed-term-list-p
             "Term runs out but there are judgements left ~p0.~%"
             ttl.judgements))
@@ -210,102 +241,103 @@
                            :path-cond ttl.path-cond
                            :judgements judge-hd))
          (good-typed-term-list-p
-          (make-typed-term :term term-tl
-                           :path-cond ttl.path-cond
-                           :judgements judge-tl)))))
+          (make-typed-term-list :term-lst term-tl
+                                :path-cond ttl.path-cond
+                                :judgements judge-tl)))))
 )
 
-stop
-;; ---------------------------------------------
-;;       Destructors for judgements
+(verify-guards good-typed-term-p)
 
-(define typed-term->kind-consistency ((tterm typed-term-p)
-                                      (kind symbolp))
-  :returns (kind symbolp)
-  (b* ((tterm (typed-term-fix tterm))
-       ((typed-term tt) tterm)
-       (check? (case-match kind
-                 ('variablep (variable-judgements-p tt.judgements))
-                 ('quotep (quote-judgements-p tt.judgements))
-                 ('lambdap (lambda-judgements-p tt.judgements))
-                 ('ifp (if-judgements-p tt.judgements))
-                 ('fncallp (fncall-judgements-p tt.judgements))
-                 (& nil)))
-       ((unless check?)
-        (er hard? 'type-inference-topdown=>typed-term->kind-consistency
-            "Term ~p0 is variablep, but judgements ~p1 is not ~
-               variable-judgements-p.~%" tt.term tt.judgements)))
-    kind))
+;; ;; ---------------------------------------------
+;; ;;       Destructors for judgements
 
-(define typed-term->kind ((tterm typed-term-p))
-  :returns (kind symbolp)
-  (b* ((tterm (typed-term-fix tterm))
-       ((typed-term tt) tterm)
-       ((if (acl2::variablep tt.term))
-        (typed-term->kind-consistency tt 'variablep))
-       ((if (acl2::quotep tt.term))
-        (typed-term->kind-consistency tt 'quotep))
-       ((cons fn &) tt.term)
-       ((if (pseudo-lambdap fn))
-        (typed-term->kind-consistency tt 'lambdap))
-       ((if (equal fn 'if))
-        (typed-term->kind-consistency tt 'ifp)))
-    (typed-term->kind-consistency tt 'fncallp))
-  ///
-  (more-returns
-   (kind (member-equal kind '(variablep quotep lambdap ifp fncallp nil))
-         :name range-of-typed-term->kind)
-   (kind (implies (equal kind 'variablep)
-                  (acl2::variablep (typed-term->term tterm)))
-         :name implies-of-variable-kind)
-   (kind (implies (equal kind 'quotep)
-                  (acl2::quotep (typed-term->term tterm)))
-         :name implies-of-quote-kind)
-   (kind (implies (equal kind 'lambdap)
-                  (pseudo-lambdap (car (typed-term->term tterm))))
-         :name implies-of-lambda-kind)
-   (kind (implies (equal kind 'ifp)
-                  (equal (car (typed-term->term tterm)) 'if))
-         :name implies-of-if-kind)
-   (kind (implies (equal kind 'fncallp)
-                  (and (not (equal (car (typed-term->term tterm)) 'quote))
-                       (symbolp (car (typed-term->term tterm)))))
-         :name implies-of-fncall-kind)))
+;; (define typed-term->kind-consistency ((tterm typed-term-p)
+;;                                       (kind symbolp))
+;;   :returns (kind symbolp)
+;;   (b* ((tterm (typed-term-fix tterm))
+;;        ((typed-term tt) tterm)
+;;        (check? (case-match kind
+;;                  ('variablep (variable-judgements-p tt.judgements))
+;;                  ('quotep (quote-judgements-p tt.judgements))
+;;                  ('lambdap (lambda-judgements-p tt.judgements))
+;;                  ('ifp (if-judgements-p tt.judgements))
+;;                  ('fncallp (fncall-judgements-p tt.judgements))
+;;                  (& nil)))
+;;        ((unless check?)
+;;         (er hard? 'type-inference-topdown=>typed-term->kind-consistency
+;;             "Term ~p0 is variablep, but judgements ~p1 is not ~
+;;                variable-judgements-p.~%" tt.term tt.judgements)))
+;;     kind))
 
-;; ------------------------------------------------
-;;       destructors
+;; (define typed-term->kind ((tterm typed-term-p))
+;;   :returns (kind symbolp)
+;;   (b* ((tterm (typed-term-fix tterm))
+;;        ((typed-term tt) tterm)
+;;        ((if (acl2::variablep tt.term))
+;;         (typed-term->kind-consistency tt 'variablep))
+;;        ((if (acl2::quotep tt.term))
+;;         (typed-term->kind-consistency tt 'quotep))
+;;        ((cons fn &) tt.term)
+;;        ((if (pseudo-lambdap fn))
+;;         (typed-term->kind-consistency tt 'lambdap))
+;;        ((if (equal fn 'if))
+;;         (typed-term->kind-consistency tt 'ifp)))
+;;     (typed-term->kind-consistency tt 'fncallp))
+;;   ///
+;;   (more-returns
+;;    (kind (member-equal kind '(variablep quotep lambdap ifp fncallp nil))
+;;          :name range-of-typed-term->kind)
+;;    (kind (implies (equal kind 'variablep)
+;;                   (acl2::variablep (typed-term->term tterm)))
+;;          :name implies-of-variable-kind)
+;;    (kind (implies (equal kind 'quotep)
+;;                   (acl2::quotep (typed-term->term tterm)))
+;;          :name implies-of-quote-kind)
+;;    (kind (implies (equal kind 'lambdap)
+;;                   (pseudo-lambdap (car (typed-term->term tterm))))
+;;          :name implies-of-lambda-kind)
+;;    (kind (implies (equal kind 'ifp)
+;;                   (equal (car (typed-term->term tterm)) 'if))
+;;          :name implies-of-if-kind)
+;;    (kind (implies (equal kind 'fncallp)
+;;                   (and (not (equal (car (typed-term->term tterm)) 'quote))
+;;                        (symbolp (car (typed-term->term tterm)))))
+;;          :name implies-of-fncall-kind)))
 
-;; ifp destructors
-(local (in-theory (disable len)))
+;; ;; ------------------------------------------------
+;; ;;       destructors
 
-(define typed-term-ifp->cond ((tterm typed-term-p))
-  :guard (equal (typed-term->kind tterm) 'ifp)
-  :guard-hints (("Goal" :in-theory (enable len)))
-  :returns (cond-tt typed-term-p)
-  (b* ((tterm (typed-term-fix tterm))
-       ((typed-term tt) tterm)
-       ((unless (mbt (equal (typed-term->kind tt) 'ifp)))
-        (make-typed-term))
-       ((unless (equal (len tt.term) 4))
-        (prog2$ (er hard? 'type-inference-topdown=>typed-term-ifp->cond
-                    "If statement is malformed: ~q0" tt.term)
-                (make-typed-term)))
-       (cond-term (cadr tt.term))
-       (cond-path-cond tt.path-cond)
-       ((mv err cond-judgements)
-        (case-match tt.judgements
-          (('if & ('if judge-cond & &) &)
-           (mv nil judge-cond))
-          (& (mv t nil))))
-       ((if err)
-        (er hard? 'type-inference-topdown=>typed-term-ifp->cond
-            "If judgements is malformed: ~q0" tt.judgements)))
-    (make-typed-term :term cond-term
-                     :path-cond cond-path-cond
-                     :judgements cond-judgements)))
+;; ;; ifp destructors
+;; (local (in-theory (disable len)))
 
-;; lambdap destructors
-(define typed-term-lambdap->)
+;; (define typed-term-ifp->cond ((tterm typed-term-p))
+;;   :guard (equal (typed-term->kind tterm) 'ifp)
+;;   :guard-hints (("Goal" :in-theory (enable len)))
+;;   :returns (cond-tt typed-term-p)
+;;   (b* ((tterm (typed-term-fix tterm))
+;;        ((typed-term tt) tterm)
+;;        ((unless (mbt (equal (typed-term->kind tt) 'ifp)))
+;;         (make-typed-term))
+;;        ((unless (equal (len tt.term) 4))
+;;         (prog2$ (er hard? 'type-inference-topdown=>typed-term-ifp->cond
+;;                     "If statement is malformed: ~q0" tt.term)
+;;                 (make-typed-term)))
+;;        (cond-term (cadr tt.term))
+;;        (cond-path-cond tt.path-cond)
+;;        ((mv err cond-judgements)
+;;         (case-match tt.judgements
+;;           (('if & ('if judge-cond & &) &)
+;;            (mv nil judge-cond))
+;;           (& (mv t nil))))
+;;        ((if err)
+;;         (er hard? 'type-inference-topdown=>typed-term-ifp->cond
+;;             "If judgements is malformed: ~q0" tt.judgements)))
+;;     (make-typed-term :term cond-term
+;;                      :path-cond cond-path-cond
+;;                      :judgements cond-judgements)))
 
-;; fncallp destructors
-(define typed-term-fncallp->)
+;; ;; lambdap destructors
+;; (define typed-term-lambdap->)
+
+;; ;; fncallp destructors
+;; (define typed-term-fncallp->)

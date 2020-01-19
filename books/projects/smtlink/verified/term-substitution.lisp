@@ -12,7 +12,7 @@
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 (include-book "kestrel/std/system/dumb-occur-var-open" :dir :system)
 
-(include-book "../utils/basics")
+(include-book "../utils/pseudo-term")
 
 (define dumb-occur-vars-or ((var-lst symbol-listp)
                             (term pseudo-termp))
@@ -90,10 +90,12 @@
                 ,(term-substitution (cadr actuals) subterm subst skip-conj)
                 ,(caddr actuals)))
          ((if (pseudo-lambdap fn))
-          (b* ((actuals-substed
+          (b* ((formals (lambda-formals fn))
+               ((unless (mbt (equal (len formals) (len actuals)))) nil)
+               (actuals-substed
                 (term-substitution-list actuals subterm subst skip-conj))
-               (formals (lambda-formals fn))
-               ((unless (mbt (equal (len formals) (len actuals-substed)))) nil)
+               ((unless (mbt (equal (len formals) (len actuals-substed))))
+                nil)
                (shadowed? (dumb-occur-vars-or formals subterm))
                ((if shadowed?) `(,fn ,@actuals-substed))
                (body (lambda-body fn))

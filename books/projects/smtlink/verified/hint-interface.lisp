@@ -12,6 +12,7 @@
 
 (include-book "../config")
 (include-book "../utils/basics")
+(include-book "../utils/pseudo-term")
 
 ;; (defsection SMT-hint-interface
 ;;   :parents (verified)

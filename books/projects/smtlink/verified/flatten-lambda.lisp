@@ -16,7 +16,7 @@
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 
 (include-book "term-substitution")
-(include-book "../utils/basics")
+(include-book "../utils/pseudo-term")
 
 ;; ---------------------------------------
 ;;         smt-flatten-lambda

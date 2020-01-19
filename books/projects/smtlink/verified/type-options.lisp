@@ -9,7 +9,7 @@
 (include-book "xdoc/top" :dir :system)
 (include-book "centaur/fty/top" :dir :system)
 
-(include-book "../utils/basics")
+(include-book "../utils/pseudo-term")
 
 (defalist type-to-types-alist
   :key-type symbolp
@@ -125,7 +125,6 @@
                              (:rewrite
                               acl2::true-list-listp-of-cdr-when-true-list-listp)
                              (:definition true-listp)
-                             (:rewrite pseudo-term-listp-of-symbol-listp)
                              (:definition symbol-listp))))
 (defprod prod-type-description
   ((recognizer symbolp)

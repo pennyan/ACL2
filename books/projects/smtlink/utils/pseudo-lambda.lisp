@@ -32,21 +32,18 @@
 
   (defthm lambda-of-pseudo-lambdap
     (implies (pseudo-lambdap x)
-             (equal (car x) 'lambda))
-    :hints (("Goal" :in-theory (enable pseudo-lambdap))))
+             (equal (car x) 'lambda)))
 
   (defthm true-listp-of-cdr-of-pseudo-lambdap
     (implies (pseudo-lambdap x)
-             (true-listp (cdr x)))
-    :hints (("Goal" :in-theory (enable pseudo-lambdap))))
+             (true-listp (cdr x))))
 
   (defthm equal-len-of-pseudo-lambda-formals-and-actuals
     (implies (and (pseudo-termp term)
                   (consp term)
                   (pseudo-lambdap (car term)))
              (equal (len (lambda-formals (car term)))
-                    (len (cdr term))))
-    :hints (("Goal" :in-theory (enable pseudo-lambdap))))
+                    (len (cdr term)))))
 
   ;; I find that Sol has another version of pseudo-lambda-p and
   ;; pseudo-lambda-fix in clause-processors/pseudo-term-fty.lisp that's
