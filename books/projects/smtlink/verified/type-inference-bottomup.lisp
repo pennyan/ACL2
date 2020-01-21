@@ -771,6 +771,7 @@
 
   (define type-judgement ((term pseudo-termp)
                           (path-cond pseudo-termp)
+                          (guard pseudo-term-listp)
                           (options type-options-p)
                           state)
     :measure (list (acl2-count (pseudo-term-fix term)) 1)

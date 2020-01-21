@@ -33,9 +33,9 @@
   (local (in-theory (disable pseudo-termp)))
 
   (defprod typed-term
-    ((term pseudo-termp)
-     (path-cond pseudo-termp)
-     (judgements pseudo-termp)))
+    ((term pseudo-termp :default ''nil)
+     (path-cond pseudo-termp :default ''t)
+     (judgements pseudo-termp :default ''nil)))
 
   (defprod typed-term-list
     ((term-lst pseudo-term-listp)
@@ -158,7 +158,7 @@
        (match?
         (case-match tt.judgements
           (('if return-judge
-               ('if (('lambda !formals body-judge))
+               ('if (('lambda !formals body-judge) . !actuals)
                    actuals-judge
                  ''nil)
              ''nil)
@@ -320,18 +320,104 @@
 
 (verify-guards good-typed-term-p)
 
+;; -------------------------------------------------------------------
+;; God I hate these
+
 (defthm implies-of-good-typed-if
   (implies (and (typed-term-p tterm) (good-typed-if-p tterm))
            (and (consp (cdr (typed-term->term tterm)))
                 (consp (cddr (typed-term->term tterm)))
                 (consp (cdddr (typed-term->term tterm)))
+                (consp (typed-term->judgements tterm))
+                (consp (cdr (typed-term->judgements tterm)))
+                (consp (cddr (typed-term->judgements tterm)))
+                (consp (caddr (typed-term->judgements tterm)))
+                (consp (cdddr (typed-term->judgements tterm)))
+                (not (cddddr (typed-term->judgements tterm)))
+                (consp (cdr (caddr (typed-term->judgements tterm))))
+                (consp (cddr (caddr (typed-term->judgements tterm))))
+                (consp (caddr (caddr (typed-term->judgements tterm))))
+                (consp (cddr (caddr (caddr (typed-term->judgements tterm)))))
+                (consp (cdr (caddr (caddr (typed-term->judgements tterm)))))
+                (consp (cdddr (caddr (typed-term->judgements tterm))))
+                (not (cddddr (caddr (typed-term->judgements tterm))))
+                (consp (cdddr (caddr (caddr (typed-term->judgements tterm)))))
+                (not (cddddr (caddr (caddr (typed-term->judgements tterm)))))
                 (pseudo-termp (cadr (caddr (typed-term->judgements tterm))))
+                (good-typed-term-p
+                 (typed-term (cadr (typed-term->term tterm))
+                             (typed-term->path-cond tterm)
+                             (cadr (caddr (typed-term->judgements tterm)))))
+                (good-typed-term-p
+                 (typed-term (caddr (typed-term->term tterm))
+                             (list* 'if
+                                    (simple-transformer (cadr (typed-term->term tterm)))
+                                    (typed-term->path-cond tterm)
+                                    '('nil))
+                             (caddr (caddr (caddr (typed-term->judgements
+                                                   tterm))))))
+                (good-typed-term-p
+                 (typed-term
+                  (cadddr (typed-term->term tterm))
+                  (list* 'if
+                         (simple-transformer (list 'not
+                                                   (cadr (typed-term->term tterm))))
+                         (typed-term->path-cond tterm)
+                         '('nil))
+                  (cadddr (caddr (caddr (typed-term->judgements tterm))))))
                 (pseudo-termp (caddr (caddr (caddr (typed-term->judgements
                                                     tterm)))))
                 (pseudo-termp (cadddr (caddr (caddr (typed-term->judgements
                                                      tterm)))))))
   :hints (("Goal"
            :expand (good-typed-if-p tterm))))
+
+(defthm implies-of-good-typed-fncall
+  (implies (and (typed-term-p tterm) (good-typed-fncall-p tterm))
+           (and (consp (typed-term->judgements tterm))
+                (consp (cdr (typed-term->judgements tterm)))
+                (consp (cddr (typed-term->judgements tterm)))
+                (pseudo-termp (caddr (typed-term->judgements tterm)))
+                (good-typed-term-list-p
+                 (typed-term-list (cdr (typed-term->term tterm))
+                                  (typed-term->path-cond tterm)
+                                  (caddr (typed-term->judgements tterm))))))
+  :hints (("Goal"
+           :expand (good-typed-fncall-p tterm))))
+
+(defthm implies-of-good-typed-lambda
+  (implies (and (typed-term-p tterm) (good-typed-lambda-p tterm))
+           (and (consp (typed-term->judgements tterm))
+                (consp (cdr (typed-term->judgements tterm)))
+                (consp (caddr (typed-term->judgements tterm)))
+                (consp (cddr (typed-term->judgements tterm)))
+                (consp (cdddr (typed-term->judgements tterm)))
+                (consp (cdr (caddr (typed-term->judgements tterm))))
+                (consp (cddr (caddr (typed-term->judgements tterm))))
+                (consp (cadr (caddr (typed-term->judgements tterm))))
+                (consp (car (cadr (caddr (typed-term->judgements tterm)))))
+                (consp (cdddr (caddr (typed-term->judgements tterm))))
+                (consp (cdr (car (cadr (caddr (typed-term->judgements
+                                               tterm))))))
+                (consp (cddr (car (cadr (caddr (typed-term->judgements tterm))))))
+                (not (cddddr (typed-term->judgements tterm)))
+                (not (cddddr (caddr (typed-term->judgements tterm))))
+                (not (cdddr (car (cadr (caddr (typed-term->judgements tterm))))))
+                (pseudo-termp (caddr (caddr (typed-term->judgements tterm))))
+                (pseudo-termp (caddr (car (cadr (caddr (typed-term->judgements
+                                                        tterm))))))
+                (good-typed-term-list-p
+                 (typed-term-list (cdr (typed-term->term tterm))
+                                  (typed-term->path-cond tterm)
+                                  (caddr (caddr (typed-term->judgements
+                                                 tterm)))))
+                (good-typed-term-p
+                 (typed-term (caddr (car (typed-term->term tterm)))
+                             (shadow-path-cond (cadr (car (typed-term->term tterm)))
+                                               (typed-term->path-cond tterm))
+                             (caddr (car (cadr (caddr (typed-term->judgements tterm)))))))))
+  :hints (("Goal"
+           :expand (good-typed-lambda-p tterm))))
 
 ;; ---------------------------------------------
 ;;       Destructors for judgements
@@ -340,6 +426,8 @@
 (define typed-term-ifp->cond ((tterm typed-term-p))
   :guard (and (equal (typed-term->kind tterm) 'ifp)
               (good-typed-term-p tterm))
+  :returns (new-tt (and (typed-term-p new-tt) (good-typed-term-p new-tt))
+                   :hyp :guard)
   (b* (((unless (mbt (and (typed-term-p tterm)
                           (equal (typed-term->kind tterm) 'ifp)
                           (good-typed-term-p tterm))))
@@ -354,7 +442,7 @@
           (& (mv t nil))))
        ((if err)
         (er hard? 'typed-term=>typed-term-ifp->cond
-            "If judgements is malformed: ~q0" tt.judgements)))
+            "Malformed if judgements ~q0" tt.judgements)))
     (make-typed-term :term cond-term
                      :path-cond cond-path-cond
                      :judgements cond-judgements)))
@@ -362,6 +450,8 @@
 (define typed-term-ifp->then ((tterm typed-term-p))
   :guard (and (equal (typed-term->kind tterm) 'ifp)
               (good-typed-term-p tterm))
+  :returns (new-tt (and (typed-term-p new-tt) (good-typed-term-p new-tt))
+                   :hyp :guard)
   (b* (((unless (mbt (and (typed-term-p tterm)
                           (equal (typed-term->kind tterm) 'ifp)
                           (good-typed-term-p tterm))))
@@ -377,7 +467,7 @@
           (& (mv t nil))))
        ((if err)
         (er hard? 'typed-term=>typed-term-ifp->then
-            "If judgements is malformed: ~q0" tt.judgements)))
+            "Malformed if judgements ~q0" tt.judgements)))
     (make-typed-term :term then-term
                      :path-cond then-path-cond
                      :judgements then-judgements)))
@@ -385,6 +475,8 @@
 (define typed-term-ifp->else ((tterm typed-term-p))
   :guard (and (equal (typed-term->kind tterm) 'ifp)
               (good-typed-term-p tterm))
+  :returns (new-tt (and (typed-term-p new-tt) (good-typed-term-p new-tt))
+                   :hyp :guard)
   (b* (((unless (mbt (and (typed-term-p tterm)
                           (equal (typed-term->kind tterm) 'ifp)
                           (good-typed-term-p tterm))))
@@ -400,15 +492,72 @@
           (& (mv t nil))))
        ((if err)
         (er hard? 'typed-term=>typed-term-ifp->else
-            "If judgements is malformed: ~q0" tt.judgements)))
+            "Malformed if judgements ~q0" tt.judgements)))
     (make-typed-term :term else-term
                      :path-cond else-path-cond
                      :judgements else-judgements)))
 
 ;; fncallp destructors
-(define typed-term-fncallp->)
-
+(define typed-term-fncallp->actuals ((tterm typed-term-p))
+  :guard (and (equal (typed-term->kind tterm) 'fncallp)
+              (good-typed-term-p tterm))
+  :returns (new-ttl (and (typed-term-list-p new-ttl) (good-typed-term-list-p new-ttl))
+                   :hyp :guard)
+  (b* ((tterm (typed-term-fix tterm))
+       ((typed-term tt) tterm)
+       ((cons & actuals) tt.term)
+       ((mv err actuals-judgements)
+        (case-match tt.judgements
+          ((& & actuals-judge . &)
+           (mv nil actuals-judge))
+          (& (mv t nil))))
+       ((if err)
+        (er hard? 'typed-term=>typed-term-fncall->actuals
+            "Malformed fncall judgements ~q0" tt.judgements)))
+    (make-typed-term-list :term-lst actuals
+                          :path-cond tt.path-cond
+                          :judgements actuals-judgements)))
 
 ;; lambdap destructors
-(define typed-term-lambdap->)
+(define typed-term-lambdap->actuals ((tterm typed-term-p))
+  :guard (and (equal (typed-term->kind tterm) 'lambdap)
+              (good-typed-term-p tterm))
+  :returns (new-ttl (and (typed-term-list-p new-ttl) (good-typed-term-list-p new-ttl))
+                    :hyp :guard)
+  (b* ((tterm (typed-term-fix tterm))
+       ((typed-term tt) tterm)
+       ((cons & actuals) tt.term)
+       ((mv err actuals-judgements)
+        (case-match tt.judgements
+          ((& & (& & actuals-judge . &) &)
+           (mv nil actuals-judge))
+          (& (mv t nil))))
+       ((if err)
+        (er hard? 'typed-term=>typed-term-lambda->actuals
+            "Malformed lambda judgements ~q0" tt.judgements)))
+    (make-typed-term-list :term-lst actuals
+                          :path-cond tt.path-cond
+                          :judgements actuals-judgements)))
 
+(define typed-term-lambdap->body ((tterm typed-term-p))
+  :guard (and (equal (typed-term->kind tterm) 'lambdap)
+              (good-typed-term-p tterm))
+  :returns (new-tt (and (typed-term-p new-tt) (good-typed-term-p new-tt))
+                   :hyp :guard)
+  (b* ((tterm (typed-term-fix tterm))
+       ((typed-term tt) tterm)
+       ((cons fn &) tt.term)
+       (formals (lambda-formals fn))
+       (body (lambda-body fn))
+       (shadowed-path-cond (shadow-path-cond formals tt.path-cond))
+       ((mv err body-judgements)
+        (case-match tt.judgements
+          ((& & (& ((& & body-judge) . &) & &) &)
+           (mv nil body-judge))
+          (& (mv t nil))))
+       ((if err)
+        (er hard? 'typed-term=>typed-term-lambda->body
+            "Malformed lambda judgements ~q0" tt.judgements)))
+    (make-typed-term :term body
+                     :path-cond shadowed-path-cond
+                     :judgements body-judgements)))
