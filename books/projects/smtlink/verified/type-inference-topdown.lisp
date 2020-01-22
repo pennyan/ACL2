@@ -47,10 +47,8 @@
     (b* (((unless (mbt (and (typed-term-p tterm)
                             (equal (typed-term->kind tterm) 'lambdap)
                             (good-typed-term-p tterm))))
-          (make-typed-term))
-         ())
-      ())
-    )
+          (make-typed-term)))
+      tterm))
 
   (define unify-if ((tterm typed-term-p))
     :guard (good-typed-term-p tterm)
@@ -59,12 +57,12 @@
                             (equal (typed-term->kind tterm) 'ifp)
                             (good-typed-term-p tterm))))
           (make-typed-term))
-         ((typed-term tt) tterm)
-         (tt-cond (typed-term-if->cond tt))
-         (tt-then (typed-term-if->then tt))
-         (tt-else (typed-term-if->else tt))
+         ;; ((typed-term tt) tterm)
+         ;; (tt-cond (typed-term-if->cond tt))
+         ;; (tt-then (typed-term-if->then tt))
+         ;; (tt-else (typed-term-if->else tt))
          )
-
+      tterm
       ;; (typed-term-if->cons tt-cond tt-then tt-else)
       ))
 
@@ -74,9 +72,8 @@
     (b* (((unless (mbt (and (typed-term-p tterm)
                             (equal (typed-term->kind tterm) 'fncallp)
                             (good-typed-term-p tterm))))
-          (make-typed-term))
-         ())
-      ()))
+          (make-typed-term)))
+      tterm))
 
 (define unify-type ((tterm typed-term-p))
   :returns (new-tt (and (typed-term-p new-tt) (good-typed-term-p new-tt)))
