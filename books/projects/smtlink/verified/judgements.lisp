@@ -123,8 +123,14 @@
            (and (consp (cdr actuals-judgements))
                 (consp (cddr actuals-judgements))))
   :hints (("Goal"
-           :in-theory (enable is-conjunct?)))
-  )
+           :in-theory (enable is-conjunct?))))
+
+(defthm is-conjunct?-constructor
+  (implies (and (pseudo-termp first)
+                (pseudo-termp rest))
+           (is-conjunct? `(if ,first ,rest 'nil)))
+  :hints (("Goal"
+           :in-theory (enable is-conjunct?))))
 
 (define is-conjunct-list? ((term pseudo-termp))
   :returns (ok booleanp)

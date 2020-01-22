@@ -15,7 +15,7 @@
 (include-book "clause-processors/meta-extract-user" :dir :system)
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 
-(include-book "partial-eval")
+(include-book "path-cond")
 
 ;;-------------------------------------------------------
 ;;  Union judgements

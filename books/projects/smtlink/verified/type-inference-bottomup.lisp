@@ -18,6 +18,7 @@
 (include-book "basics")
 (include-book "hint-please")
 (include-book "typed-term")
+(include-book "judgement-fns")
 
 (set-state-ok t)
 
