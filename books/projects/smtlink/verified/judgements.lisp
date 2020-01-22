@@ -134,4 +134,3 @@
        ((if (equal term ''t)) t)
        ((list & & then &) term))
     (is-conjunct-list? then)))
-

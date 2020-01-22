@@ -387,6 +387,14 @@
                      't)
                   nil nil nil 'top-level state)
 
+(mv-let
+  (erp val)
+  (guard-obligation 'term5-unquoted nil nil nil 'top-level state)
+  (value
+   (and
+    (not erp)
+    (cw "clauses: ~q0" (conjoin-clauses (cadr val))))))
+
 (gthm 'term5-unquoted nil nil)
 (guard-theorem 'term5-unquoted nil nil (w state) state)
 
