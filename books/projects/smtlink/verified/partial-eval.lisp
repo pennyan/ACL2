@@ -12,6 +12,7 @@
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 
 (include-book "../utils/pseudo-term")
+(include-book "evaluator")
 
 (local
  (defthm acl2-count-of-car-of-pseudo-term-list-fix

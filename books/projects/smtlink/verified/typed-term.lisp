@@ -51,7 +51,12 @@
   :returns (ok booleanp)
   (b* ((tterm-lst (typed-term-list-fix tterm-lst))
        ((typed-term-list ttl) tterm-lst))
-    (consp ttl.term-lst)))
+    (consp ttl.term-lst))
+  ///
+  (more-returns
+   (ok (implies (and (typed-term-list-p tterm-lst) ok)
+                (consp (typed-term-list->term-lst tterm-lst)))
+       :name consp-of-term-lst-of-typed-term-list-consp)))
 
 ;; ---------------------------------------------
 ;;       Recognizers
@@ -651,8 +656,15 @@
             "Malformed fncall judgements ~q0" ttl.judgements)))
     (make-typed-term-list :term-lst lst-tl
                           :path-cond ttl.path-cond
-                          :judgements judge-tl)))
-
+                          :judgements judge-tl))
+  ///
+  (more-returns
+   (new-ttl (implies (and (typed-term-list-p tterm-lst)
+                          (good-typed-term-list-p tterm-lst)
+                          (typed-term-list-consp tterm-lst))
+                     (< (acl2-count (typed-term-list->term-lst new-ttl))
+                        (acl2-count (typed-term-list->term-lst tterm-lst))))
+            :name acl2-count-of-typed-term-list->cdr)))
 
 ;; -----------------------------------------------
 ;; Theorems for constructors
