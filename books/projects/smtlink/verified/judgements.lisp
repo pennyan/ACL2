@@ -116,7 +116,7 @@
                                     symbol-listp)))
        :rule-classes :linear)))
 
-(defthm is-conjunct?-unbearable
+(defthm consp-of-is-conjunct?
   (implies (and (pseudo-termp actuals-judgements)
                 (not (equal actuals-judgements ''t))
                 (is-conjunct? actuals-judgements))
@@ -132,11 +132,20 @@
   :hints (("Goal"
            :in-theory (enable is-conjunct?))))
 
-(define is-conjunct-list? ((term pseudo-termp))
+(define is-conjunct-list? ((judges pseudo-termp)
+                           (term pseudo-termp)
+                           (supertype-alst type-to-types-alist-p))
   :returns (ok booleanp)
-  :measure (acl2-count (pseudo-term-fix term))
+  :measure (acl2-count (pseudo-term-fix judges))
+  :hints (("Goal"
+           :in-theory (enable pseudo-term-fix)))
   (b* ((term (pseudo-term-fix term))
-       ((unless (is-conjunct? term)) nil)
-       ((if (equal term ''t)) t)
-       ((list & & then &) term))
-    (is-conjunct-list? then)))
+       (judges (pseudo-term-fix judges))
+       (supertype-alst (type-to-types-alist-fix supertype-alst))
+       ((if (equal judges ''t)) t)
+       ((if (judgement-of-term judges term supertype-alst)) t)
+       ((unless (consp judges)) nil)
+       ((list fn cond then nil-term) judges)
+       ((unless (and (equal fn 'if) (equal nil-term ''nil))) nil))
+    (and (is-conjunct-list? cond term supertype-alst)
+         (is-conjunct-list? then term supertype-alst))))

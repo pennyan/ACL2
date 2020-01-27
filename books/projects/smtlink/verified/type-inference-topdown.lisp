@@ -17,6 +17,43 @@
 
 (include-book "typed-term")
 
+(define choose-judge ((tterm typed-term-p))
+  :guard (good-typed-term-p tterm)
+  :guard-hints (("Goal" :in-theory (enable is-conjunct-list?)))
+  :returns (new-tt (and (typed-term-p new-tt)
+                        (good-typed-term-p new-tt)))
+  (b* (((unless (mbt (and (typed-term-p tterm)
+                          (good-typed-term-p tterm))))
+        (make-typed-term))
+       ((typed-term tt) tterm)
+       ((unless (is-conjunct-list? tt.judgements))
+        (prog2$
+         (er hard? 'type-inference-topdown=>choose-judge
+             "The judge is not a conjunct: ~q0" tt.judgements)
+         (make-typed-term)))
+       ((if (equal tt.judgements ''t))
+        (prog2$
+         (er hard? 'type-inference-topdown=>choose-judge
+             "The type judgement is ''t, there's nothing to choose from.~%")
+         (make-typed-term)))
+       ;; choose the first judge
+       ((list & first & &) tt.judgements))
+    (make-typed-term :term tt.term
+                     :path-cond tt.path-cond
+                     :judgements first)))
+
+(define choose-judge-list ((tterm-lst typed-term-list-p))
+  :guard (good-typed-term-list-p tterm-lst)
+  :returns (new-ttl (and (typed-term-list-p new-ttl)
+                         (good-typed-term-list-p new-ttl)))
+  (b* (((unless (mbt (and (typed-term-list-p tterm-lst)
+                          (good-typed-term-list-p tterm-lst))))
+        (make-typed-term))
+       ((unless (typed-term-list-consp tterm-lst))
+        (make-typed-term-list)))
+    (typed-term-list->cons (choose-judge (typed-term-list->car tterm-lst))
+                           (choose-judge-list (typed-term-list->cdr tterm-lst)))))
+
 (define unify-variable ((tterm typed-term-p))
   :guard (and (good-typed-term-p tterm)
               (equal (typed-term->kind tterm) 'variablep))

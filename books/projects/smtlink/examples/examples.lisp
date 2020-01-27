@@ -810,7 +810,7 @@
   :prods ((:lunch :constructor (meal-lunch meal-p)
                   :destructors ((main symbolp)
                                 (snack integerp)
-                                (drink raitonalp)))
+                                (drink rationalp)))
           (:dinner :contructor (meal-dinner meal-p)
                    :destructors ((appetizer symbolp)
                                  (main symbolp)

@@ -402,3 +402,7 @@
 ;; guard-theorem is interesting to me.
 ;; Guard-obligation takes a term but guard-theorem doesn't. I guess I will go
 ;; with guard-obligation.
+;;------------------------------------------------------
+
+(good-typed-term-p
+ (type-judgement (term) ''t (options) state))
