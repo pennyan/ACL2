@@ -17,62 +17,80 @@
 
 (include-book "typed-term")
 
-(define choose-judge ((tterm typed-term-p))
-  :guard (good-typed-term-p tterm)
-  :guard-hints (("Goal" :in-theory (enable is-conjunct-list?)))
-  :returns (new-tt (and (typed-term-p new-tt)
-                        (good-typed-term-p new-tt)))
-  (b* (((unless (mbt (and (typed-term-p tterm)
-                          (good-typed-term-p tterm))))
-        (make-typed-term))
-       ((typed-term tt) tterm)
-       ((unless (is-conjunct-list? tt.judgements))
-        (prog2$
-         (er hard? 'type-inference-topdown=>choose-judge
-             "The judge is not a conjunct: ~q0" tt.judgements)
-         (make-typed-term)))
-       ((if (equal tt.judgements ''t))
-        (prog2$
-         (er hard? 'type-inference-topdown=>choose-judge
-             "The type judgement is ''t, there's nothing to choose from.~%")
-         (make-typed-term)))
-       ;; choose the first judge
-       ((list & first & &) tt.judgements))
-    (make-typed-term :term tt.term
-                     :path-cond tt.path-cond
-                     :judgements first)))
+(local (in-theory (disable (:executable-counterpart typed-term)
+                           (:executable-counterpart typed-term-list))))
 
-(define choose-judge-list ((tterm-lst typed-term-list-p))
-  :guard (good-typed-term-list-p tterm-lst)
-  :returns (new-ttl (and (typed-term-list-p new-ttl)
-                         (good-typed-term-list-p new-ttl)))
-  (b* (((unless (mbt (and (typed-term-list-p tterm-lst)
-                          (good-typed-term-list-p tterm-lst))))
-        (make-typed-term))
-       ((unless (typed-term-list-consp tterm-lst))
-        (make-typed-term-list)))
-    (typed-term-list->cons (choose-judge (typed-term-list->car tterm-lst))
-                           (choose-judge-list (typed-term-list->cdr tterm-lst)))))
+(define choose-judge ((judges pseudo-termp)
+                      (term pseudo-termp)
+                      (supertype type-to-types-alist-p))
+  :guard (and (pseudo-termp judges)
+              (pseudo-termp term)
+              (type-to-types-alist-p supertype))
+  :returns (judge (or (equal judge ''t)
+                      (judgement-of-term judge term supertype))
+                  :hints (("Goal" :in-theory (e/d (judgement-of-term)
+                                                  (length pseudo-termp)))))
+  (b* (((unless (mbt (and (pseudo-termp judges)
+                          (pseudo-termp term)
+                          (type-to-types-alist-p supertype))))
+        ''t)
+       ((if (equal judges ''t)) ''t)
+       ((if (type-predicate-of-term judges term supertype)) judges)
+       ((unless (is-conjunct? judges))
+        (prog2$ (er hard? 'type-inference-topdown=>choose-judge
+                    "Judges should be a conjunct: ~q0" judges)
+                term))
+       ((list & cond then &) judges)
+       (cond-judge (choose-judge cond term supertype))
+       ((unless (equal cond-judge ''t)) cond-judge))
+    (choose-judge then term supertype))
+  ///
+  (more-returns
+   (judge (pseudo-termp judge)
+          :name pseudo-termp-of-choose-judge)
+   (judge (implies (equal judges ''t) (equal judge ''t))
+          :name t-of-choose-judge)
+   (judge (is-conjunct-list? judge term supertype)
+          :name is-conjunct-list?-of-choose-judge)))
 
-(define unify-variable ((tterm typed-term-p))
-  :guard (and (good-typed-term-p tterm)
+(define unify-variable ((tterm typed-term-p)
+                        (options type-options-p))
+  :guard (and (good-typed-term-p tterm options)
               (equal (typed-term->kind tterm) 'variablep))
-  :returns (new-tt (and (typed-term-p new-tt) (good-typed-term-p new-tt)))
+  :returns (new-tt (and (typed-term-p new-tt)
+                        (good-typed-term-p new-tt options))
+                   :hints (("Goal"
+                            :in-theory (enable good-typed-variable-p))))
   (b* (((unless (mbt (and (typed-term-p tterm)
                           (equal (typed-term->kind tterm) 'variablep)
-                          (good-typed-term-p tterm))))
-        (make-typed-term)))
-    tterm))
+                          (good-typed-term-p tterm options))))
+        (make-typed-term))
+       ((typed-term tt) tterm)
+       ((type-options to) options))
+    (make-typed-term :term tt.term
+                     :path-cond tt.path-cond
+                     :judgements (choose-judge tt.judgements tt.term
+                                               to.supertype))))
 
-(define unify-quote ((tterm typed-term-p))
-  :guard (and (good-typed-term-p tterm)
+(define unify-quote ((tterm typed-term-p)
+                     (options type-options-p))
+  :guard (and (good-typed-term-p tterm options)
               (equal (typed-term->kind tterm) 'quotep))
-  :returns (new-tt (and (typed-term-p new-tt) (good-typed-term-p new-tt)))
+  :returns (new-tt (and (typed-term-p new-tt)
+                        (good-typed-term-p new-tt options))
+                   :hints (("Goal"
+                            :in-theory (enable good-typed-quote-p))))
   (b* (((unless (mbt (and (typed-term-p tterm)
+                          (type-options-p options)
                           (equal (typed-term->kind tterm) 'quotep)
-                          (good-typed-term-p tterm))))
-        (make-typed-term)))
-    tterm))
+                          (good-typed-term-p tterm options))))
+        (make-typed-term))
+       ((typed-term tt) tterm)
+       ((type-options to) options))
+    (make-typed-term :term tt.term
+                     :path-cond tt.path-cond
+                     :judgements (choose-judge tt.judgements tt.term
+                                               to.supertype))))
 
 (define unify-lambda ((tterm typed-term-p))
   :guard (and (good-typed-term-p tterm)
