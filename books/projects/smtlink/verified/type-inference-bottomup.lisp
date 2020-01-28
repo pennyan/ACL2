@@ -200,13 +200,11 @@
        ((if (and (equal (arg-decl-kind arg-decl) :done)
                  (null actuals)
                  (equal actuals-judgements ''t)))
-        (progn$ (cw "fn: ~p0, actuals: ~p1~%" fn actuals-total)
-                (cw "actuals-judgements-total: ~p0~%" actuals-judgements-total)
         `(if ,(construct-returns-judgement fn actuals-total
                                            actuals-judgements-total
                                            (arg-decl-done->r arg-decl)
                                            state)
-             ,acc 'nil)))
+             ,acc 'nil))
        ((if (and (equal (arg-decl-kind arg-decl) :done)
                  (or actuals (not (equal actuals-judgements ''t)))))
         (er hard? 'type-inference-bottomup=>returns-judgement
@@ -443,7 +441,8 @@
          (judge-else-top (type-judgement-top judge-else else options))
          (judge-from-then (term-substitution judge-then-top then term t))
          (judge-from-else (term-substitution judge-else-top else term t))
-         (judge-if-top (union-judgements judge-from-then judge-from-else state))
+         (judge-if-top (union-judgements judge-from-then judge-from-else
+                                         state))
          (judge-if-top-extended
           (extend-judgements judge-if-top path-cond options state)))
       `(if ,judge-if-top-extended

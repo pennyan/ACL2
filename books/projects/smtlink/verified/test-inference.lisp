@@ -1,5 +1,6 @@
 (in-package "SMT")
 (include-book "type-inference-bottomup")
+(set-state-ok t)
 
 (defalist rational-integer-alist
   :key-type rationalp
