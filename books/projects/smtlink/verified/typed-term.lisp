@@ -457,20 +457,26 @@
                 (consp (caddr (typed-term->judgements tterm)))
                 (consp (cddr (typed-term->judgements tterm)))
                 (consp (cdddr (typed-term->judgements tterm)))
-                (consp (cdr (caddr (typed-term->judgements tterm))))
-                (consp (cddr (caddr (typed-term->judgements tterm))))
                 (consp (cadr (caddr (typed-term->judgements tterm))))
                 (consp (car (cadr (caddr (typed-term->judgements tterm)))))
+                (consp (cdr (caddr (typed-term->judgements tterm))))
+                (consp (cdr (car (cadr (caddr (typed-term->judgements tterm))))))
+                (consp (cddr (caddr (typed-term->judgements tterm))))
                 (consp (cdddr (caddr (typed-term->judgements tterm))))
-                (consp (cdr (car (cadr (caddr (typed-term->judgements
-                                               tterm))))))
                 (consp (cddr (car (cadr (caddr (typed-term->judgements tterm))))))
+                (consp (caddr (car (cadr (caddr (typed-term->judgements
+                                                 tterm))))))
+                (consp (cddr (caddr (car (cadr (caddr (typed-term->judgements tterm)))))))
+                (consp (cdddr (caddr (car (cadr (caddr (typed-term->judgements
+                                                        tterm)))))))
+                (consp (cdr (caddr (car (cadr (caddr (typed-term->judgements
+                                                      tterm)))))))
                 (not (cddddr (typed-term->judgements tterm)))
                 (not (cddddr (caddr (typed-term->judgements tterm))))
-                (not (cdddr (car (cadr (caddr (typed-term->judgements tterm))))))
-                (pseudo-termp (caddr (caddr (typed-term->judgements tterm))))
-                (pseudo-termp (caddr (car (cadr (caddr (typed-term->judgements
-                                                        tterm))))))
+                (not (cdddr (car (cadr (caddr (typed-term->judgements
+                                               tterm))))))
+                (not (cddddr (caddr (car (cadr (caddr (typed-term->judgements
+                                                       tterm)))))))
                 (good-typed-term-list-p
                  (typed-term-list (cdr (typed-term->term tterm))
                                   (typed-term->path-cond tterm)
@@ -478,11 +484,11 @@
                                                  tterm))))
                  options)
                 (good-typed-term-p
-                 (typed-term (caddr (car (typed-term->term tterm)))
-                             (shadow-path-cond (cadr (car (typed-term->term tterm)))
-                                               (typed-term->path-cond tterm))
-                             (caddr (car (cadr (caddr (typed-term->judgements
-                                                       tterm))))))
+                 (typed-term
+                  (caddr (car (typed-term->term tterm)))
+                  (shadow-path-cond (cadr (car (typed-term->term tterm)))
+                                    (typed-term->path-cond tterm))
+                  (cadr (caddr (car (cadr (caddr (typed-term->judgements tterm)))))))
                  options)))
   :hints (("Goal"
            :expand (good-typed-lambda-p tterm options))))
@@ -630,6 +636,8 @@
                                      (options type-options-p))
   :guard (and (equal (typed-term->kind tterm) 'lambdap)
               (good-typed-term-p tterm options))
+  :guard-hints (("Goal"
+                 :expand (good-typed-lambda-p tterm options)))
   :returns (new-ttl (and (typed-term-list-p new-ttl)
                          (good-typed-term-list-p new-ttl options)))
   (b* (((unless (mbt (and (typed-term-p tterm)
@@ -655,6 +663,8 @@
                                   (options type-options-p))
   :guard (and (equal (typed-term->kind tterm) 'lambdap)
               (good-typed-term-p tterm options))
+  :guard-hints (("Goal"
+                 :expand (good-typed-lambda-p tterm options)))
   :returns (new-tt (and (typed-term-p new-tt)
                         (good-typed-term-p new-tt options)))
   (b* (((unless (mbt (and (typed-term-p tterm)
@@ -669,7 +679,7 @@
        (shadowed-path-cond (shadow-path-cond formals tt.path-cond))
        ((mv err body-judgements)
         (case-match tt.judgements
-          ((& & (& ((& & body-judge) . &) & &) &)
+          ((& & (& ((& & (& body-judge & &)) . &) & &) &)
            (mv nil body-judge))
           (& (mv t nil))))
        ((if err)
