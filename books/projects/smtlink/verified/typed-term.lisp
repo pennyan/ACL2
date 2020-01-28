@@ -176,7 +176,7 @@
          (match?
           (case-match tt.judgements
             (('if return-judge
-                 ('if (('lambda !formals body-judge) . !actuals)
+                 ('if (('lambda !formals ('if body-judge & ''nil)) . !actuals)
                      actuals-judge
                    ''nil)
                ''nil)
@@ -221,17 +221,7 @@
                      ('if !cond judge-then judge-else)
                    ''nil)
                ''nil)
-             (b* ((- (cw "cond: ~p0, path-cond: ~p1, judge-cond: ~p2~%"
-                         cond tt.path-cond judge-cond))
-                  (- (cw "then: ~p0, path-cond: ~p1, judge-then: ~p2~%"
-                         then `(if ,(simple-transformer cond)
-                                   ,tt.path-cond 'nil)
-                         judge-then))
-                  (- (cw "else: ~p0, path-cond: ~p1, judge-else: ~p2~%"
-                         else `(if ,(simple-transformer `(not ,cond))
-                                   ,tt.path-cond 'nil)
-                         judge-else)))
-               (and (is-conjunct-list? tt.term judge-if-top to.supertype)
+             (and (is-conjunct-list? judge-if-top tt.term to.supertype)
                     (good-typed-term-p
                      (make-typed-term :term cond
                                       :path-cond tt.path-cond
@@ -250,7 +240,7 @@
                                       `(if ,(simple-transformer `(not ,cond))
                                            ,tt.path-cond 'nil)
                                       :judgements judge-else)
-                     to))))
+                     to)))
             (& nil))))
       (if match? t nil)))
 
@@ -263,21 +253,21 @@
     :measure (list (acl2-count (typed-term->term (typed-term-fix tterm)))
                    0)
     (b* ((tterm (typed-term-fix tterm))
+         (options (type-options-fix options))
          ((typed-term tt) tterm)
+         ((type-options to) options)
          ((unless (mbt (consp tt.term))) nil)
          ((cons & actuals) tt.term)
          ((unless (consp tt.judgements)) nil)
          (match?
           (case-match tt.judgements
             (('if return-judge actuals-judge ''nil)
-             (b* ((- (cw "return-judge: ~q0" return-judge))
-                  (- (cw "actuals: ~p0, path-cond: ~p1, actuals-judge: ~p2~%"
-                         actuals tt.path-cond actuals-judge)))
-               (and (good-typed-term-list-p
-                     (make-typed-term-list :term-lst actuals
-                                           :path-cond tt.path-cond
-                                           :judgements actuals-judge)
-                     options))))
+             (and (is-conjunct-list? return-judge tt.term to.supertype)
+                  (good-typed-term-list-p
+                   (make-typed-term-list :term-lst actuals
+                                         :path-cond tt.path-cond
+                                         :judgements actuals-judge)
+                   options)))
             (& nil))))
       (if match? t nil)))
 

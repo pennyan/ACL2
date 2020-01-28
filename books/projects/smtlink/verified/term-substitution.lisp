@@ -131,33 +131,3 @@
            :expand (term-substitution-list term-lst subterm subst conj))))
 
 (verify-guards term-substitution)
-
-(define term-substitution-multi ((term pseudo-termp)
-                                 (subterm-lst pseudo-term-listp)
-                                 (subst-lst pseudo-term-listp)
-                                 (skip-conj booleanp))
-  :returns (substed-term pseudo-termp)
-  (b* ((term (pseudo-term-fix term))
-       (subterm-lst (pseudo-term-list-fix subterm-lst))
-       (subst-lst (pseudo-term-list-fix subst-lst))
-       ((unless (and (consp subterm-lst)
-                     (consp subst-lst)))
-        term)
-       ((cons subterm-hd subterm-tl) subterm-lst)
-       ((cons subst-hd subst-tl) subst-lst))
-    (term-substitution-multi (term-substitution term subterm-hd subst-hd skip-conj)
-                             subterm-tl
-                             subst-tl
-                             skip-conj)))
-
-(define term-substitution-multi-list ((term-lst pseudo-term-listp)
-                                      (subterm-lst pseudo-term-listp)
-                                      (subst-lst pseudo-term-listp)
-                                      (skip-conj booleanp))
-  :returns (subted-term-lst pseudo-term-listp)
-  (b* ((term-lst (pseudo-term-list-fix term-lst))
-       ((unless (consp term-lst)) nil)
-       ((cons term-hd term-tl) term-lst))
-    (cons (term-substitution-multi term-hd subterm-lst subst-lst skip-conj)
-          (term-substitution-multi-list term-tl subterm-lst subst-lst skip-conj))))
-

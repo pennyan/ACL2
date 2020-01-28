@@ -75,7 +75,8 @@
                        maybe-rational-integer-consp-can-be-rational-integer-cons-p)))
 
 (defthm return-of-assoc-equal
-  (implies (rational-integer-alistp x)
+  (implies (and (rationalp y)
+                (rational-integer-alistp x))
            (maybe-rational-integer-consp (assoc-equal y x)))
   :hints (("Goal" :in-theory (enable maybe-rational-integer-consp
                                      rational-integer-cons-p))))
@@ -324,85 +325,126 @@
        (< '0 (cdr (assoc-equal y (acons '1 '2 x))))
      't))
 
+(defun term5 ()
+  '(if (if (rational-integer-alistp al)
+           (rationalp r1)
+         'nil)
+       ((lambda (x y)
+          (if (assoc-equal y x)
+              (< (binary-+ (cdr (assoc-equal y x))
+                           (unary-- (cdr (assoc-equal y x))))
+                 '2)
+            'nil))
+        al r1)
+     't))
+
 (type-judgement (term) ''t (options) state)
 (type-judgement (term2) ''t (options) state)
 (type-judgement (term3) ''t (options) state)
 (type-judgement (term4) ''t (options) state)
+(type-judgement (term5) ''t (options) state)
 
 ;; -----------------------------------------
-;; testing guard utilities
+;; ;; testing guard utilities
 
-(defun term5-unquoted (r1 al)
-  (if (if (rational-integer-alistp al)
-          (if (rationalp r1)
-              (assoc-equal r1 al)
-            'nil)
-        'nil)
-      ((lambda (x y)
-         (< (binary-+ (cdr (assoc-equal y x))
-                      (unary-- (cdr (assoc-equal y x))))
-            '2))
-       al r1)
-    't))
+;; (defun term5-unquoted (r1 al)
+;;   (if (if (rational-integer-alistp al)
+;;           (if (rationalp r1)
+;;               (assoc-equal r1 al)
+;;             'nil)
+;;         'nil)
+;;       ((lambda (x y)
+;;          (< (binary-+ (cdr (assoc-equal y x))
+;;                       (unary-- (cdr (assoc-equal y x))))
+;;             '2))
+;;        al r1)
+;;     't))
 
-(defun term5 ()
-  '(if (if (rational-integer-alistp al)
-           (if (rationalp r1)
-               (assoc-equal r1 al)
-             'nil)
-         'nil)
-       ((lambda (x y)
-          (< (binary-+ (cdr (assoc-equal y x))
-                       (unary-- (cdr (assoc-equal y x))))
-             '2))
-        al r1)
-     't))
+;; (defun term5 ()
+;;   '(if (if (rational-integer-alistp al)
+;;            (if (rationalp r1)
+;;                (assoc-equal r1 al)
+;;              'nil)
+;;          'nil)
+;;        ((lambda (x y)
+;;           (< (binary-+ (cdr (assoc-equal y x))
+;;                        (unary-- (cdr (assoc-equal y x))))
+;;              '2))
+;;         al r1)
+;;      't))
 
-(verify-guards-formula term5-unquoted)
-(verify-guards-formula term5-unquoted :guard-simplify nil)
-(verify-guards-formula (if (if (rational-integer-alistp al)
-                               (if (rationalp r1)
-                                   (assoc-equal r1 al)
-                                 'nil)
-                             'nil)
-                           ((lambda (x y)
-                              (< (binary-+ (cdr (assoc-equal y x))
-                                           (unary-- (cdr (assoc-equal y x))))
-                                 '2))
-                            al r1)
-                         't)
-                       :guard-simplify nil)
+;; (verify-guards-formula term5-unquoted)
+;; (verify-guards-formula term5-unquoted :guard-simplify nil)
+;; (verify-guards-formula (if (if (rational-integer-alistp al)
+;;                                (if (rationalp r1)
+;;                                    (assoc-equal r1 al)
+;;                                  'nil)
+;;                              'nil)
+;;                            ((lambda (x y)
+;;                               (< (binary-+ (cdr (assoc-equal y x))
+;;                                            (unary-- (cdr (assoc-equal y x))))
+;;                                  '2))
+;;                             al r1)
+;;                          't)
+;;                        :guard-simplify nil)
 
-(guard-obligation 'term5-unquoted nil nil nil 'top-level state)
-(guard-obligation '(if (if (rational-integer-alistp al)
-                           (if (rationalp r1)
-                               (assoc-equal r1 al)
-                             'nil)
-                         'nil)
-                       ((lambda (x y)
-                          (< (binary-+ (cdr (assoc-equal y x))
-                                       (unary-- (cdr (assoc-equal y x))))
-                             '2))
-                        al r1)
-                     't)
-                  nil nil nil 'top-level state)
+;; (guard-obligation 'term5-unquoted nil nil nil 'top-level state)
+;; (guard-obligation '(if (if (rational-integer-alistp al)
+;;                            (if (rationalp r1)
+;;                                (assoc-equal r1 al)
+;;                              'nil)
+;;                          'nil)
+;;                        ((lambda (x y)
+;;                           (< (binary-+ (cdr (assoc-equal y x))
+;;                                        (unary-- (cdr (assoc-equal y x))))
+;;                              '2))
+;;                         al r1)
+;;                      't)
+;;                   nil nil nil 'top-level state)
 
-(mv-let
-  (erp val)
-  (guard-obligation 'term5-unquoted nil nil nil 'top-level state)
-  (value
-   (and
-    (not erp)
-    (cw "clauses: ~q0" (conjoin-clauses (cadr val))))))
+;; (mv-let
+;;   (erp val)
+;;   (guard-obligation 'term5-unquoted nil nil nil 'top-level state)
+;;   (value
+;;    (and
+;;     (not erp)
+;;     (cw "clauses: ~q0" (conjoin-clauses (cadr val))))))
 
-(gthm 'term5-unquoted nil nil)
-(guard-theorem 'term5-unquoted nil nil (w state) state)
+;; (gthm 'term5-unquoted nil nil)
+;; (guard-theorem 'term5-unquoted nil nil (w state) state)
 
-;; I needed a translated term, therefore only guard-obligation and
-;; guard-theorem is interesting to me.
-;; Guard-obligation takes a term but guard-theorem doesn't. I guess I will go
-;; with guard-obligation.
+;; ;; I needed a translated term, therefore only guard-obligation and
+;; ;; guard-theorem is interesting to me.
+;; ;; Guard-obligation takes a term but guard-theorem doesn't. I guess I will go
+;; ;; with guard-obligation.
 ;;------------------------------------------------------
 
 (good-typed-term-p
- (type-judgement (term) ''t (options) state))
+ (make-typed-term :term (term)
+                  :path-cond ''t
+                  :judgements (type-judgement (term) ''t (options) state))
+ (options))
+
+(good-typed-term-p
+ (make-typed-term :term (term2)
+                  :path-cond ''t
+                  :judgements (type-judgement (term2) ''t (options) state))
+ (options))
+
+(good-typed-term-p
+ (make-typed-term :term (term3)
+                  :path-cond ''t
+                  :judgements (type-judgement (term3) ''t (options) state))
+ (options))
+
+(good-typed-term-p
+ (make-typed-term :term (term4)
+                  :path-cond ''t
+                  :judgements (type-judgement (term4) ''t (options) state))
+ (options))
+
+(good-typed-term-p
+ (make-typed-term :term (term5)
+                  :path-cond ''t
+                  :judgements (type-judgement (term5) ''t (options) state))
+ (options))

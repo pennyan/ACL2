@@ -22,6 +22,29 @@
 
 (set-state-ok t)
 
+(define term-substitution-conj ((term pseudo-termp)
+                                (subterm-lst pseudo-term-listp)
+                                (subst-lst pseudo-term-listp)
+                                (skip-conj booleanp))
+  :returns (substed pseudo-termp)
+  :measure (acl2-count (pseudo-term-fix term))
+  (b* ((term (pseudo-term-fix term))
+       (subterm-lst (pseudo-term-list-fix subterm-lst))
+       (subst-lst (pseudo-term-list-fix subst-lst))
+       ((if (equal term ''t)) ''t)
+       ((unless (and (consp subterm-lst)
+                     (consp subst-lst)))
+        (er hard? 'type-inference-bottomup=>term-substitution-conj
+            "Subterm-lst or subst-lst is empty.~%"))
+       ((cons subterm-hd subterm-tl) subterm-lst)
+       ((cons subst-hd subst-tl) subst-lst)
+       ((unless (is-conjunct? term))
+        (term-substitution term subterm-hd subst-hd skip-conj))
+       ((list & first rest &) term))
+    `(if ,(term-substitution first subterm-hd subst-hd skip-conj)
+         ,(term-substitution-conj rest subterm-tl subst-tl skip-conj)
+       'nil)))
+
 ;; ------------------------------------------------------------
 ;; Return the topest judgement
 
@@ -87,8 +110,8 @@
           ((('lambda r (!return-type r)) (!fn . &)) (mv t return-type))
           (('implies type-predicates (!return-type (!fn . formals)))
            (b* (((unless (symbol-listp formals)) (mv nil nil))
-                (substed (term-substitution-multi type-predicates formals
-                                                  actuals t))
+                (substed (term-substitution-conj type-predicates formals
+                                                 actuals t))
                 (yes? (path-test-list actuals-judgements substed state))
                 ((if yes?) (mv t return-type)))
              (mv nil nil)))
@@ -372,7 +395,7 @@
          (actuals-judgements
           (type-judgement-list actuals path-cond options state))
          (substed-actuals-judgements
-          (term-substitution-multi actuals-judgements actuals formals t))
+          (term-substitution-conj actuals-judgements actuals formals t))
          (body-judgements
           (type-judgement body `(if ,shadowed-path-cond
                                     ,substed-actuals-judgements 'nil)
