@@ -17,6 +17,24 @@
 
 (include-book "typed-term")
 
+(define look-up-judge-list ((term-lst pseudo-term-listp)
+                            (judge pseudo-termp)
+                            (supertype type-to-types-alist-p))
+  :returns (jugde-lst pseudo-term-listp)
+  (b* ((term-lst (pseudo-term-list-fix term-lst))
+       (judge (pseudo-term-fix judge))
+       (supertype (type-to-types-alist-fix supertype))
+       ((unless (consp term-lst)) nil)
+       ((cons term-hd term-tl) term-lst)
+       (judge-hd (look-up-path-cond term-hd judge supertype))
+       ((unless (and (is-conjunct? judge-hd)
+                     (not (equal judge-hd ''t))
+                     (type-predicate-of-term (cadr judge-hd) term-hd
+                                             supertype)))
+        (er hard? 'type-inference-topdpwn=>look-up-judge-list
+            "~p0 is not a type-predicate of term ~p1.~%" judge-hd term-hd)))
+    (cons (cadr judge-hd) (look-up-judge-list term-tl judge supertype))))
+
 (local (in-theory (disable (:executable-counterpart typed-term)
                            (:executable-counterpart typed-term-list))))
 
@@ -113,24 +131,6 @@
 
 (set-ignore-ok t)
 
-(define unify-lambda ((tterm typed-term-p)
-                      (expected pseudo-termp)
-                      (options type-options-p))
-  :guard (and (good-typed-term-p tterm options)
-              (equal (typed-term->kind tterm) 'lambdap))
-  :returns (new-tt (and (typed-term-p new-tt)
-                        (good-typed-term-p new-tt options)))
-  (b* (((unless (mbt (and (typed-term-p tterm)
-                          (equal (typed-term->kind tterm) 'lambdap)
-                          (good-typed-term-p tterm options))))
-        (make-typed-term))
-       ((type-options to) options)
-       ((typed-term tt) tterm)
-       ((typed-term tt-actuals) (typed-term-lambda->actuals tt to))
-       ((typed-term tt-body) (typed-term-lambda->body tt to))
-       )
-    tterm))
-
 ;; if: ?
 ;; implies: do i care?
 ;; not:
@@ -154,10 +154,47 @@
         (make-typed-term)))
     tterm))
 
-
 (defines unify-type
   :well-founded-relation l<
   :verify-guards nil
+
+  (define unify-lambda ((tterm typed-term-p)
+                        (expected pseudo-termp)
+                        (options type-options-p))
+    :guard (and (good-typed-term-p tterm options)
+                (equal (typed-term->kind tterm) 'lambdap))
+    :returns (new-tt (and (typed-term-p new-tt)
+                          (good-typed-term-p new-tt options)))
+    :measure (list (acl2-count (typed-term->term tterm)) 0)
+    (b* (((unless (mbt (and (typed-term-p tterm)
+                            (type-options-p options)
+                            (equal (typed-term->kind tterm) 'lambdap)
+                            (good-typed-term-p tterm options))))
+          (make-typed-term))
+         ((type-options to) options)
+         ((typed-term tt) tterm)
+         ((typed-term tt-actuals) (typed-term-lambda->actuals tt to))
+         ((typed-term tt-body) (typed-term-lambda->body tt to))
+         ((typed-term tt-top) (typed-term->top tt to))
+         (judge-top (if (equal expected ''t)
+                        (choose-judge tt-top.judgements tt-top.term
+                                      to.supertype)
+                      expected))
+         (new-top (make-typed-term :term tt-top.term
+                                   :path-cond tt-top.path-cond
+                                   :judgements judge-top))
+         (body-expected
+          (term-substitution judge-top tt-top.term tt-body.term t))
+         (new-body (unify-type tt-body body-expected to))
+         ((typed-term nbd) new-body)
+         (formals (lambda-formals (car tt-top.term)))
+         (actuals (cdr tt-top.term))
+         (formals-judges
+          (look-up-judge-list formals nbd.judgements to.supertype))
+         (actuals-expected
+          (term-substitution-linear formals-judges formals actuals t))
+         (new-actuals (unify-type-list tt-actuals actuals-expected options)))
+      (make-typed-lambda new-top new-body new-actuals to)))
 
   (define unify-if ((tterm typed-term-p)
                     (expected pseudo-termp)
@@ -191,7 +228,7 @@
          (new-then (unify-type tt-then then-expected to))
          (else-expected (term-substitution judge-top tt-top.term tt-else.term t))
          (new-else (unify-type tt-else else-expected to)))
-      (make-typed-term-if new-top new-cond new-then new-else to)))
+      (make-typed-if new-top new-cond new-then new-else to)))
 
   (define unify-type ((tterm typed-term-p)
                       (expected pseudo-termp)
@@ -237,7 +274,8 @@
              typed-terms.~%")
          (make-typed-term-list)))
        ((cons expected-hd expected-tl) expected-lst))
-    (typed-term-list->cons (unify-type (typed-term-list->car ttl options) expected-hd options)
+    (typed-term-list->cons (unify-type (typed-term-list->car ttl options)
+                                       expected-hd options)
                            (unify-type-list (typed-term-list->cdr ttl options)
                                             expected-tl options)
                            options)))
