@@ -112,7 +112,7 @@
                           'nil)
                         't
                       'nil)
-                   '((integerp . rationalp)
+                   '((integerp . (rationalp))
                      (rationalp)
                      (rational-integer-alistp)))
 

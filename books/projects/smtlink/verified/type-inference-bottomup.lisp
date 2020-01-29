@@ -351,12 +351,9 @@
    (implies (and (symbol-listp formals)
                  (pseudo-termp body-judgements)
                  (pseudo-term-listp actuals)
-                 (pseudo-termp substed-actuals-judgements)
                  (equal (len formals) (len actuals)))
             (pseudo-termp `((lambda ,formals
-                              (if ,body-judgements
-                                  ,substed-actuals-judgements
-                                'nil))
+                              ,body-judgements)
                             ,@actuals))))
  )
 
@@ -400,9 +397,7 @@
                           options state))
          (lambda-judgements
           `((lambda ,formals
-              (if ,body-judgements
-                  ,substed-actuals-judgements
-                'nil))
+              ,body-judgements)
             ,@actuals))
          (return-judgement
           (term-substitution (type-judgement-top body-judgements body options)

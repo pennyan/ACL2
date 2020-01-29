@@ -23,9 +23,6 @@
 (define choose-judge ((judges pseudo-termp)
                       (term pseudo-termp)
                       (supertype type-to-types-alist-p))
-  :guard (and (pseudo-termp judges)
-              (pseudo-termp term)
-              (type-to-types-alist-p supertype))
   :returns (judge (or (equal judge ''t)
                       (judgement-of-term judge term supertype))
                   :hints (("Goal" :in-theory (e/d (judgement-of-term)
@@ -54,6 +51,7 @@
           :name is-conjunct-list?-of-choose-judge)))
 
 (define unify-variable ((tterm typed-term-p)
+                        (expected pseudo-termp)
                         (options type-options-p))
   :guard (and (good-typed-term-p tterm options)
               (equal (typed-term->kind tterm) 'variablep))
@@ -62,17 +60,28 @@
                    :hints (("Goal"
                             :in-theory (enable good-typed-variable-p))))
   (b* (((unless (mbt (and (typed-term-p tterm)
+                          (pseudo-termp expected)
                           (equal (typed-term->kind tterm) 'variablep)
                           (good-typed-term-p tterm options))))
         (make-typed-term))
        ((typed-term tt) tterm)
-       ((type-options to) options))
+       ((type-options to) options)
+       ((unless (is-conjunct-list? expected tt.term to.supertype))
+        (prog2$
+         (er hard? 'type-inference-topdown=>unify-variable
+             "Expected ~p0 is not a conjunct list.~%" expected)
+         (make-typed-term)))
+       ((unless (equal expected ''t))
+        (make-typed-term :term tt.term
+                         :path-cond tt.path-cond
+                         :judgements expected)))
     (make-typed-term :term tt.term
                      :path-cond tt.path-cond
                      :judgements (choose-judge tt.judgements tt.term
                                                to.supertype))))
 
 (define unify-quote ((tterm typed-term-p)
+                     (expected pseudo-termp)
                      (options type-options-p))
   :guard (and (good-typed-term-p tterm options)
               (equal (typed-term->kind tterm) 'quotep))
@@ -81,43 +90,46 @@
                    :hints (("Goal"
                             :in-theory (enable good-typed-quote-p))))
   (b* (((unless (mbt (and (typed-term-p tterm)
+                          (pseudo-termp expected)
                           (type-options-p options)
                           (equal (typed-term->kind tterm) 'quotep)
                           (good-typed-term-p tterm options))))
         (make-typed-term))
        ((typed-term tt) tterm)
-       ((type-options to) options))
+       ((type-options to) options)
+       ((unless (is-conjunct-list? expected tt.term to.supertype))
+        (prog2$
+         (er hard? 'type-inference-topdown=>unify-variable
+             "Expected ~p0 is not a conjunct list.~%" expected)
+         (make-typed-term)))
+       ((unless (equal expected ''t))
+        (make-typed-term :term tt.term
+                         :path-cond tt.path-cond
+                         :judgements expected)))
     (make-typed-term :term tt.term
                      :path-cond tt.path-cond
                      :judgements (choose-judge tt.judgements tt.term
                                                to.supertype))))
 
-(define unify-lambda ((tterm typed-term-p))
-  :guard (and (good-typed-term-p tterm)
-              (equal (typed-term->kind tterm) 'lambdap))
-    :returns (new-tt (and (typed-term-p new-tt) (good-typed-term-p new-tt)))
-    (b* (((unless (mbt (and (typed-term-p tterm)
-                            (equal (typed-term->kind tterm) 'lambdap)
-                            (good-typed-term-p tterm))))
-          (make-typed-term)))
-      tterm))
+(set-ignore-ok t)
 
-  (define unify-if ((tterm typed-term-p))
-    :guard (and (good-typed-term-p tterm)
-                (equal (typed-term->kind tterm) 'ifp))
-    :returns (new-tt (and (typed-term-p new-tt) (good-typed-term-p new-tt)))
-    (b* (((unless (mbt (and (typed-term-p tterm)
-                            (equal (typed-term->kind tterm) 'ifp)
-                            (good-typed-term-p tterm))))
-          (make-typed-term))
-         ;; ((typed-term tt) tterm)
-         ;; (tt-cond (typed-term-if->cond tt))
-         ;; (tt-then (typed-term-if->then tt))
-         ;; (tt-else (typed-term-if->else tt))
-         )
-      tterm
-      ;; (typed-term-if->cons tt-cond tt-then tt-else)
-      ))
+(define unify-lambda ((tterm typed-term-p)
+                      (expected pseudo-termp)
+                      (options type-options-p))
+  :guard (and (good-typed-term-p tterm options)
+              (equal (typed-term->kind tterm) 'lambdap))
+  :returns (new-tt (and (typed-term-p new-tt)
+                        (good-typed-term-p new-tt options)))
+  (b* (((unless (mbt (and (typed-term-p tterm)
+                          (equal (typed-term->kind tterm) 'lambdap)
+                          (good-typed-term-p tterm options))))
+        (make-typed-term))
+       ((type-options to) options)
+       ((typed-term tt) tterm)
+       ((typed-term tt-actuals) (typed-term-lambda->actuals tt to))
+       ((typed-term tt-body) (typed-term-lambda->body tt to))
+       )
+    tterm))
 
 ;; if: ?
 ;; implies: do i care?
@@ -127,47 +139,108 @@
 ;; binary-+, binary-*, unary--, unary-/:
 ;; cons, car, cdr, acons, assoc-equal:
 ;; user defined: select judgements that satisfies the function guard
-  (define unify-fncall ((tterm typed-term-p))
-    :guard (and (good-typed-term-p tterm)
-                (equal (typed-term->kind tterm) 'fncallp))
-    :returns (new-tt (and (typed-term-p new-tt) (good-typed-term-p new-tt)))
-    (b* (((unless (mbt (and (typed-term-p tterm)
-                            (equal (typed-term->kind tterm) 'fncallp)
-                            (good-typed-term-p tterm))))
-          (make-typed-term)))
-      tterm))
-
-(define unify-type ((tterm typed-term-p))
-  :returns (new-tt (and (typed-term-p new-tt) (good-typed-term-p new-tt)))
-  :guard (good-typed-term-p tterm)
+(define unify-fncall ((tterm typed-term-p)
+                      (expected pseudo-termp)
+                      (options type-options-p))
+  :guard (and (good-typed-term-p tterm options)
+              (equal (typed-term->kind tterm) 'fncallp))
+  :returns (new-tt (and (typed-term-p new-tt)
+                        (good-typed-term-p new-tt options)))
   (b* (((unless (mbt (and (typed-term-p tterm)
-                          (good-typed-term-p tterm))))
+                          (type-options-p options)
+                          (pseudo-termp expected)
+                          (equal (typed-term->kind tterm) 'fncallp)
+                          (good-typed-term-p tterm options))))
+        (make-typed-term)))
+    tterm))
+
+
+(defines unify-type
+  :well-founded-relation l<
+  :verify-guards nil
+
+  (define unify-if ((tterm typed-term-p)
+                    (expected pseudo-termp)
+                    (options type-options-p))
+    :guard (and (good-typed-term-p tterm options)
+                (equal (typed-term->kind tterm) 'ifp))
+    :returns (new-tt (and (typed-term-p new-tt)
+                          (good-typed-term-p new-tt options)))
+    :measure (list (acl2-count (typed-term->term tterm)) 0)
+    (b* (((unless (mbt (and (typed-term-p tterm)
+                            (pseudo-termp expected)
+                            (type-options-p options)
+                            (equal (typed-term->kind tterm) 'ifp)
+                            (good-typed-term-p tterm options))))
+          (make-typed-term))
+         ((type-options to) options)
+         ((typed-term tt) tterm)
+         ((typed-term tt-cond) (typed-term-if->cond tt to))
+         ((typed-term tt-then) (typed-term-if->then tt to))
+         ((typed-term tt-else) (typed-term-if->else tt to))
+         ((typed-term tt-top) (typed-term->top tt to))
+         (new-cond (unify-type tt-cond ''t to))
+         (judge-top (if (equal expected ''t)
+                        (choose-judge tt-top.judgements tt-top.term
+                                      to.supertype)
+                      expected))
+         (new-top (make-typed-term :term tt-top.term
+                                   :path-cond tt-top.path-cond
+                                   :judgements judge-top))
+         (then-expected (term-substitution judge-top tt-top.term tt-then.term t))
+         (new-then (unify-type tt-then then-expected to))
+         (else-expected (term-substitution judge-top tt-top.term tt-else.term t))
+         (new-else (unify-type tt-else else-expected to)))
+      (make-typed-term-if new-top new-cond new-then new-else to)))
+
+  (define unify-type ((tterm typed-term-p)
+                      (expected pseudo-termp)
+                      (options type-options-p))
+    :guard (good-typed-term-p tterm options)
+    :returns (new-tt (and (typed-term-p new-tt)
+                          (good-typed-term-p new-tt options)))
+    :measure (list (acl2-count (typed-term->term tterm)) 1)
+    (b* (((unless (mbt (and (typed-term-p tterm)
+                            (type-options-p options)
+                            (pseudo-termp expected)
+                          (good-typed-term-p tterm options))))
         (make-typed-term))
        ((if (equal (typed-term->kind tterm) 'variablep))
-        (unify-variable tterm))
+        (unify-variable tterm expected options))
        ((if (equal (typed-term->kind tterm) 'quotep))
-        (unify-quote tterm))
+        (unify-quote tterm expected options))
        ((if (equal (typed-term->kind tterm) 'lambdap))
-        (unify-lambda tterm))
+        (unify-lambda tterm expected options))
        ((if (equal (typed-term->kind tterm) 'ifp))
-        (unify-if tterm)))
-    (unify-fncall tterm)))
+        (unify-if tterm expected options)))
+    (unify-fncall tterm expected options)))
 
-;; (defines unify-type
-;;   :well-founded-relation l<
-;;   :verify-guards nil
-
-(define unify-type-list ((tterm-lst typed-term-list-p))
+  (define unify-type-list ((tterm-lst typed-term-list-p)
+                           (expected-lst pseudo-term-listp)
+                           (options type-options-p))
   :returns (new-ttl (and (typed-term-list-p new-ttl)
-                         (good-typed-term-list-p new-ttl)))
-  :guard (good-typed-term-list-p tterm-lst)
-  :measure (acl2-count (typed-term-list->term-lst tterm-lst))
-  :verify-guards nil
+                         (good-typed-term-list-p new-ttl options)))
+  :guard (good-typed-term-list-p tterm-lst options)
+  :measure (list (acl2-count (typed-term-list->term-lst tterm-lst))
+                 1)
   (b* (((unless (mbt (and (typed-term-list-p tterm-lst)
-                          (good-typed-term-list-p tterm-lst))))
+                          (type-options-p options)
+                          (pseudo-term-listp expected-lst)
+                          (good-typed-term-list-p tterm-lst options))))
         (make-typed-term-list))
        ((typed-term-list ttl) tterm-lst)
-       ((unless (typed-term-list-consp ttl)) ttl))
-    (typed-term-list->cons (unify-type (typed-term-list->car ttl))
-                           (unify-type-list (typed-term-list->cdr ttl)))))
-;; )
+       ((unless (typed-term-list-consp ttl)) ttl)
+       ((unless (consp expected-lst))
+        (prog2$
+         (er hard? 'type-inference-topdown=>unify-type-list
+             "Expected-lst is already empty while there are still ~
+             typed-terms.~%")
+         (make-typed-term-list)))
+       ((cons expected-hd expected-tl) expected-lst))
+    (typed-term-list->cons (unify-type (typed-term-list->car ttl options) expected-hd options)
+                           (unify-type-list (typed-term-list->cdr ttl options)
+                                            expected-tl options)
+                           options)))
+)
+
+(verify-guards unify-type)
