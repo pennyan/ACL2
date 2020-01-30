@@ -195,3 +195,13 @@
                   (judgement-of-term judges term supertype))
              (is-conjunct-list? judges term supertype)))
   )
+
+(defthm construct-is-conjunct-list?
+  (implies (and (pseudo-termp judges)
+                (pseudo-termp term)
+                (type-to-types-alist-p supertype)
+                (is-conjunct-list? judges term supertype)
+                (type-predicate-of-term judge term supertype))
+           (is-conjunct-list? `(if ,judge ,judges 'nil) term supertype))
+  :hints (("Goal"
+           :in-theory (enable is-conjunct-list?))))
