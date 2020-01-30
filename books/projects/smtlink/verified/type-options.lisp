@@ -37,7 +37,8 @@
                 (symbolp (cdr (assoc-equal y x))))))
 
 (defprod return-spec
-  ((return-type symbolp)
+  ((formals symbol-listp)
+   (return-type symbolp)
    (returns-thm symbolp)))
 
 (deflist return-spec-list

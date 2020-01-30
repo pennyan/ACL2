@@ -139,74 +139,103 @@
 ;; binary-+: integerp integerp -> integerp
 ;; unary--: integerp -> integerp
 (defun functions ()
-  `((acons . ,(make-arg-decl-next
-               :next `((rationalp . ,(make-arg-decl-next
-                                      :next `((integerp . ,(make-arg-decl-next
-                                                            :next `((rational-integer-alistp . ,(make-arg-decl-done
-                                                                                                 :r (make-return-spec
-                                                                                                     :return-type 'rational-integer-alistp
-                                                                                                     :returns-thm 'return-of-acons))))))))))))
-    (assoc-equal . ,(make-arg-decl-next
-                     :next `((rationalp . ,(make-arg-decl-next
-                                            :next `((rational-integer-alistp . ,(make-arg-decl-done
-                                                                                 :r (make-return-spec
-                                                                                     :return-type 'maybe-rational-integer-consp
-                                                                                     :returns-thm 'return-of-assoc-equal)))))))))
-    (cdr . ,(make-arg-decl-next
-             :next `((maybe-rational-integer-consp . ,(make-arg-decl-done
-                                                      :r (make-return-spec
-                                                          :return-type 'maybe-integerp
-                                                          :returns-thm 'return-of-cdr-maybe)))
-                     (rational-integer-cons-p . ,(make-arg-decl-done
-                                                 :r (make-return-spec
-                                                     :return-type 'integerp
-                                                     :returns-thm 'return-of-cdr))))))
-    (< . ,(make-arg-decl-next
-           :next `((rationalp . ,(make-arg-decl-next
-                                 :next `((rationalp . ,(make-arg-decl-done
-                                                       :r (make-return-spec
-                                                           :return-type 'booleanp
-                                                           :returns-thm 'return-of-<)))))))))
-    (binary-+ . ,(make-arg-decl-next
-                  :next `((integerp . ,(make-arg-decl-next
-                                        :next `((integerp .
-                                                          ,(make-arg-decl-done
-                                                            :r (make-return-spec
-                                                                :return-type 'integerp
-                                                                :returns-thm
-                                                                'return-of-binary-+))))))
-                          (rationalp . ,(make-arg-decl-next
-                                        :next `((rationalp .
-                                                          ,(make-arg-decl-done
-                                                            :r (make-return-spec
-                                                                :return-type 'rationalp
-                                                                :returns-thm 'return-of-binary-+-rationalp)))))))))
+  `((acons
+     . ,(make-arg-decl-next
+         :next `((rationalp
+                  . ,(make-arg-decl-next
+                      :next `((integerp
+                               . ,(make-arg-decl-next
+                                   :next `((rational-integer-alistp
+                                            . ,(make-arg-decl-done
+                                                :r
+                                                (make-return-spec
+                                                 :formals '(x y z)
+                                                 :return-type 'rational-integer-alistp
+                                                 :returns-thm 'return-of-acons))))))))))))
+    (assoc-equal
+     . ,(make-arg-decl-next
+         :next `((rationalp
+                  . ,(make-arg-decl-next
+                      :next `((rational-integer-alistp
+                               . ,(make-arg-decl-done
+                                   :r (make-return-spec
+                                       :formals '(y x)
+                                       :return-type 'maybe-rational-integer-consp
+                                       :returns-thm 'return-of-assoc-equal)))))))))
+    (cdr
+     . ,(make-arg-decl-next
+         :next `((maybe-rational-integer-consp
+                  . ,(make-arg-decl-done
+                      :r (make-return-spec
+                          :formals '(x)
+                          :return-type 'maybe-integerp
+                          :returns-thm 'return-of-cdr-maybe)))
+                 (rational-integer-cons-p
+                  . ,(make-arg-decl-done
+                      :r (make-return-spec
+                          :formals '(x)
+                          :return-type 'integerp
+                          :returns-thm 'return-of-cdr))))))
+    (<
+     . ,(make-arg-decl-next
+         :next `((rationalp
+                  . ,(make-arg-decl-next
+                      :next `((rationalp
+                               . ,(make-arg-decl-done
+                                   :r (make-return-spec
+                                       :formals '(x y)
+                                       :return-type 'booleanp
+                                       :returns-thm 'return-of-<)))))))))
+    (binary-+
+     . ,(make-arg-decl-next
+         :next `((integerp
+                  . ,(make-arg-decl-next
+                      :next `((integerp
+                               . ,(make-arg-decl-done
+                                   :r (make-return-spec
+                                       :formals '(x y)
+                                       :return-type 'integerp
+                                       :returns-thm
+                                       'return-of-binary-+))))))
+                 (rationalp
+                  . ,(make-arg-decl-next
+                      :next `((rationalp
+                               . ,(make-arg-decl-done
+                                   :r (make-return-spec
+                                       :formals '(x y)
+                                       :return-type 'rationalp
+                                       :returns-thm 'return-of-binary-+-rationalp)))))))))
     (unary-- . ,(make-arg-decl-next
                  :next `((integerp . ,(make-arg-decl-done
                                        :r (make-return-spec
+                                           :formals '(x)
                                            :return-type 'integerp
                                            :returns-thm
                                            'return-of-unary--)))
                          (rationalp . ,(make-arg-decl-done
                                         :r (make-return-spec
+                                            :formals '(x)
                                             :return-type 'rationalp
                                             :returns-thm
                                             'return-of-unary---rationalp))))))
     (rational-integer-alistp . ,(make-arg-decl-next
                                  :next `((t . ,(make-arg-decl-done
                                                 :r (make-return-spec
+                                                    :formals '(x)
                                                     :return-type 'booleanp
                                                     :returns-thm
                                                     'return-of-rational-integer-alistp))))))
     (rationalp . ,(make-arg-decl-next
                    :next `((t . ,(make-arg-decl-done
                                   :r (make-return-spec
+                                      :formals '(x)
                                       :return-type 'booleanp
                                       :returns-thm
                                       'return-of-rationalp))))))
     (integerp . ,(make-arg-decl-next
                   :next `((t . ,(make-arg-decl-done
                                  :r (make-return-spec
+                                     :formals '(x)
                                      :return-type 'booleanp
                                      :returns-thm
                                      'return-of-integerp))))))

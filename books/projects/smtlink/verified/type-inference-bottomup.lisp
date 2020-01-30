@@ -88,6 +88,8 @@
                                      (actuals pseudo-term-listp)
                                      (actuals-judgements pseudo-termp)
                                      (return-spec return-spec-p)
+                                     (path-cond pseudo-termp)
+                                     (supertype type-to-types-alist-p)
                                      state)
   :returns (judgement pseudo-termp)
   :guard (not (equal fn 'quote))
@@ -96,6 +98,7 @@
        ((unless (mbt (not (equal fn 'quote)))) nil)
        (actuals (pseudo-term-list-fix actuals))
        (return-spec (return-spec-fix return-spec))
+       (formals (return-spec->formals return-spec))
        (returns-name (return-spec->returns-thm return-spec))
        (return-type (return-spec->return-type return-spec))
        (returns-thm
@@ -104,23 +107,44 @@
         (er hard? 'type-inference-bottomup=>construct-returns-judgement
             "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
             returns-name returns-thm))
-       ((mv ok type)
+       ((mv ok return-judge)
         (case-match returns-thm
-          ((!return-type (!fn . &))  (mv t return-type))
-          ((('lambda r (!return-type r)) (!fn . &)) (mv t return-type))
-          (('implies type-predicates (!return-type (!fn . formals)))
+          ((!return-type (!fn . &))
+           (mv t `(,return-type (,fn ,@actuals))))
+          ((('lambda r conclusions) (!fn . &))
            (b* (((unless (symbol-listp formals)) (mv nil nil))
-                (substed (term-substitution-conj type-predicates formals
-                                                 actuals t))
-                (yes? (path-test-list actuals-judgements substed state))
-                ((if yes?) (mv t return-type)))
-             (mv nil nil)))
-          (& (mv nil nil))))
+                (substed-conclusions
+                 (term-substitution conclusions `(,fn ,@formals)
+                                    `(,fn ,@actuals) t))
+                (return-judge
+                 (look-up-path-cond `(,fn ,@actuals) substed-conclusions supertype)))
+             (mv t return-judge)))
+          (('implies type-predicates conclusions)
+           (b* (((unless (symbol-listp formals)) (mv nil nil))
+                (substed
+                 (term-substitution-conj type-predicates formals actuals t))
+                (yes?
+                 (path-test-list `(if ,path-cond ,actuals-judgements 'nil)
+                                 substed state))
+                ((unless yes?) (mv nil nil))
+                (substed-conclusions
+                 (term-substitution conclusions `(,fn ,@formals)
+                                    `(,fn ,@actuals) t))
+                (return-judge
+                 (look-up-path-cond `(,fn ,@actuals) substed-conclusions supertype)))
+             (mv t return-judge)))
+          (& (b* (((unless (symbol-listp formals)) (mv nil nil))
+                  (substed-conclusions
+                   (term-substitution returns-thm `(,fn ,@formals)
+                                      `(,fn ,@actuals) t))
+                  (return-judge
+                   (look-up-path-cond `(,fn ,@actuals) substed-conclusions supertype)))
+               (mv t return-judge)))))
        ((unless ok)
         (er hard? 'type-inference-bottomup=>construct-returns-judgement
             "The returns theorem for function ~p0 is of the wrong syntactic ~
                form ~p1~%" fn returns-thm)))
-    `(,return-type (,fn ,@actuals))))
+    return-judge))
 )
 
 (local
@@ -140,6 +164,8 @@
                                       (actuals-judgements pseudo-termp)
                                       (actuals-judgements-total pseudo-termp)
                                       (arg-check arg-check-p)
+                                      (path-cond pseudo-termp)
+                                      (supertype type-to-types-alist-p)
                                       (acc pseudo-termp)
                                       state)
   :returns (judgements pseudo-termp)
@@ -167,18 +193,20 @@
        ((if (equal type 't))
         (returns-judgement fn actuals-tl actuals-total
                            actuals-judge-tl actuals-judgements-total arg-decl
-                           acc state))
+                           path-cond supertype acc state))
        (guard-term `(,type ,actual))
        (yes? (path-test actual-judge guard-term state))
        ((unless yes?)
         (returns-judgement-single-arg fn actuals actuals-total actuals-judgements
-                                      actuals-judgements-total check-tl acc state))
+                                      actuals-judgements-total check-tl
+                                      path-cond supertype acc state))
        (new-acc
         (returns-judgement fn actuals-tl actuals-total
                            actuals-judge-tl actuals-judgements-total arg-decl
-                           acc state)))
+                           path-cond supertype acc state)))
     (returns-judgement-single-arg fn actuals actuals-total actuals-judgements
-                                  actuals-judgements-total check-tl new-acc state)))
+                                  actuals-judgements-total check-tl path-cond
+                                  supertype new-acc state)))
 
 (define returns-judgement ((fn symbolp)
                            (actuals pseudo-term-listp)
@@ -186,6 +214,8 @@
                            (actuals-judgements pseudo-termp)
                            (actuals-judgements-total pseudo-termp)
                            (arg-decl arg-decl-p)
+                           (path-cond pseudo-termp)
+                           (supertype type-to-types-alist-p)
                            (acc pseudo-termp)
                            state)
   :returns (judgements pseudo-termp)
@@ -203,7 +233,7 @@
         `(if ,(construct-returns-judgement fn actuals-total
                                            actuals-judgements-total
                                            (arg-decl-done->r arg-decl)
-                                           state)
+                                           path-cond supertype state)
              ,acc 'nil))
        ((if (and (equal (arg-decl-kind arg-decl) :done)
                  (or actuals (not (equal actuals-judgements ''t)))))
@@ -215,7 +245,8 @@
             "Run out of actuals or actuals-judgements.~%"))
        (arg-check (arg-decl-next->next arg-decl)))
     (returns-judgement-single-arg fn actuals actuals-total actuals-judgements
-                                  actuals-judgements-total arg-check acc state)))
+                                  actuals-judgements-total arg-check path-cond
+                                  supertype acc state)))
 )
 
 (verify-guards returns-judgement
@@ -478,7 +509,8 @@
          ;; return-judgement could be ''t which means it could be anything
          (return-judgement
           (returns-judgement fn actuals actuals actuals-judgements-top
-                             actuals-judgements-top fn-description ''t state))
+                             actuals-judgements-top fn-description path-cond
+                             (type-options->supertype options) ''t state))
          ((if (equal return-judgement ''t))
           (er hard? 'type-inference-bottomup=>type-judgement-fn
               "Failed to find type judgements for return of function call ~
