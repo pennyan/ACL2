@@ -19,32 +19,9 @@
 (include-book "hint-please")
 (include-book "typed-term")
 (include-book "judgement-fns")
+(include-book "returns-judgement")
 
 (set-state-ok t)
-
-(define term-substitution-conj ((term pseudo-termp)
-                                (subterm-lst pseudo-term-listp)
-                                (subst-lst pseudo-term-listp)
-                                (skip-conj booleanp))
-  :returns (substed pseudo-termp)
-  :measure (acl2-count (pseudo-term-fix term))
-  (b* ((term (pseudo-term-fix term))
-       (subterm-lst (pseudo-term-list-fix subterm-lst))
-       (subst-lst (pseudo-term-list-fix subst-lst))
-       ((if (equal term ''t)) ''t)
-       ((unless (and (consp subterm-lst)
-                     (consp subst-lst)))
-        (er hard? 'type-inference-bottomup=>term-substitution-conj
-            "Subterm-lst or subst-lst is empty.~%"))
-       ((cons subterm-hd subterm-tl) subterm-lst)
-       ((cons subst-hd subst-tl) subst-lst)
-       ((unless (is-conjunct? term))
-        (term-substitution term subterm-hd subst-hd skip-conj))
-       ((list & first rest &) term))
-    `(if ,(term-substitution first subterm-hd subst-hd skip-conj)
-         ,(term-substitution-conj rest subterm-tl subst-tl skip-conj)
-       'nil)))
-
 ;; ------------------------------------------------------------
 ;; Return the topest judgement
 
@@ -74,184 +51,6 @@
     `(if ,(type-judgement-top judgements-hd term-hd options)
          ,(type-judgement-top-list judgements-tl term-tl options)
        'nil)))
-
-;;-------------------------------------------------------
-;; Returns judgmenets
-
-(encapsulate ()
-  (local (in-theory (disable (:definition assoc-equal)
-                             (:definition symbol-listp)
-                             (:rewrite consp-of-pseudo-lambdap)
-                             (:definition pseudo-termp))))
-
-(define construct-returns-judgement ((fn symbolp)
-                                     (actuals pseudo-term-listp)
-                                     (actuals-judgements pseudo-termp)
-                                     (return-spec return-spec-p)
-                                     (path-cond pseudo-termp)
-                                     (supertype type-to-types-alist-p)
-                                     state)
-  :returns (judgement pseudo-termp)
-  :guard (not (equal fn 'quote))
-  :ignore-ok t
-  (b* ((fn (symbol-fix fn))
-       ((unless (mbt (not (equal fn 'quote)))) nil)
-       (actuals (pseudo-term-list-fix actuals))
-       (return-spec (return-spec-fix return-spec))
-       (formals (return-spec->formals return-spec))
-       (returns-name (return-spec->returns-thm return-spec))
-       (return-type (return-spec->return-type return-spec))
-       (returns-thm
-        (acl2::meta-extract-formula-w returns-name (w state)))
-       ((unless (pseudo-termp returns-thm))
-        (er hard? 'type-inference-bottomup=>construct-returns-judgement
-            "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
-            returns-name returns-thm))
-       ((mv ok return-judge)
-        (case-match returns-thm
-          ((!return-type (!fn . &))
-           (mv t `(,return-type (,fn ,@actuals))))
-          ((('lambda r conclusions) (!fn . &))
-           (b* (((unless (symbol-listp formals)) (mv nil nil))
-                (substed-conclusions
-                 (term-substitution conclusions `(,fn ,@formals)
-                                    `(,fn ,@actuals) t))
-                (return-judge
-                 (look-up-path-cond `(,fn ,@actuals) substed-conclusions supertype)))
-             (mv t return-judge)))
-          (('implies type-predicates conclusions)
-           (b* (((unless (symbol-listp formals)) (mv nil nil))
-                (substed
-                 (term-substitution-conj type-predicates formals actuals t))
-                (yes?
-                 (path-test-list `(if ,path-cond ,actuals-judgements 'nil)
-                                 substed state))
-                ((unless yes?) (mv nil nil))
-                (substed-conclusions
-                 (term-substitution conclusions `(,fn ,@formals)
-                                    `(,fn ,@actuals) t))
-                (return-judge
-                 (look-up-path-cond `(,fn ,@actuals) substed-conclusions supertype)))
-             (mv t return-judge)))
-          (& (b* (((unless (symbol-listp formals)) (mv nil nil))
-                  (substed-conclusions
-                   (term-substitution returns-thm `(,fn ,@formals)
-                                      `(,fn ,@actuals) t))
-                  (return-judge
-                   (look-up-path-cond `(,fn ,@actuals) substed-conclusions supertype)))
-               (mv t return-judge)))))
-       ((unless ok)
-        (er hard? 'type-inference-bottomup=>construct-returns-judgement
-            "The returns theorem for function ~p0 is of the wrong syntactic ~
-               form ~p1~%" fn returns-thm)))
-    return-judge))
-)
-
-(local
- (defthm acl2-count-of-arg-decl-next->next
-   (implies (and (not (equal (arg-decl-kind arg-decl) :done)))
-            (< (acl2-count (arg-decl-next->next arg-decl))
-               (acl2-count (arg-decl-fix arg-decl))))
-   :hints (("Goal" :in-theory (enable arg-decl-fix arg-decl-next->next)))))
-
-(defines returns-judgement
-  :well-founded-relation l<
-  :verify-guards nil
-
-(define returns-judgement-single-arg ((fn symbolp)
-                                      (actuals pseudo-term-listp)
-                                      (actuals-total pseudo-term-listp)
-                                      (actuals-judgements pseudo-termp)
-                                      (actuals-judgements-total pseudo-termp)
-                                      (arg-check arg-check-p)
-                                      (path-cond pseudo-termp)
-                                      (supertype type-to-types-alist-p)
-                                      (acc pseudo-termp)
-                                      state)
-  :returns (judgements pseudo-termp)
-  :guard (and (consp actuals)
-              (not (equal actuals-judgements ''t))
-              (not (equal fn 'quote)))
-  :measure (list (len (pseudo-term-list-fix actuals))
-                 (acl2-count (arg-check-fix arg-check)))
-  (b* (((unless (mbt (not (equal fn 'quote)))) nil)
-       (actuals (pseudo-term-list-fix actuals))
-       (actuals-judgements (pseudo-term-fix actuals-judgements))
-       (acc (pseudo-term-fix acc))
-       ((unless (is-conjunct? actuals-judgements))
-        (er hard? 'type-inference-bottomup=>returns-judgement-single-arg
-            "Actuals judgements is not a conjunct ~p0.~%" actuals-judgements))
-       (arg-check (arg-check-fix arg-check))
-       ((unless (consp arg-check)) acc)
-       ((cons check-hd check-tl) arg-check)
-       ((cons type arg-decl) check-hd)
-       ((unless (mbt (and (consp actuals)
-                          (not (equal actuals-judgements ''t)))))
-        nil)
-       ((cons actual actuals-tl) actuals)
-       ((list & actual-judge actuals-judge-tl &) actuals-judgements)
-       ((if (equal type 't))
-        (returns-judgement fn actuals-tl actuals-total
-                           actuals-judge-tl actuals-judgements-total arg-decl
-                           path-cond supertype acc state))
-       (guard-term `(,type ,actual))
-       (yes? (path-test actual-judge guard-term state))
-       ((unless yes?)
-        (returns-judgement-single-arg fn actuals actuals-total actuals-judgements
-                                      actuals-judgements-total check-tl
-                                      path-cond supertype acc state))
-       (new-acc
-        (returns-judgement fn actuals-tl actuals-total
-                           actuals-judge-tl actuals-judgements-total arg-decl
-                           path-cond supertype acc state)))
-    (returns-judgement-single-arg fn actuals actuals-total actuals-judgements
-                                  actuals-judgements-total check-tl path-cond
-                                  supertype new-acc state)))
-
-(define returns-judgement ((fn symbolp)
-                           (actuals pseudo-term-listp)
-                           (actuals-total pseudo-term-listp)
-                           (actuals-judgements pseudo-termp)
-                           (actuals-judgements-total pseudo-termp)
-                           (arg-decl arg-decl-p)
-                           (path-cond pseudo-termp)
-                           (supertype type-to-types-alist-p)
-                           (acc pseudo-termp)
-                           state)
-  :returns (judgements pseudo-termp)
-  :measure (list (len (pseudo-term-list-fix actuals))
-                 (acl2-count (arg-decl-fix arg-decl)))
-  :guard (not (equal fn 'quote))
-  (b* (((unless (mbt (not (equal fn 'quote)))) nil)
-       (actuals (pseudo-term-list-fix actuals))
-       (actuals-judgements (pseudo-term-fix actuals-judgements))
-       (arg-decl (arg-decl-fix arg-decl))
-       (acc (pseudo-term-fix acc))
-       ((if (and (equal (arg-decl-kind arg-decl) :done)
-                 (null actuals)
-                 (equal actuals-judgements ''t)))
-        `(if ,(construct-returns-judgement fn actuals-total
-                                           actuals-judgements-total
-                                           (arg-decl-done->r arg-decl)
-                                           path-cond supertype state)
-             ,acc 'nil))
-       ((if (and (equal (arg-decl-kind arg-decl) :done)
-                 (or actuals (not (equal actuals-judgements ''t)))))
-        (er hard? 'type-inference-bottomup=>returns-judgement
-            "Run out of arg-decls.~%"))
-       ((if (or (null actuals)
-                (equal actuals-judgements ''t)))
-        (er hard? 'type-inference-bottomup=>returns-judgement
-            "Run out of actuals or actuals-judgements.~%"))
-       (arg-check (arg-decl-next->next arg-decl)))
-    (returns-judgement-single-arg fn actuals actuals-total actuals-judgements
-                                  actuals-judgements-total arg-check path-cond
-                                  supertype acc state)))
-)
-
-(verify-guards returns-judgement
-  :hints (("Goal"
-           :in-theory (disable pseudo-termp))))
 
 ;;-------------------------------------------------------
 ;; quoted judgements
@@ -467,7 +266,7 @@
          (judge-else-top (type-judgement-top judge-else else options))
          (judge-from-then (term-substitution judge-then-top then term t))
          (judge-from-else (term-substitution judge-else-top else term t))
-         (judge-if-top (union-judgements judge-from-then judge-from-else
+         (judge-if-top (intersect-judgements judge-from-then judge-from-else
                                          state))
          (judge-if-top-extended
           (extend-judgements judge-if-top path-cond options state)))
@@ -507,10 +306,10 @@
               "There exists no function description for function ~p0. ~%" fn))
          (fn-description (cdr conspair))
          ;; return-judgement could be ''t which means it could be anything
-         (return-judgement
+         ((mv return-judgement &)
           (returns-judgement fn actuals actuals actuals-judgements-top
                              actuals-judgements-top fn-description path-cond
-                             (type-options->supertype options) ''t state))
+                             (type-options->supertype options) ''t nil state))
          ((if (equal return-judgement ''t))
           (er hard? 'type-inference-bottomup=>type-judgement-fn
               "Failed to find type judgements for return of function call ~

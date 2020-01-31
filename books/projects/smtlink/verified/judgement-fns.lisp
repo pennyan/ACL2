@@ -18,7 +18,48 @@
 (include-book "path-cond")
 
 ;;-------------------------------------------------------
-;;  Union judgements
+;;  Intersect judgements
+(define intersect-judgements-acc ((judge1 pseudo-termp)
+                              (judge2 pseudo-termp)
+                              (acc pseudo-termp)
+                              state)
+  :returns (intersect pseudo-termp)
+  :verify-guards nil
+  :measure (acl2-count (pseudo-term-fix judge2))
+  (b* ((judge1 (pseudo-term-fix judge1))
+       (judge2 (pseudo-term-fix judge2))
+       (acc (pseudo-term-fix acc))
+       ((if (and (not (is-conjunct? judge2))
+                 (path-test judge1 judge2 state)))
+        `(if ,judge2 ,acc 'nil))
+       ((unless (is-conjunct? judge2)) acc)
+       ((if (equal judge2 ''t)) acc)
+       ((list & judge-hd judge-tl &) judge2)
+       (acc-hd (intersect-judgements-acc judge1 judge-hd acc state)))
+    (intersect-judgements-acc judge1 judge-tl acc-hd state)))
+
+(verify-guards intersect-judgements-acc)
+
+(define intersect-judgements ((judge1 pseudo-termp)
+                          (judge2 pseudo-termp)
+                          state)
+  :returns (intersect pseudo-termp)
+  (intersect-judgements-acc judge1 judge2 ''t state))
+
+#|
+(defthm test (implies (integerp x) (rationalp x)))
+(intersect-judgements '(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
+                  '(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
+                  state)
+
+(intersect-judgements '(if (rationalp x) 't 'nil)
+                  '(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
+                  state)
+|#
+
+;;------------------------------------------------------
+;; Union judgements
+
 (define union-judgements-acc ((judge1 pseudo-termp)
                               (judge2 pseudo-termp)
                               (acc pseudo-termp)
@@ -30,7 +71,7 @@
        (judge2 (pseudo-term-fix judge2))
        (acc (pseudo-term-fix acc))
        ((if (and (not (is-conjunct? judge2))
-                 (path-test judge1 judge2 state)))
+                 (not (path-test acc judge2 state))))
         `(if ,judge2 ,acc 'nil))
        ((unless (is-conjunct? judge2)) acc)
        ((if (equal judge2 ''t)) acc)
@@ -44,14 +85,17 @@
                           (judge2 pseudo-termp)
                           state)
   :returns (union pseudo-termp)
-  (union-judgements-acc judge1 judge2 ''t state))
+  (union-judgements-acc judge1 judge2 judge1 state))
 
 #|
 (defthm test (implies (integerp x) (rationalp x)))
-(union-judgements '(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
-                  '(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
+(union-judgements '(if (integerp x) 't 'nil)
+                  '(if (rationalp x) (< x '0) 'nil)
                   state)
-
+(union-judgements ''t
+                  '(if (integerp x) (if (rationalp x) (< x '0) 'nil)
+                     'nil)
+                  state)
 (union-judgements '(if (rationalp x) 't 'nil)
                   '(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
                   state)

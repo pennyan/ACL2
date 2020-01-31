@@ -693,7 +693,17 @@
             "Malformed fncall judgements ~q0" tt.judgements)))
     (make-typed-term-list :term-lst actuals
                           :path-cond tt.path-cond
-                          :judgements actuals-judgements)))
+                          :judgements actuals-judgements))
+  ///
+  (more-returns
+   (new-ttl (implies (and (typed-term-p tterm)
+                          (type-options-p options)
+                          (equal (typed-term->kind tterm) 'fncallp)
+                          (good-typed-term-p tterm options))
+                     (< (acl2-count
+                         (typed-term-list->term-lst new-ttl))
+                        (acl2-count (typed-term->term tterm))))
+           :name acl2-count-of-make-typed-fncall)))
 
 ;; lambdap destructors
 (define typed-term-lambda->actuals ((tterm typed-term-p)
@@ -727,7 +737,7 @@
    (new-ttl (implies (and (typed-term-p tterm)
                           (equal (typed-term->kind tterm)
                                  'lambdap)
-                          (good-typed-lambda-p tterm options))
+                          (good-typed-term-p tterm options))
                      (< (acl2-count
                          (typed-term-list->term-lst new-ttl))
                         (acl2-count (typed-term->term tterm))))
@@ -768,7 +778,7 @@
                          (type-options-p options)
                          (equal (typed-term->kind tterm)
                                 'lambdap)
-                         (good-typed-lambda-p tterm options))
+                         (good-typed-term-p tterm options))
                     (< (acl2-count (typed-term->term new-tt))
                        (acl2-count (typed-term->term tterm))))
            :name acl2-count-of-typed-term-lambda->body)))
@@ -1035,6 +1045,59 @@
                           ,tta.judgements
                         'nil)
                     'nil))))
+
+(defthm kind-of-make-typed-fncall
+  (implies
+     (and (typed-term-p tt-top)
+          (typed-term-list-p tt-actuals)
+          (good-typed-term-list-p tt-actuals options)
+          (consp (typed-term->term tt-top))
+          (symbolp (car (typed-term->term tt-top)))
+          (not (equal (car (typed-term->term tt-top)) 'quote))
+          (not (equal (car (typed-term->term tt-top)) 'if))
+          (equal (cdr (typed-term->term tt-top))
+                 (typed-term-list->term-lst tt-actuals))
+          (equal (typed-term->path-cond tt-top)
+                 (typed-term-list->path-cond tt-actuals)))
+     (equal (typed-term->kind
+             (typed-term (typed-term->term tt-top)
+                         (typed-term->path-cond tt-top)
+                         (list* 'if
+                                (typed-term->judgements tt-top)
+                                (typed-term-list->judgements tt-actuals)
+                                '('nil))))
+            'fncallp))
+  :hints (("Goal"
+           :in-theory (enable typed-term->kind))))
+
+(define make-typed-fncall ((tt-top typed-term-p)
+                           (tt-actuals typed-term-list-p)
+                           (options type-options-p))
+  :guard (good-typed-term-list-p tt-actuals options)
+  :returns (new-tt (and (typed-term-p new-tt)
+                        (good-typed-term-p new-tt options))
+                   :hints (("Goal"
+                            :in-theory (enable good-typed-fncall-p))))
+  (b* (((unless (mbt (and (typed-term-p tt-top)
+                          (typed-term-list-p tt-actuals)
+                          (type-options-p options)
+                          (good-typed-term-list-p tt-actuals options))))
+        (make-typed-term))
+       ((typed-term ttt) tt-top)
+       ((typed-term-list tta) tt-actuals)
+       ((unless (and (consp ttt.term)
+                     (symbolp (car ttt.term))
+                     (equal (cdr ttt.term) tta.term-lst)
+                     (equal ttt.path-cond tta.path-cond)
+                     (not (equal (car (typed-term->term tt-top)) 'quote))
+                     (not (equal (car (typed-term->term tt-top)) 'if))))
+        (prog2$ (er hard? 'typed-term=>make-typed-fncall
+                    "Inconsistent inputs.~%")
+                (make-typed-term))))
+    (make-typed-term
+     :term ttt.term
+     :path-cond ttt.path-cond
+     :judgements `(if ,ttt.judgements ,tta.judgements 'nil))))
 
 (define typed-term-list->cons ((tterm typed-term-p)
                                (tterm-lst typed-term-list-p)
