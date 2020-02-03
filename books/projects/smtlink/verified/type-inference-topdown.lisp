@@ -20,7 +20,7 @@
 (include-book "judgement-fns")
 
 (set-state-ok t)
- 
+
 (define look-up-judge-list ((term-lst pseudo-term-listp)
                             (judge pseudo-termp)
                             (supertype type-to-types-alist-p))
@@ -138,7 +138,6 @@
                                      state)
   :returns (new-alst pseudo-term-alistp)
   (b* ((hypo (pseudo-term-fix hypo))
-       (- (cw "hypo: ~q0" hypo))
        (actual (pseudo-term-fix actual))
        (formal-judges (look-up-path-cond formal hypo supertype))
        (actual-judges (term-substitution formal-judges formal actual t))
@@ -150,7 +149,6 @@
             actuals-judges-alst))
        (judge-acc (cdr yes?))
        (new-judge (union-judgements actual-judges judge-acc state))
-       (- (cw "new-judge: ~q0" new-judge))
        (yes? (atmost-one-type-predicate new-judge actual supertype))
        ((unless yes?) nil))
     (acons actual new-judge actuals-judges-alst)))
@@ -168,11 +166,8 @@
   :returns (new-alst pseudo-term-alistp)
   :measure (len (symbol-list-fix formals))
   (b* ((formals (symbol-list-fix formals))
-       (- (cw "formals: ~q0" formals))
        (actuals (pseudo-term-list-fix actuals))
-       (- (cw "actuals: ~q0" actuals))
        (actuals-judges-alst (pseudo-term-alist-fix actuals-judges-alst))
-       (- (cw "actuals-judges-alst: ~q0" actuals-judges-alst))
        ((unless (consp formals)) actuals-judges-alst)
        ((unless (consp actuals)) actuals-judges-alst)
        ((cons formals-hd formals-tl) formals)
@@ -223,17 +218,11 @@
   :measure (len (returns-list-fix returns-thms))
   :verify-guards nil
   (b* ((return-judge (pseudo-term-fix return-judge))
-       (- (cw "return-judge: ~q0" return-judge))
        (returns-thms (returns-list-fix returns-thms))
-       (- (cw "return-thms: ~q0" returns-thms))
        (fn (symbol-fix fn))
-       (- (cw "fn: ~q0" fn))
        (actuals (pseudo-term-list-fix actuals))
-       (- (cw "actuals: ~q0" actuals))
        (conclusion-acc (pseudo-term-fix conclusion-acc))
-       (- (cw "conclusion-acc: ~q0" conclusion-acc))
        (actuals-judges-acc (pseudo-term-alist-fix actuals-judges-acc))
-       (- (cw "actuals-judges-acc: ~q0" actuals-judges-acc))
        (options (type-options-fix options))
        ((type-options to) options)
        ((if (path-test-list conclusion-acc return-judge state))
@@ -248,13 +237,9 @@
           (('implies type-predicates conclusions)
            (mv type-predicates conclusions))
           (& (mv ''t re.returns-thm))))
-       (- (cw "hypo: ~q0" hypo))
-       (- (cw "concl: ~q0" concl))
        (substed-concl
         (term-substitution concl `(,fn ,@re.formals) `(,fn ,@actuals) t))
-       (- (cw "substed-concl: ~q0" substed-concl))
        (extended-concl (extend-judgements substed-concl path-cond options state))
-       (- (cw "extended-concl: ~q0" extended-concl))
        ;; return-judge implies extended-concl
        ((unless (path-test-list-or return-judge extended-concl state))
         (choose-returns-helper return-judge returns-tl fn actuals path-cond
@@ -266,7 +251,6 @@
                                        (initialize-actuals-judges-alist
                                         actuals)
                                        to.supertype state))
-             (- (cw "new-actuals-judges: ~q0" new-actuals-judges))
              ((if new-actuals-judges) (mv substed-concl new-actuals-judges)))
           (choose-returns-helper return-judge returns-tl fn actuals path-cond
                                  conclusion-acc actuals-judges-acc options
@@ -445,14 +429,11 @@
           (returns-judgement fn actuals actuals tta.judgements tta.judgements
                              fn-description tta.path-cond to.supertype ''t nil
                              state))
-         (- (cw "returns-thms: ~q0" returns-thms))
          (actuals-alst-try (choose-returns judge-top returns-thms fn actuals
                                            ttt.path-cond to t state))
-         (- (cw "actuals-alst-try: ~q0" actuals-alst-try))
          (actuals-alst (if actuals-alst-try actuals-alst-try
                          (choose-returns judge-top returns-thms fn actuals
                                          ttt.path-cond to nil state)))
-         (- (cw "actuals-alst: ~q0" actuals-alst))
          ((unless actuals-alst)
           (prog2$ (er hard? 'type-inference-topdown=>unify-fncall
                       "Run out of returns theorems, but returns judgement is not

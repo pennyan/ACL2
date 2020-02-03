@@ -39,7 +39,10 @@
        ;; (options (construct-type-options smtlink-hint)) ;; TODO
        (options (construct-type-options smtlink-hint))
        (type-judgements (type-judgement goal ''t options state))
-       (new-cl `((implies ,type-judgements ,goal)))
+       (typed-term (make-typed-term :term goal :path-cond ''t :judgements type-judgements))
+       (unified-typed-term (unify-type typed-term ''t options state))
+       (unified-judgements (typed-term->judgements unified-typed-term))
+       (new-cl `((implies ,unified-judgements ,goal)))
        (next-cp (cdr (assoc-equal 'type-judge *SMT-architecture*)))
        ((if (null next-cp)) (list cl))
        (the-hint
