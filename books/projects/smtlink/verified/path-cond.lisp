@@ -75,6 +75,21 @@
                 state)
 |#
 
+(define path-test-list-or ((path-cond pseudo-termp)
+                           (expr-conj pseudo-termp)
+                           state)
+  :returns (ok booleanp)
+  :measure (acl2-count (pseudo-term-fix expr-conj))
+  (b* ((path-cond (pseudo-term-fix path-cond))
+       (expr-conj (pseudo-term-fix expr-conj))
+       ((unless (is-conjunct? expr-conj))
+        (path-test path-cond expr-conj state))
+       ((if (equal expr-conj ''t)) nil)
+       ((list & expr-hd expr-tl &) expr-conj)
+       (yes? (path-test path-cond expr-hd state))
+       ((if yes?) t))
+    (path-test-list-or path-cond expr-tl state)))
+
 ;; look-up-path-cond will ignore the whole branch of or's and only look for top
 ;; level and's
 (define look-up-path-cond-acc ((term pseudo-termp)

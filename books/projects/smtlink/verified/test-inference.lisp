@@ -1,6 +1,6 @@
 (in-package "SMT")
 (include-book "type-inference-bottomup")
-;; (include-book "type-inference-topdowm")
+(include-book "type-inference-topdown")
 (set-state-ok t)
 
 (defalist rational-integer-alist
@@ -479,3 +479,46 @@
                   :path-cond ''t
                   :judgements (type-judgement (term5) ''t (options) state))
  (options))
+
+
+;; ------------------------------------------------------
+
+(unify-type (make-typed-term :term (term)
+                             :path-cond ''t
+                             :judgements (type-judgement (term) ''t (options)
+                                                         state))
+            ''t
+            (options)
+            state)
+
+(unify-type (make-typed-term :term (term2)
+                             :path-cond ''t
+                             :judgements (type-judgement (term2) ''t (options)
+                                                         state))
+            ''t
+            (options)
+            state)
+
+(unify-type (make-typed-term :term (term3)
+                             :path-cond ''t
+                             :judgements (type-judgement (term3) ''t (options)
+                                                         state))
+            ''t
+            (options)
+            state)
+
+(unify-type (make-typed-term :term (term4)
+                             :path-cond ''t
+                             :judgements (type-judgement (term4) ''t (options)
+                                                         state))
+            ''t
+            (options)
+            state)
+
+(unify-type (make-typed-term :term (term5)
+                             :path-cond ''t
+                             :judgements (type-judgement (term5) ''t (options)
+                                                         state))
+            ''t
+            (options)
+            state)
