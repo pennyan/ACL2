@@ -39,7 +39,11 @@
        ;; (options (construct-type-options smtlink-hint)) ;; TODO
        (options (construct-type-options smtlink-hint))
        (type-judgements (type-judgement goal ''t options state))
-       (typed-term (make-typed-term :term goal :path-cond ''t :judgements type-judgements))
+       (typed-term (make-typed-term :term goal :path-cond ''t
+                                    :judgements type-judgements))
+       ((unless (good-typed-term-p typed-term options))
+        (er hard? 'type-inference=>type-judge-fn
+            "Not a good-typed-term-p: ~q0" typed-term))
        (unified-typed-term (unify-type typed-term ''t options state))
        (unified-judgements (typed-term->judgements unified-typed-term))
        (new-cl `((implies ,unified-judgements ,goal)))
