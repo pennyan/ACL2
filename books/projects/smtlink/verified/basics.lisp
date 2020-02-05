@@ -71,8 +71,8 @@
 (defval *SMT-architecture*
   '((process-hint          . add-hypo-cp)
     (add-hypo              . type-judge-cp)
-    (type-judge            . type-decorate-cp)
-    (type-decorate         . expand-cp)
+    (type-judge            . term-rectify-cp)
+    (term-rectify          . expand-cp)
     (expand                . type-extract-cp)
     (type-extract          . uninterpreted-fn-cp)
     (uninterpreted         . smt-trusted-cp)

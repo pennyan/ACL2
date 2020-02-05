@@ -375,8 +375,8 @@
 (type-judgement (term4) ''t (options) state)
 (type-judgement (term5) ''t (options) state)
 
-;; -----------------------------------------
-;; ;; testing guard utilities
+;; ;; -----------------------------------------
+;; ;; ;; testing guard utilities
 
 ;; (defun term5-unquoted (r1 al)
 ;;   (if (if (rational-integer-alistp al)

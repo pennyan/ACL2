@@ -20,13 +20,6 @@
 
 (set-state-ok t)
 
-(define construct-type-options ((smtlink-hint smtlink-hint-p))
-  :returns (type-options type-options-p)
-  :irrelevant-formals-ok t
-  :ignore-ok t
-  (b* ((smtlink-hint (smtlink-hint-fix smtlink-hint)))
-    (make-type-options)))
-
 (define type-judge-fn ((cl pseudo-term-listp)
                        (smtlink-hint t)
                        state)
@@ -36,7 +29,6 @@
         (list cl))
        ((smtlink-hint h) smtlink-hint)
        (goal (disjoin cl))
-       ;; (options (construct-type-options smtlink-hint)) ;; TODO
        (options (construct-type-options smtlink-hint))
        (type-judgements (type-judgement goal ''t options state))
        (typed-term (make-typed-term :term goal :path-cond ''t

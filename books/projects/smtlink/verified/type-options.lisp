@@ -10,6 +10,7 @@
 (include-book "centaur/fty/top" :dir :system)
 
 (include-book "../utils/pseudo-term")
+(include-book "hint-interface")
 
 (defalist type-to-types-alist
   :key-type symbolp
@@ -189,3 +190,10 @@
                   (supertype-alst type-to-types-alist-p))
   :returns (ok booleanp)
   (not (null (assoc-equal type (type-to-types-alist-fix supertype-alst)))))
+
+(define construct-type-options ((smtlink-hint smtlink-hint-p))
+  :returns (type-options type-options-p)
+  :irrelevant-formals-ok t
+  :ignore-ok t
+  (b* ((smtlink-hint (smtlink-hint-fix smtlink-hint)))
+    (make-type-options)))

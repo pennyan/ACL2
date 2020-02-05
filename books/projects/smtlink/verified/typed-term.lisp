@@ -45,6 +45,8 @@
     ((term-lst pseudo-term-listp :default nil)
      (path-cond pseudo-termp :default ''t)
      (judgements pseudo-termp :default ''t)))
+
+  (defoption maybe-typed-term typed-term-p)
   )
 
 (define typed-term-list-consp ((tterm-lst typed-term-list-p))
