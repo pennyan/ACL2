@@ -22,7 +22,8 @@
 
 (defprod returns
   ((formals symbol-listp)
-   (returns-thm pseudo-termp)))
+   (returns-thm pseudo-termp)
+   (replace-thm pseudo-termp)))
 
 (deflist returns-list
   :elt-type returns-p
@@ -78,6 +79,7 @@
        (return-spec (return-spec-fix return-spec))
        (formals (return-spec->formals return-spec))
        (returns-name (return-spec->returns-thm return-spec))
+       (replace-name (return-spec->replace-thm return-spec))
        (return-type (return-spec->return-type return-spec))
        (returns-thm
         (acl2::meta-extract-formula-w returns-name (w state)))
@@ -85,6 +87,13 @@
         (mv (er hard? 'type-inference-bottomup=>construct-returns-judgement
                 "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
                 returns-name returns-thm)
+            (make-returns)))
+       (replace-thm
+        (acl2::meta-extract-formula-w replace-name (w state)))
+       ((unless (pseudo-termp replace-thm))
+        (mv (er hard? 'type-inference-bottomup=>construct-returns-judgement
+                "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
+                replace-name replace-thm)
             (make-returns)))
        ((mv ok return-judge)
         (case-match returns-thm
@@ -120,7 +129,9 @@
                 "The returns theorem for function ~p0 is of the wrong syntactic ~
                form ~p1~%" fn returns-thm)
             (make-returns))))
-    (mv return-judge (make-returns :formals formals :returns-thm returns-thm))))
+    (mv return-judge
+        (make-returns :formals formals :returns-thm returns-thm
+                      :replace-thm replace-thm))))
 )
 
 (local

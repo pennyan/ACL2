@@ -40,7 +40,8 @@
 (defprod return-spec
   ((formals symbol-listp)
    (return-type symbolp)
-   (returns-thm symbolp)))
+   (returns-thm symbolp)
+   (replace-thm symbolp)))
 
 (deflist return-spec-list
   :elt-type return-spec-p
