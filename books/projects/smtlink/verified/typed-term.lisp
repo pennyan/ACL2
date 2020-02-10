@@ -17,6 +17,7 @@
 
 (include-book "../utils/pseudo-term")
 (include-book "path-cond")
+(include-book "term-substitution")
 ;; (include-book "evaluator")
 
 ;; reduce not's in term
@@ -116,7 +117,8 @@
        (options (type-options-fix options))
        ((typed-term tt) tterm)
        ((type-options to) options))
-    (if (is-conjunct-list? tt.judgements tt.term to.supertype) t nil)))
+    ;; (if (is-conjunct-list? tt.judgements tt.term to.supertype) t nil)
+    t))
 
 #|
 (good-typed-variable-p (typed-term 'x
@@ -135,7 +137,8 @@
        (options (type-options-fix options))
        ((typed-term tt) tterm)
        ((type-options to) options))
-    (if (is-conjunct-list? tt.judgements tt.term to.supertype) t nil)))
+    ;; (if (is-conjunct-list? tt.judgements tt.term to.supertype) t nil)
+    t))
 
 #|
 (good-typed-quote-p (typed-term ''t
@@ -743,7 +746,15 @@
                      (< (acl2-count
                          (typed-term-list->term-lst new-ttl))
                         (acl2-count (typed-term->term tterm))))
-            :name acl2-count-of-typed-term-lambda->actuals)))
+            :name acl2-count-of-typed-term-lambda->actuals)
+   (new-ttl (implies (and (typed-term-p tterm)
+                          (type-options-p options)
+                          (equal (typed-term->kind tterm)
+                                 'lambdap)
+                          (good-typed-term-p tterm options))
+                     (equal (len (cdr (typed-term->term tterm)))
+                            (len (typed-term-list->term-lst new-ttl))))
+            :name typed-term-lambda->actuals-preserve-len)))
 
 (define typed-term-lambda->body ((tterm typed-term-p)
                                  (options type-options-p))
@@ -1124,4 +1135,18 @@
          (make-typed-term-list))))
     (make-typed-term-list :term-lst `(,tt.term ,@ttl.term-lst)
                           :path-cond tt.path-cond
-                          :judgements `(if ,tt.judgements ,ttl.judgements 'nil))))
+                          :judgements `(if ,tt.judgements ,ttl.judgements
+                                         'nil)))
+  ///
+  (defthm len-of-typed-term-list->cons
+    (implies (and (typed-term-p tterm)
+                  (typed-term-list-p tterm-lst)
+                  (type-options-p options)
+                  (good-typed-term-p tterm options)
+                  (good-typed-term-list-p tterm-lst options)
+                  (equal (typed-term->path-cond tterm)
+                         (typed-term-list->path-cond tterm-lst)))
+             (equal (len (typed-term-list->term-lst
+                          (typed-term-list->cons tterm tterm-lst options)))
+                    (+ 1
+                       (len (typed-term-list->term-lst tterm-lst)))))))

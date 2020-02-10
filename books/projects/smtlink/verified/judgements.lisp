@@ -205,3 +205,4 @@
            (is-conjunct-list? `(if ,judge ,judges 'nil) term supertype))
   :hints (("Goal"
            :in-theory (enable is-conjunct-list?))))
+
