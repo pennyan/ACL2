@@ -374,6 +374,19 @@
 
 (verify-guards good-typed-term-p)
 
+(defthm kind-of-make-typed-term-change
+  (equal (typed-term->kind
+          (typed-term ''nil
+                      path-cond
+                      '(if (if (symbolp 'nil)
+                               (if (booleanp 'nil) 't 'nil)
+                               'nil)
+                           't
+                           'nil)))
+         'quotep)
+  :hints (("Goal"
+           :in-theory (enable typed-term->kind))))
+
 (defthm good-typed-term-of-make-typed-term
   (good-typed-term-p (make-typed-term) options)
   :hints (("Goal" :in-theory (enable good-typed-term-p
@@ -381,8 +394,23 @@
                                      is-conjunct-list?
                                      judgement-of-term))))
 
+(defthm good-typed-term-of-make-typed-term-change
+  (good-typed-term-p
+   (change-typed-term (make-typed-term) :path-cond path-cond)
+   options)
+  :hints (("Goal" :in-theory (enable good-typed-term-p
+                                     good-typed-quote-p
+                                     is-conjunct-list?
+                                     judgement-of-term))))
+
 (defthm good-typed-term-list-of-make-typed-term-list
   (good-typed-term-list-p (make-typed-term-list) options)
+  :hints (("Goal" :in-theory (enable good-typed-term-list-p))))
+
+(defthm good-typed-term-of-make-typed-term-list-change
+  (good-typed-term-list-p
+   (change-typed-term-list (make-typed-term-list) :path-cond path-cond)
+   options)
   :hints (("Goal" :in-theory (enable good-typed-term-list-p))))
 
 ;; -------------------------------------------------------------------
@@ -658,8 +686,9 @@
            (mv nil top-judge))
           (& (mv t nil))))
        ((if err)
-        (er hard? 'typed-term=>typed-term->top
-            "Malformed judgements ~q0" tt.judgements)))
+        (prog2$ (er hard? 'typed-term=>typed-term->top
+                    "Malformed judgements ~q0" tt.judgements)
+                (change-typed-term (make-typed-term) :path-cond tt.path-cond))))
     (make-typed-term :term tt.term
                      :path-cond tt.path-cond
                      :judgements top-judge))
@@ -672,7 +701,16 @@
                          (type-options-p options))
                     (and (consp (typed-term->term new-tt))
                          (pseudo-lambdap (car (typed-term->term new-tt)))))
-           :name implies-of-typed-term->top)))
+           :name implies-of-typed-term->top)
+   (new-tt (implies (and (typed-term-p tterm)
+                         (type-options-p options)
+                         (or (equal (typed-term->kind tterm) 'ifp)
+                             (equal (typed-term->kind tterm) 'lambdap)
+                             (equal (typed-term->kind tterm) 'fncallp))
+                         (good-typed-term-p tterm options))
+                    (equal (typed-term->path-cond new-tt)
+                           (typed-term->path-cond tterm)))
+           :name typed-term->top-maintains-path-cond)))
 
 ;; fncallp destructors
 (define typed-term-fncall->actuals ((tterm typed-term-p)
@@ -829,7 +867,14 @@
                          (typed-term-list-consp tterm-lst))
                     (< (acl2-count (typed-term->term new-tt))
                        (acl2-count (typed-term-list->term-lst tterm-lst))))
-           :name acl2-count-of-typed-term-list->car)))
+           :name acl2-count-of-typed-term-list->car)
+   (new-tt (implies (and (typed-term-list-p tterm-lst)
+                         (type-options-p options)
+                         (good-typed-term-list-p tterm-lst options)
+                         (typed-term-list-consp tterm-lst))
+                    (equal (typed-term->path-cond new-tt)
+                           (typed-term-list->path-cond tterm-lst)))
+           :name typed-term-list->car-maintains-path-cond)))
 
 (define typed-term-list->cdr ((tterm-lst typed-term-list-p)
                               (options type-options-p))
@@ -870,7 +915,14 @@
                           (typed-term-list-consp tterm-lst))
                      (equal (len (typed-term-list->term-lst tterm-lst))
                             (+ 1 (len (typed-term-list->term-lst new-ttl)))))
-            :name len-of-typed-term-list->cdr)))
+            :name len-of-typed-term-list->cdr)
+   (new-ttl (implies (and (typed-term-list-p tterm-lst)
+                          (type-options-p options)
+                          (good-typed-term-list-p tterm-lst options)
+                          (typed-term-list-consp tterm-lst))
+                     (equal (typed-term-list->path-cond new-ttl)
+                            (typed-term-list->path-cond tterm-lst)))
+            :name typed-term-list->cdr-maintains-path-cond)))
 
 ;; -----------------------------------------------
 ;; Theorems for constructors
@@ -969,7 +1021,7 @@
         (prog2$
          (er hard? 'typed-term=>make-typed-term-if
              "Inconsistent inputs.~%")
-         (make-typed-term))))
+         (change-typed-term (make-typed-term) :path-cond ttp.path-cond))))
     (make-typed-term
      :term `(if ,ttc.term ,ttt.term ,tte.term)
      :path-cond ttp.path-cond
@@ -978,7 +1030,21 @@
           (if ,ttc.judgements
               (if ,ttc.term ,ttt.judgements ,tte.judgements)
             'nil)
-        'nil))))
+        'nil)))
+  ///
+  (more-returns
+   (new-tt
+    (implies (and (type-options-p options)
+                  (typed-term-p tt-top)
+                  (typed-term-p tt-cond)
+                  (typed-term-p tt-then)
+                  (typed-term-p tt-else)
+                  (good-typed-term-p tt-cond options)
+                  (good-typed-term-p tt-then options)
+                  (good-typed-term-p tt-else options))
+             (equal (typed-term->path-cond new-tt)
+                    (typed-term->path-cond tt-top)))
+    :name make-typed-if-maintains-path-cond)))
 
 (local
  (defthm pseudo-termp-of-lambda
@@ -1042,7 +1108,8 @@
                      (pseudo-lambdap (car ttt.term))))
         (prog2$ (er hard? 'typed-term=>make-typed-term-lambda
                     "Inconsistent inputs.~%")
-                (make-typed-term)))
+                (change-typed-term (make-typed-term)
+                                   :path-cond ttt.path-cond)))
        (formals (lambda-formals (car ttt.term)))
        (body (lambda-body (car ttt.term)))
        (actuals (cdr ttt.term))
@@ -1054,7 +1121,8 @@
                      (equal ttt.path-cond tta.path-cond)))
         (prog2$ (er hard? 'typed-term=>make-typed-term-lambda
                     "Inconsistent inputs.~%")
-                (make-typed-term))))
+                (change-typed-term (make-typed-term)
+                                   :path-cond ttt.path-cond))))
     (make-typed-term
      :term ttt.term
      :path-cond ttt.path-cond
@@ -1064,7 +1132,19 @@
                            ,@actuals)
                           ,tta.judgements
                         'nil)
-                    'nil))))
+                    'nil)))
+  ///
+  (more-returns
+   (new-tt
+    (implies (and (type-options-p options)
+                  (typed-term-p tt-top)
+                  (typed-term-p tt-body)
+                  (typed-term-list-p tt-actuals)
+                  (good-typed-term-p tt-body options)
+                  (good-typed-term-list-p tt-actuals options))
+             (equal (typed-term->path-cond new-tt)
+                    (typed-term->path-cond tt-top)))
+    :name make-typed-lambda-maintains-path-cond)))
 
 (defthm kind-of-make-typed-fncall
   (implies
@@ -1113,17 +1193,30 @@
                      (not (equal (car (typed-term->term tt-top)) 'if))))
         (prog2$ (er hard? 'typed-term=>make-typed-fncall
                     "Inconsistent inputs.~%")
-                (make-typed-term))))
+                (change-typed-term (make-typed-term)
+                                   :path-cond ttt.path-cond))))
     (make-typed-term
      :term ttt.term
      :path-cond ttt.path-cond
-     :judgements `(if ,ttt.judgements ,tta.judgements 'nil))))
+     :judgements `(if ,ttt.judgements ,tta.judgements 'nil)))
+  ///
+  (more-returns
+   (new-tt
+    (implies (and (typed-term-p tt-top)
+                  (typed-term-list-p tt-actuals)
+                  (type-options-p options)
+                  (good-typed-term-list-p tt-actuals options))
+             (equal (typed-term->path-cond new-tt)
+                    (typed-term->path-cond tt-top)))
+    :name make-typed-fncall-maintains-path-cond)))
 
 (define typed-term-list->cons ((tterm typed-term-p)
                                (tterm-lst typed-term-list-p)
                                (options type-options-p))
   :guard (and (good-typed-term-p tterm options)
-              (good-typed-term-list-p tterm-lst options))
+              (good-typed-term-list-p tterm-lst options)
+              (equal (typed-term->path-cond tterm)
+                     (typed-term-list->path-cond tterm-lst)))
   :returns (new-ttl (and (typed-term-list-p new-ttl)
                          (good-typed-term-list-p new-ttl options)))
   (b* (((unless (mbt (and (typed-term-p tterm)
@@ -1134,23 +1227,33 @@
         (make-typed-term-list))
        ((typed-term tt) tterm)
        ((typed-term-list ttl) tterm-lst)
-       ((unless (equal tt.path-cond ttl.path-cond))
-        (prog2$
-         (er hard? 'typed-term=>typed-term-list->cons
-             "Path condition for head and tail of typed-term-list->cons is not ~
-              the same: ~p0 ~p1~%" tt.path-cond ttl.path-cond)
-         (make-typed-term-list))))
+       ((unless (mbt (equal tt.path-cond ttl.path-cond)))
+        (change-typed-term-list (make-typed-term-list)
+                                :path-cond tt.path-cond)))
     (make-typed-term-list :term-lst `(,tt.term ,@ttl.term-lst)
                           :path-cond tt.path-cond
                           :judgements `(if ,tt.judgements ,ttl.judgements
                                          'nil)))
   ///
+  (more-returns
+   (new-ttl (implies (and (typed-term-p tterm)
+                          (typed-term-list-p tterm-lst)
+                          (type-options-p options)
+                          (good-typed-term-p tterm options)
+                          (good-typed-term-list-p tterm-lst options)
+                          (equal (typed-term->path-cond tterm)
+                                 (typed-term-list->path-cond tterm-lst)))
+                     (equal (typed-term-list->path-cond new-ttl)
+                            (typed-term->path-cond tterm)))
+            :name typed-term-list->cons-maintains-path-cond))
   (defthm len-of-typed-term-list->cons
     (implies (and (typed-term-p tterm)
                   (typed-term-list-p tterm-lst)
                   (type-options-p options)
                   (good-typed-term-p tterm options)
-                  (good-typed-term-list-p tterm-lst options))
+                  (good-typed-term-list-p tterm-lst options)
+                  (equal (typed-term->path-cond tterm)
+                         (typed-term-list->path-cond tterm-lst)))
              (equal (len (typed-term-list->term-lst
                           (typed-term-list->cons tterm tterm-lst options)))
                     (+ 1
