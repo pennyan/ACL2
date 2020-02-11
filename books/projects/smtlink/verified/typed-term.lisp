@@ -1150,11 +1150,22 @@
                   (typed-term-list-p tterm-lst)
                   (type-options-p options)
                   (good-typed-term-p tterm options)
-                  (good-typed-term-list-p tterm-lst options)
-                  (equal (typed-term->path-cond tterm)
-                         (typed-term-list->path-cond tterm-lst)))
+                  (good-typed-term-list-p tterm-lst options))
              (equal (len (typed-term-list->term-lst
                           (typed-term-list->cons tterm tterm-lst options)))
                     (+ 1
                        (len (typed-term-list->term-lst tterm-lst)))))))
 
+(define typed-term-list->cdr-induct ((ttl typed-term-list-p)
+                                     (options type-options-p))
+  :guard (good-typed-term-list-p ttl options)
+  :measure (acl2-count (typed-term-list->term-lst ttl))
+  :hints (("Goal" :in-theory (enable typed-term-list->cdr
+                                     typed-term-list-consp)))
+  (if (and (typed-term-list-consp ttl)
+           (good-typed-term-list-p ttl options)
+           (typed-term-list-p ttl)
+           (type-options-p options))
+      (typed-term-list->cdr-induct
+       (typed-term-list->cdr ttl options) options)
+      nil))

@@ -116,9 +116,6 @@
          ((typed-term ttt) (typed-term->top tt options))
          ((typed-term-list rtta) (term-list-rectify tta options state))
          ((typed-term rttb) (term-rectify ttb options state))
-         ;; ((unless (mbt (equal (len formals)
-         ;;                      (len rtta.term-lst))))
-         ;;  (make-typed-term))
          (new-term `((lambda ,formals ,rttb.term) ,@rtta.term-lst))
          (new-top-judge (term-substitution ttt.judgements ttt.term new-term t))
          (new-top (make-typed-term :term new-term
@@ -236,6 +233,18 @@
                             options state)
                            options)))
 ///
+(defthm term-list-rectify-maintains-len-nil
+  (implies (and (typed-term-list-p tterm-lst)
+                (type-options-p options)
+                (good-typed-term-list-p tterm-lst options)
+                (not (typed-term-list-consp tterm-lst)))
+           (equal (len (typed-term-list->term-lst
+                        (term-list-rectify tterm-lst options state)))
+                  (len (typed-term-list->term-lst tterm-lst))))
+  :hints (("Goal"
+           :in-theory (enable term-list-rectify)
+           :expand (term-list-rectify tterm-lst options state))))
+
 (defthm term-list-rectify-maintains-len
   (implies (and (typed-term-list-p tterm-lst)
                 (type-options-p options)
@@ -244,8 +253,10 @@
                         (term-list-rectify tterm-lst options state)))
                   (len (typed-term-list->term-lst tterm-lst))))
   :hints (("Goal"
-           :in-theory (enable lambda-rectify fncall-rectify if-rectify
-                              term-rectify term-list-rectify))))
+           :in-theory (enable term-list-rectify
+                              (:induction typed-term-list->cdr-induct))
+           :expand (term-list-rectify tterm-lst options state)
+           :induct (typed-term-list->cdr-induct tterm-lst options))))
 )
 
 (verify-guards term-rectify)
