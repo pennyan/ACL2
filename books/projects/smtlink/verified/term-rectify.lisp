@@ -224,14 +224,19 @@
                           (type-options-p options)
                           (good-typed-term-list-p tterm-lst options))))
         (make-typed-term-list))
-       ((unless (typed-term-list-consp tterm-lst)) tterm-lst))
-    (typed-term-list->cons (term-rectify
-                            (typed-term-list->car tterm-lst options)
-                            options state)
-                           (term-list-rectify
-                            (typed-term-list->cdr tterm-lst options)
-                            options state)
-                           options)))
+       ((unless (typed-term-list-consp tterm-lst)) tterm-lst)
+       ((typed-term tt-car)
+        (term-rectify
+         (typed-term-list->car tterm-lst options)
+         options state))
+       ((typed-term-list tt-cdr)
+        (term-list-rectify
+         (typed-term-list->cdr tterm-lst options)
+         options state))
+       ((unless (mbt (equal tt-car.path-cond
+                            tt-cdr.path-cond)))
+        tterm-lst))
+    (typed-term-list->cons tt-car tt-cdr options)))
 ///
 (defthm term-list-rectify-maintains-len-nil
   (implies (and (typed-term-list-p tterm-lst)
@@ -253,8 +258,9 @@
                         (term-list-rectify tterm-lst options state)))
                   (len (typed-term-list->term-lst tterm-lst))))
   :hints (("Goal"
-           :in-theory (enable term-list-rectify
-                              (:induction typed-term-list->cdr-induct))
+           :in-theory (e/d (term-list-rectify
+                            (:induction typed-term-list->cdr-induct))
+                           (term-rectify))
            :expand (term-list-rectify tterm-lst options state)
            :induct (typed-term-list->cdr-induct tterm-lst options))))
 )

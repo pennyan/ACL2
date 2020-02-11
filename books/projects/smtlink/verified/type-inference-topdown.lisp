@@ -47,43 +47,43 @@
                        acl2::pseudo-termp-opener
                        acl2-count)))
 
-(define choose-judge-helper ((judges pseudo-termp)
-                             (term pseudo-termp)
-                             (supertype type-to-types-alist-p)
-                             (acc pseudo-termp)
-                             (counter natp))
-  :guard (is-conjunct-list? acc term supertype)
-  :returns (mv (ctr natp)
-               (judge (and (pseudo-termp judge)
-                           (is-conjunct-list? judge term supertype))
-                      :hyp :guard))
-  :measure (acl2-count (pseudo-term-fix judges))
-  :verify-guards nil
-  (b* ((judges (pseudo-term-fix judges))
-       (term (pseudo-term-fix term))
-       (acc (pseudo-term-fix acc))
-       ((unless (mbt (is-conjunct-list? acc term supertype)))
-        (mv 0 ''t))
-       (counter (nfix counter))
-       ((if (equal judges ''t)) (mv counter acc))
-       ((if (and (type-predicate-of-term judges term supertype)
-                 (zp counter)))
-        (mv (1+ counter)
-            `(if ,judges ,acc 'nil)))
-       ((if (and (type-predicate-of-term judges term supertype)
-                 (not (zp counter))))
-        (mv counter acc))
-       ((unless (is-conjunct? judges))
-        (prog2$ (er hard? 'type-inference-topdown=>choose-judge
-                    "Judges should be a conjunct: ~q0" judges)
-                (mv counter acc)))
-       ((list & cond then &) judges)
-       ((mv new-ctr new-acc)
-        (choose-judge-helper cond term supertype acc counter)))
-    (choose-judge-helper then term supertype new-acc new-ctr)))
+  (define choose-judge-helper ((judges pseudo-termp)
+                               (term pseudo-termp)
+                               (supertype type-to-types-alist-p)
+                               (acc pseudo-termp)
+                               (counter natp))
+    :guard (is-conjunct-list? acc term supertype)
+    :returns (mv (ctr natp)
+                 (judge (and (pseudo-termp judge)
+                             (is-conjunct-list? judge term supertype))
+                        :hyp :guard))
+    :measure (acl2-count (pseudo-term-fix judges))
+    :verify-guards nil
+    (b* ((judges (pseudo-term-fix judges))
+         (term (pseudo-term-fix term))
+         (acc (pseudo-term-fix acc))
+         ((unless (mbt (is-conjunct-list? acc term supertype)))
+          (mv 0 ''t))
+         (counter (nfix counter))
+         ((if (equal judges ''t)) (mv counter acc))
+         ((if (and (type-predicate-of-term judges term supertype)
+                   (zp counter)))
+          (mv (1+ counter)
+              `(if ,judges ,acc 'nil)))
+         ((if (and (type-predicate-of-term judges term supertype)
+                   (not (zp counter))))
+          (mv counter acc))
+         ((unless (is-conjunct? judges))
+          (prog2$ (er hard? 'type-inference-topdown=>choose-judge
+                      "Judges should be a conjunct: ~q0" judges)
+                  (mv counter acc)))
+         ((list & cond then &) judges)
+         ((mv new-ctr new-acc)
+          (choose-judge-helper cond term supertype acc counter)))
+      (choose-judge-helper then term supertype new-acc new-ctr)))
 
-(verify-guards choose-judge-helper)
-)
+  (verify-guards choose-judge-helper)
+  )
 
 (define choose-judge ((judges pseudo-termp)
                       (term pseudo-termp)
@@ -130,56 +130,56 @@
   (local (in-theory (disable symbol-listp acl2::pseudo-termp-opener
                              member-equal)))
 
-(define generate-actuals-judges-one ((hypo pseudo-termp)
-                                     (formal symbolp)
-                                     (actual pseudo-termp)
-                                     (actuals-judges-alst pseudo-term-alistp)
-                                     (supertype type-to-types-alist-p)
-                                     state)
-  :returns (new-alst pseudo-term-alistp)
-  (b* ((hypo (pseudo-term-fix hypo))
-       (actual (pseudo-term-fix actual))
-       (formal-judges (look-up-path-cond formal hypo supertype))
-       (actual-judges (term-substitution formal-judges formal actual t))
-       (actuals-judges-alst (pseudo-term-alist-fix actuals-judges-alst))
-       (yes? (assoc-equal actual actuals-judges-alst))
-       ((unless yes?)
-        (er hard? 'type-inference-topdown=>generate-actuals-judges-one
-            "Actual ~p0 doesn't exist in alist ~p1~%" actual
-            actuals-judges-alst))
-       (judge-acc (cdr yes?))
-       (new-judge (union-judgements actual-judges judge-acc state))
-       (yes? (atmost-one-type-predicate new-judge actual supertype))
-       ((unless yes?) nil))
-    (acons actual new-judge actuals-judges-alst)))
-)
+  (define generate-actuals-judges-one ((hypo pseudo-termp)
+                                       (formal symbolp)
+                                       (actual pseudo-termp)
+                                       (actuals-judges-alst pseudo-term-alistp)
+                                       (supertype type-to-types-alist-p)
+                                       state)
+    :returns (new-alst pseudo-term-alistp)
+    (b* ((hypo (pseudo-term-fix hypo))
+         (actual (pseudo-term-fix actual))
+         (formal-judges (look-up-path-cond formal hypo supertype))
+         (actual-judges (term-substitution formal-judges formal actual t))
+         (actuals-judges-alst (pseudo-term-alist-fix actuals-judges-alst))
+         (yes? (assoc-equal actual actuals-judges-alst))
+         ((unless yes?)
+          (er hard? 'type-inference-topdown=>generate-actuals-judges-one
+              "Actual ~p0 doesn't exist in alist ~p1~%" actual
+              actuals-judges-alst))
+         (judge-acc (cdr yes?))
+         (new-judge (union-judgements actual-judges judge-acc state))
+         (yes? (atmost-one-type-predicate new-judge actual supertype))
+         ((unless yes?) nil))
+      (acons actual new-judge actuals-judges-alst)))
+  )
 
 (encapsulate ()
   (local (in-theory (disable pseudo-termp symbol-listp)))
 
-(define generate-actuals-judges ((hypo pseudo-termp)
-                                 (formals symbol-listp)
-                                 (actuals pseudo-term-listp)
-                                 (actuals-judges-alst pseudo-term-alistp)
-                                 (supertype type-to-types-alist-p)
-                                 state)
-  :returns (new-alst pseudo-term-alistp)
-  :measure (len (symbol-list-fix formals))
-  (b* ((formals (symbol-list-fix formals))
-       (actuals (pseudo-term-list-fix actuals))
-       (actuals-judges-alst (pseudo-term-alist-fix actuals-judges-alst))
-       ((unless (consp formals)) actuals-judges-alst)
-       ((unless (consp actuals)) actuals-judges-alst)
-       ((cons formals-hd formals-tl) formals)
-       ((cons actuals-hd actuals-tl) actuals)
-       (new-acc
-        (generate-actuals-judges-one hypo formals-hd actuals-hd
-                                     actuals-judges-alst supertype
-                                     state))
-       ((unless new-acc) nil))
-    (generate-actuals-judges hypo formals-tl actuals-tl new-acc supertype
-                             state)))
-)
+  (define generate-actuals-judges ((hypo pseudo-termp)
+                                   (formals symbol-listp)
+                                   (actuals pseudo-term-listp)
+                                   (actuals-judges-alst pseudo-term-alistp)
+                                   (supertype type-to-types-alist-p)
+                                   state)
+    :returns (new-alst pseudo-term-alistp)
+    :measure (len (symbol-list-fix formals))
+    (b* ((formals (symbol-list-fix formals))
+         (actuals (pseudo-term-list-fix actuals))
+         (actuals-judges-alst (pseudo-term-alist-fix actuals-judges-alst))
+         ((unless (consp formals)) actuals-judges-alst)
+         ((unless (consp actuals)) actuals-judges-alst)
+         ((cons formals-hd formals-tl) formals)
+         ((cons actuals-hd actuals-tl) actuals)
+         (new-acc
+          (generate-actuals-judges-one hypo formals-hd actuals-hd
+                                       actuals-judges-alst supertype
+                                       state))
+         ((unless new-acc) nil))
+      (generate-actuals-judges hypo formals-tl actuals-tl new-acc supertype
+                               state)))
+  )
 
 (encapsulate ()
   (local (in-theory (disable symbol-listp
@@ -196,80 +196,80 @@
                              pseudo-term-listp
                              pseudo-term-alistp-when-not-consp)))
 
-;; For each returns theorems, get conclusion, extend the conclusion.
-;; check if the judge-top includes the conclusion. If so, construct
-;; actuals-judges based on its hypotheses. Pay attention not to add duplicated
-;; judgements and there should only be one type predicate. If there are
-;; multiple type predicates, continue. Do this util all judge-top is covered.
-;; If by the end, not all judge-top is covered, complain.
-(define choose-returns-helper ((return-judge pseudo-termp)
-                               (returns-thms returns-list-p)
-                               (fn symbolp)
-                               (actuals pseudo-term-listp)
-                               (path-cond pseudo-termp)
-                               (conclusion-acc pseudo-termp)
-                               (actuals-judges-acc pseudo-term-alistp)
-                               (options type-options-p)
-                               (single? booleanp)
-                               state)
-  :guard (not (equal fn 'quote))
-  :returns (mv (conclusion pseudo-termp)
-               (actuals-judges pseudo-term-alistp))
-  :measure (len (returns-list-fix returns-thms))
-  :verify-guards nil
-  (b* ((return-judge (pseudo-term-fix return-judge))
-       (returns-thms (returns-list-fix returns-thms))
-       (fn (symbol-fix fn))
-       (actuals (pseudo-term-list-fix actuals))
-       (conclusion-acc (pseudo-term-fix conclusion-acc))
-       (actuals-judges-acc (pseudo-term-alist-fix actuals-judges-acc))
-       (options (type-options-fix options))
-       ((type-options to) options)
-       ((if (path-test-list conclusion-acc return-judge state))
-        (mv conclusion-acc actuals-judges-acc))
-       ((unless (consp returns-thms)) (mv nil nil))
-       ((cons returns-hd returns-tl) returns-thms)
-       ((returns re) returns-hd)
-       ((mv hypo concl)
-        (case-match re.returns-thm
-          ((('lambda (r) conclusions) (!fn . !re.formals))
-           (mv ''t (term-substitution conclusions r `(,fn ,@re.formals) t)))
-          (('implies type-predicates conclusions)
-           (mv type-predicates conclusions))
-          (& (mv ''t re.returns-thm))))
-       (substed-concl
-        (term-substitution concl `(,fn ,@re.formals) `(,fn ,@actuals) t))
-       (extended-concl (extend-judgements substed-concl path-cond options state))
-       ;; return-judge implies extended-concl
-       ((unless (path-test-list-or return-judge extended-concl state))
-        (choose-returns-helper return-judge returns-tl fn actuals path-cond
-                               conclusion-acc actuals-judges-acc options
-                               single? state))
-       ((if (and single? (path-test-list extended-concl return-judge state)))
-        (b* ((new-actuals-judges
-              (generate-actuals-judges hypo re.formals actuals
-                                       (initialize-actuals-judges-alist
-                                        actuals)
-                                       to.supertype state))
-             ((if new-actuals-judges) (mv substed-concl new-actuals-judges)))
+  ;; For each returns theorems, get conclusion, extend the conclusion.
+  ;; check if the judge-top includes the conclusion. If so, construct
+  ;; actuals-judges based on its hypotheses. Pay attention not to add duplicated
+  ;; judgements and there should only be one type predicate. If there are
+  ;; multiple type predicates, continue. Do this util all judge-top is covered.
+  ;; If by the end, not all judge-top is covered, complain.
+  (define choose-returns-helper ((return-judge pseudo-termp)
+                                 (returns-thms returns-list-p)
+                                 (fn symbolp)
+                                 (actuals pseudo-term-listp)
+                                 (path-cond pseudo-termp)
+                                 (conclusion-acc pseudo-termp)
+                                 (actuals-judges-acc pseudo-term-alistp)
+                                 (options type-options-p)
+                                 (single? booleanp)
+                                 state)
+    :guard (not (equal fn 'quote))
+    :returns (mv (conclusion pseudo-termp)
+                 (actuals-judges pseudo-term-alistp))
+    :measure (len (returns-list-fix returns-thms))
+    :verify-guards nil
+    (b* ((return-judge (pseudo-term-fix return-judge))
+         (returns-thms (returns-list-fix returns-thms))
+         (fn (symbol-fix fn))
+         (actuals (pseudo-term-list-fix actuals))
+         (conclusion-acc (pseudo-term-fix conclusion-acc))
+         (actuals-judges-acc (pseudo-term-alist-fix actuals-judges-acc))
+         (options (type-options-fix options))
+         ((type-options to) options)
+         ((if (path-test-list conclusion-acc return-judge state))
+          (mv conclusion-acc actuals-judges-acc))
+         ((unless (consp returns-thms)) (mv nil nil))
+         ((cons returns-hd returns-tl) returns-thms)
+         ((returns re) returns-hd)
+         ((mv hypo concl)
+          (case-match re.returns-thm
+            ((('lambda (r) conclusions) (!fn . !re.formals))
+             (mv ''t (term-substitution conclusions r `(,fn ,@re.formals) t)))
+            (('implies type-predicates conclusions)
+             (mv type-predicates conclusions))
+            (& (mv ''t re.returns-thm))))
+         (substed-concl
+          (term-substitution concl `(,fn ,@re.formals) `(,fn ,@actuals) t))
+         (extended-concl (extend-judgements substed-concl path-cond options state))
+         ;; return-judge implies extended-concl
+         ((unless (path-test-list-or return-judge extended-concl state))
+          (choose-returns-helper return-judge returns-tl fn actuals path-cond
+                                 conclusion-acc actuals-judges-acc options
+                                 single? state))
+         ((if (and single? (path-test-list extended-concl return-judge state)))
+          (b* ((new-actuals-judges
+                (generate-actuals-judges hypo re.formals actuals
+                                         (initialize-actuals-judges-alist
+                                          actuals)
+                                         to.supertype state))
+               ((if new-actuals-judges) (mv substed-concl new-actuals-judges)))
+            (choose-returns-helper return-judge returns-tl fn actuals path-cond
+                                   conclusion-acc actuals-judges-acc options
+                                   single? state)))
+         ((if single?)
+          (choose-returns-helper return-judge returns-tl fn actuals path-cond
+                                 conclusion-acc actuals-judges-acc options
+                                 single? state))
+         (new-concl (union-judgements conclusion-acc extended-concl state))
+         (new-actuals-judges
+          (generate-actuals-judges hypo re.formals actuals actuals-judges-acc
+                                   to.supertype state))
+         ((unless new-actuals-judges)
           (choose-returns-helper return-judge returns-tl fn actuals path-cond
                                  conclusion-acc actuals-judges-acc options
                                  single? state)))
-       ((if single?)
-        (choose-returns-helper return-judge returns-tl fn actuals path-cond
-                               conclusion-acc actuals-judges-acc options
-                               single? state))
-       (new-concl (union-judgements conclusion-acc extended-concl state))
-       (new-actuals-judges
-        (generate-actuals-judges hypo re.formals actuals actuals-judges-acc
-                                 to.supertype state))
-       ((unless new-actuals-judges)
-        (choose-returns-helper return-judge returns-tl fn actuals path-cond
-                               conclusion-acc actuals-judges-acc options
-                               single? state)))
-    (choose-returns-helper return-judge returns-tl fn actuals path-cond new-concl
-                           new-actuals-judges options single? state)))
-)
+      (choose-returns-helper return-judge returns-tl fn actuals path-cond new-concl
+                             new-actuals-judges options single? state)))
+  )
 
 (verify-guards choose-returns-helper
   :hints (("Goal"
@@ -407,6 +407,8 @@
   :verify-guards nil
   :hints (("Goal"
            :in-theory (disable acl2-count implies-of-fncall-kind)))
+  ;; :returns-hints (("Goal"
+  ;;                  :in-theory (disable )))
 
   (define unify-fncall ((tterm typed-term-p)
                         (expected pseudo-termp)
@@ -545,94 +547,97 @@
     (b* (((unless (mbt (and (typed-term-p tterm)
                             (type-options-p options)
                             (pseudo-termp expected)
-                          (good-typed-term-p tterm options))))
-        (make-typed-term))
-       ((if (equal (typed-term->kind tterm) 'variablep))
-        (unify-variable tterm expected options))
-       ((if (equal (typed-term->kind tterm) 'quotep))
-        (unify-quote tterm expected options))
-       ((if (equal (typed-term->kind tterm) 'lambdap))
-        (unify-lambda tterm expected options state))
-       ((if (equal (typed-term->kind tterm) 'ifp))
-        (unify-if tterm expected options state)))
-    (unify-fncall tterm expected options state)))
+                            (good-typed-term-p tterm options))))
+          (make-typed-term))
+         ((if (equal (typed-term->kind tterm) 'variablep))
+          (unify-variable tterm expected options))
+         ((if (equal (typed-term->kind tterm) 'quotep))
+          (unify-quote tterm expected options))
+         ((if (equal (typed-term->kind tterm) 'lambdap))
+          (unify-lambda tterm expected options state))
+         ((if (equal (typed-term->kind tterm) 'ifp))
+          (unify-if tterm expected options state)))
+      (unify-fncall tterm expected options state)))
 
   (define unify-type-list ((tterm-lst typed-term-list-p)
                            (expected-lst pseudo-term-listp)
                            (options type-options-p)
                            state)
-  :returns (new-ttl (and (typed-term-list-p new-ttl)
-                         (good-typed-term-list-p new-ttl options)))
-  :guard (good-typed-term-list-p tterm-lst options)
-  :measure (list (acl2-count (typed-term-list->term-lst tterm-lst))
-                 1)
-  (b* (((unless (mbt (and (typed-term-list-p tterm-lst)
-                          (type-options-p options)
-                          (pseudo-term-listp expected-lst)
-                          (good-typed-term-list-p tterm-lst options))))
-        (make-typed-term-list))
-       ((typed-term-list ttl) tterm-lst)
-       ((unless (typed-term-list-consp ttl)) ttl)
-       ((unless (consp expected-lst))
-        (prog2$
-         (er hard? 'type-inference-topdown=>unify-type-list
-             "Expected-lst is already empty while there are still ~
+    :returns (new-ttl (and (typed-term-list-p new-ttl)
+                           (good-typed-term-list-p new-ttl options)))
+    :guard (good-typed-term-list-p tterm-lst options)
+    :measure (list (acl2-count (typed-term-list->term-lst tterm-lst))
+                   1)
+    (b* (((unless (mbt (and (typed-term-list-p tterm-lst)
+                            (type-options-p options)
+                            (pseudo-term-listp expected-lst)
+                            (good-typed-term-list-p tterm-lst options))))
+          (make-typed-term-list))
+         ((typed-term-list ttl) tterm-lst)
+         ((unless (typed-term-list-consp ttl)) ttl)
+         ((unless (consp expected-lst))
+          (prog2$
+           (er hard? 'type-inference-topdown=>unify-type-list
+               "Expected-lst is already empty while there are still ~
              typed-terms.~%")
-         ttl))
-       ((cons expected-hd expected-tl) expected-lst)
-       ((typed-term tt-car)
-        (unify-type (typed-term-list->car ttl options)
-                    expected-hd options state))
-       ((typed-term-list tt-cdr)
-        (unify-type-list (typed-term-list->cdr ttl options)
-                         expected-tl options state))
-       ((unless (mbt (equal tt-car.path-cond
-                            tt-cdr.path-cond)))
-        ttl))
-    (typed-term-list->cons tt-car tt-cdr options)))
+           ttl))
+         ((cons expected-hd expected-tl) expected-lst)
+         ((typed-term tt-car)
+          (unify-type (typed-term-list->car ttl options)
+                      expected-hd options state))
+         ((typed-term-list tt-cdr)
+          (unify-type-list (typed-term-list->cdr ttl options)
+                           expected-tl options state))
+         ((unless (mbt (equal tt-car.path-cond
+                              tt-cdr.path-cond)))
+          ttl))
+      (typed-term-list->cons tt-car tt-cdr options)))
   ///
-  (defthm unify-if-maintains-path-cond
-    (implies (and (typed-term-p tterm)
-                  (pseudo-termp expected)
-                  (type-options-p options)
-                  (equal (typed-term->kind tterm) 'ifp)
-                  (good-typed-term-p tterm options))
-             (equal (typed-term->path-cond (unify-if tterm expected options state))
-                    (typed-term->path-cond tterm)))
-    :hints (("Goal"
-             :expand (unify-if tterm expected options state))))
-  (defthm unify-fncall-maintains-path-cond
-    (implies (and (typed-term-p tterm)
-                  (pseudo-termp expected)
-                  (type-options-p options)
-                  (equal (typed-term->kind tterm) 'fncallp)
-                  (good-typed-term-p tterm options))
-             (equal (typed-term->path-cond (unify-fncall tterm expected options state))
-                    (typed-term->path-cond tterm)))
-    :hints (("Goal"
-             :expand (unify-fncall tterm expected options state))))
-  (defthm unify-lambda-maintains-path-cond
-    (implies (and (typed-term-p tterm)
-                  (pseudo-termp expected)
-                  (type-options-p options)
-                  (equal (typed-term->kind tterm) 'lambdap)
-                  (good-typed-term-p tterm options))
-             (equal (typed-term->path-cond (unify-lambda tterm expected options state))
-                    (typed-term->path-cond tterm)))
-    :hints (("Goal"
-             :expand (unify-lambda tterm expected options state))))
-  (defthm unify-type-maintains-path-cond
-    (implies (and (typed-term-p tterm)
-                  (pseudo-termp expected)
-                  (type-options-p options)
-                  (good-typed-term-p tterm options))
-             (equal (typed-term->path-cond (unify-type tterm expected options state))
-                    (typed-term->path-cond tterm)))
-    :hints (("Goal"
-             :expand (unify-type tterm expected options state))))
-)
-stop
-(skip-proofs
+  )
+
+(defthm unify-if-maintains-path-cond
+  (implies (and (typed-term-p tterm)
+                (pseudo-termp expected)
+                (type-options-p options)
+                (equal (typed-term->kind tterm) 'ifp)
+                (good-typed-term-p tterm options))
+           (equal (typed-term->path-cond (unify-if tterm expected options state))
+                  (typed-term->path-cond tterm)))
+  :hints (("Goal"
+           :expand (unify-if tterm expected options state))))
+
+(defthm unify-fncall-maintains-path-cond
+  (implies (and (typed-term-p tterm)
+                (pseudo-termp expected)
+                (type-options-p options)
+                (equal (typed-term->kind tterm) 'fncallp)
+                (good-typed-term-p tterm options))
+           (equal (typed-term->path-cond (unify-fncall tterm expected options state))
+                  (typed-term->path-cond tterm)))
+  :hints (("Goal"
+           :expand (unify-fncall tterm expected options state))))
+
+(defthm unify-lambda-maintains-path-cond
+  (implies (and (typed-term-p tterm)
+                (pseudo-termp expected)
+                (type-options-p options)
+                (equal (typed-term->kind tterm) 'lambdap)
+                (good-typed-term-p tterm options))
+           (equal (typed-term->path-cond (unify-lambda tterm expected options state))
+                  (typed-term->path-cond tterm)))
+  :hints (("Goal"
+           :expand (unify-lambda tterm expected options state))))
+
+(defthm unify-type-maintains-path-cond
+  (implies (and (typed-term-p tterm)
+                (pseudo-termp expected)
+                (type-options-p options)
+                (good-typed-term-p tterm options))
+           (equal (typed-term->path-cond (unify-type tterm expected options state))
+                  (typed-term->path-cond tterm)))
+  :hints (("Goal"
+           :expand (unify-type tterm expected options state))))
+
 (defthm unify-type-list-maintains-path-cond
   (implies (and (typed-term-list-p tterm-lst)
                 (pseudo-term-listp expected-lst)
@@ -643,6 +648,5 @@ stop
                   (typed-term-list->path-cond tterm-lst)))
   :hints (("Goal"
            :expand (unify-type-list tterm-lst expected-lst options state))))
-)
 
 (verify-guards unify-type)

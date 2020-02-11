@@ -1227,9 +1227,11 @@
         (make-typed-term-list))
        ((typed-term tt) tterm)
        ((typed-term-list ttl) tterm-lst)
-       ((unless (mbt (equal tt.path-cond ttl.path-cond)))
-        (change-typed-term-list (make-typed-term-list)
-                                :path-cond tt.path-cond)))
+       ((unless (equal tt.path-cond ttl.path-cond))
+        (prog2$ (er hard? 'typed-term=>typed-term-list->cons
+                    "tterm and tterm-lst of cons must have the same path-cond.~%")
+                (change-typed-term-list (make-typed-term-list)
+                                        :path-cond tt.path-cond))))
     (make-typed-term-list :term-lst `(,tt.term ,@ttl.term-lst)
                           :path-cond tt.path-cond
                           :judgements `(if ,tt.judgements ,ttl.judgements
