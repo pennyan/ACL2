@@ -25,70 +25,69 @@
 (local (in-theory (disable (:executable-counterpart typed-term)
                            (:executable-counterpart typed-term-list))))
 
-(define rectify ((tterm typed-term-p)
+(define rectify ((fn symbolp)
+                 (actuals pseudo-term-listp)
+                 (actual-judges pseudo-termp)
                  (return returns-p)
                  (options type-options-p)
                  state)
-  :guard (and (good-typed-term-p tterm options)
-              (equal (typed-term->kind tterm) 'fncallp))
-  :returns (new-tt maybe-typed-term-p)
-  (b* (((unless (mbt (and (typed-term-p tterm)
+  :returns (new-fn symbolp)
+  :guard (not (equal fn 'quote))
+  (b* (((unless (mbt (and (symbolp fn)
+                          (pseudo-term-listp actuals)
+                          (pseudo-termp actual-judges)
                           (returns-p return)
-                          (type-options-p options)
-                          (good-typed-term-p tterm options)
-                          (equal (typed-term->kind tterm) 'fncallp))))
-        (make-typed-term))
-       ((typed-term tt) tterm)
-       ((cons fn actuals) tt.term)
-       ((typed-term-list tta) (typed-term-fncall->actuals tt options))
+                          (type-options-p options))))
+        nil)
        (replace-thm (returns->replace-thm return))
        (formals (returns->formals return))
-       ((mv err new-term)
+       ((mv err new-fn)
         (case-match replace-thm
           (('implies hypo ('equal (!fn !formals) (new-fn !formals)))
-           (b* ((substed
+           (b* (((if (equal new-fn 'quote)) (mv t nil))
+                (substed
                  (term-substitution-conj hypo formals actuals t))
-                (yes? (path-test-list tta.judgements substed state))
-                ((if yes?) (mv nil `(,new-fn ,actuals))))
+                (yes? (path-test-list actual-judges substed state))
+                ((if yes?) (mv nil new-fn)))
              (mv nil nil)))
           (('implies hypo ('equal (new-fn !formals) (!fn !formals)))
-           (b* ((substed
+           (b* (((if (equal new-fn 'quote)) (mv t nil))
+                (substed
                  (term-substitution-conj hypo formals actuals t))
-                (yes? (path-test-list tta.judgements substed state))
-                ((if yes?) (mv nil `(,new-fn ,actuals))))
+                (yes? (path-test-list actual-judges substed state))
+                ((if yes?) (mv nil new-fn)))
              (mv nil nil)))
           (& (mv t nil))))
        ((unless err)
         (er hard? 'term-rectify=>rectify
-            "The replace theorem is malformed: ~q0" replace-thm))
-       ((unless new-term) nil))
-    (make-typed-term
-     :term new-term
-     :path-cond tt.path-cond
-     :judgements (term-substitution tt.judgements tt.term new-term t)))
+            "The replace theorem is malformed: ~q0" replace-thm)))
+    new-fn)
   ///
   (more-returns
-   (new-tt (implies new-tt (good-typed-term-p new-tt options))
-           :name good-typed-term-p-of-rectify)))
+   (new-fn (not (equal new-fn 'quote))
+           :name not-quote-of-rectify)))
 
-(define rectify-list ((tterm typed-term-p)
+(define rectify-list ((fn symbolp)
+                      (actuals pseudo-term-listp)
+                      (actual-judges pseudo-termp)
                       (returns returns-list-p)
                       (options type-options-p)
                       state)
-  :guard (and (good-typed-term-p tterm options)
-              (equal (typed-term->kind tterm) 'fncallp))
-  :returns (new-tt (and (typed-term-p new-tt)
-                        (good-typed-term-p new-tt options)))
+  :returns (new-fn symbolp)
   :measure (len returns)
+  :guard (not (equal fn 'quote))
   (b* ((returns (returns-list-fix returns))
        ((unless returns)
-        (prog2$ (er hard? 'term-rectify=>rectify-list
-                    "None of the replaces matches.~%")
-               (make-typed-term)))
+        (er hard? 'term-rectify=>rectify-list
+            "None of the replaces matches.~%"))
        ((cons returns-hd returns-tl) returns)
-       (rectify-hd (rectify tterm returns-hd options state))
+       (rectify-hd (rectify fn actuals actual-judges returns-hd options state))
        ((if rectify-hd) rectify-hd))
-    (rectify-list tterm returns-tl options state)))
+    (rectify-list fn actuals actual-judges returns-tl options state))
+  ///
+  (more-returns
+   (new-fn (not (equal new-fn 'quote))
+           :name not-quote-of-rectify-list)))
 
 (defines term-rectify
   :well-founded-relation l<
@@ -117,9 +116,9 @@
          ((typed-term ttt) (typed-term->top tt options))
          ((typed-term-list rtta) (term-list-rectify tta options state))
          ((typed-term rttb) (term-rectify ttb options state))
-         ((unless (mbt (equal (len formals)
-                              (len rtta.term-lst))))
-          (make-typed-term))
+         ;; ((unless (mbt (equal (len formals)
+         ;;                      (len rtta.term-lst))))
+         ;;  (make-typed-term))
          (new-term `((lambda ,formals ,rttb.term) ,@rtta.term-lst))
          (new-top-judge (term-substitution ttt.judgements ttt.term new-term t))
          (new-top (make-typed-term :term new-term
@@ -170,12 +169,12 @@
                             (good-typed-term-p tterm options)
                             (equal (typed-term->kind tterm) 'fncallp))))
           (make-typed-term))
-         ((typed-term tt) tterm)
          ((type-options to) options)
-         ((typed-term-list tta) (typed-term-fncall->actuals tt to))
+         ((typed-term tt) tterm)
+         ((typed-term-list tta) (typed-term-fncall->actuals tterm to))
          ((typed-term-list rtta) (term-list-rectify tta to state))
-         ((typed-term ttt) (typed-term->top tt to))
-         ((cons fn actuals) tt.term)
+         ((typed-term ttt) (typed-term->top tterm to))
+         ((cons fn &) tt.term)
          (conspair (assoc-equal fn to.functions))
          ((unless conspair)
           (prog2$
@@ -184,16 +183,18 @@
            (make-typed-term)))
          (fn-description (cdr conspair))
          ((mv & returns)
-          (returns-judgement fn actuals actuals tta.judgements tta.judgements
-                             fn-description tta.path-cond to.supertype ''t nil
-                             state))
-         (new-term `(,fn ,@rtta.term-lst))
+          (returns-judgement fn rtta.term-lst rtta.term-lst tta.judgements
+                             tta.judgements fn-description tta.path-cond
+                             to.supertype ''t nil state))
+         (new-fn
+          (rectify-list fn rtta.term-lst rtta.judgements returns options state))
+         (new-term `(,new-fn ,@rtta.term-lst))
          (new-judge
-          (term-substitution tt.judgements tt.term new-term t))
-         (ntt (make-typed-term :term new-term
-                               :path-cond tt.path-cond
-                               :judgements new-judge)))
-      (rectify-list ntt returns options state)))
+          (term-substitution ttt.judgements ttt.term new-term t))
+         (new-top (make-typed-term :term new-term
+                                   :path-cond ttt.path-cond
+                                   :judgements new-judge)))
+      (make-typed-fncall new-top rtta to)))
 
 (define term-rectify ((tterm typed-term-p)
                       (options type-options-p)
@@ -235,22 +236,19 @@
                             options state)
                            options)))
 ///
+(defthm term-list-rectify-maintains-len
+  (implies (and (typed-term-list-p tterm-lst)
+                (type-options-p options)
+                (good-typed-term-list-p tterm-lst options))
+           (equal (len (typed-term-list->term-lst
+                        (term-list-rectify tterm-lst options state)))
+                  (len (typed-term-list->term-lst tterm-lst))))
+  :hints (("Goal"
+           :in-theory (enable lambda-rectify fncall-rectify if-rectify
+                              term-rectify term-list-rectify))))
 )
 
-(skip-proofs
- (defthm term-list-rectify-maintains-len
-   (implies (and (typed-term-list-p tterm-lst)
-                 (type-options-p options)
-                 (good-typed-term-list-p tterm-lst options))
-            (equal (len (typed-term-list->term-lst
-                         (term-list-rectify tterm-lst options state)))
-                   (len (typed-term-list->term-lst tterm-lst))))
-   :hints (("Goal"
-            :in-theory (enable term-list-rectify)
-            :expand (term-list-rectify tterm-lst options state)))))
-
-(verify-guards term-rectify
-  :hints (("Goal")))
+(verify-guards term-rectify)
 
 (define term-rectify-fn ((cl pseudo-term-listp)
                          (smtlink-hint t)
@@ -270,10 +268,13 @@
         (er hard? 'term-rectify=>term-rectify-fn
             "Theorem should be a implies from a judgement to a goal.~%"))
        (options (construct-type-options smtlink-hint))
-       (rectified-tterm (term-rectify (make-typed-term :term original-goal
-                                                       :path-cond ''t
-                                                       :judgements judges)
-                                      options state))
+       (tt (make-typed-term :term original-goal
+                            :path-cond ''t
+                            :judgements judges))
+       ((unless (good-typed-term-p tt options))
+        (er hard? 'term-rectify=>term-rectify-fn
+            "Expected a good-typed-term-p.~%"))
+       (rectified-tterm (term-rectify tt options state))
        (new-cl (typed-term->term rectified-tterm))
        (next-cp (cdr (assoc-equal 'term-rectify *SMT-architecture*)))
        ((if (null next-cp)) (list cl))

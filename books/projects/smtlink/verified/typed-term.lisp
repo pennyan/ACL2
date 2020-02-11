@@ -863,7 +863,14 @@
                           (typed-term-list-consp tterm-lst))
                      (< (acl2-count (typed-term-list->term-lst new-ttl))
                         (acl2-count (typed-term-list->term-lst tterm-lst))))
-            :name acl2-count-of-typed-term-list->cdr)))
+            :name acl2-count-of-typed-term-list->cdr)
+   (new-ttl (implies (and (typed-term-list-p tterm-lst)
+                          (good-typed-term-list-p tterm-lst options)
+                          (type-options-p options)
+                          (typed-term-list-consp tterm-lst))
+                     (equal (len (typed-term-list->term-lst tterm-lst))
+                            (+ 1 (len (typed-term-list->term-lst new-ttl)))))
+            :name len-of-typed-term-list->cdr)))
 
 ;; -----------------------------------------------
 ;; Theorems for constructors
@@ -1150,3 +1157,4 @@
                           (typed-term-list->cons tterm tterm-lst options)))
                     (+ 1
                        (len (typed-term-list->term-lst tterm-lst)))))))
+
