@@ -66,53 +66,33 @@
            (and (consp (assoc-equal x y))
                 (arg-decl-p (cdr (assoc-equal x y))))))
 
-(defprod basic-type-description
-  ((recognizer symbolp)
-   (fixer symbolp)))
-
-(defalist basic-type-description-alist
-  :key-type symbolp
-  :val-type basic-type-description-p
-  :true-listp t)
-
-(defprod cons-type-description
-  ((recognizer symbolp)
-   (fixer symbolp)
-   (car-type symbolp)
-   (cdr-type symbolp)
-   (cdr-thm symbolp)))
-
-(defalist cons-type-description-alist
-  :key-type symbolp
-  :val-type cons-type-description-p
-  :true-listp t)
-
 (encapsulate ()
 (local (in-theory (disable (:rewrite default-cdr))))
-(defprod list-type-description
-  ((recognizer symbolp)
-   (fixer symbolp)
-   (elt-type symbolp)
-   (cons-thm symbolp)
-   (car-thm symbolp)
-   (cdr-thm symbolp)))
 
-(defalist list-type-description-alist
-  :key-type symbolp
-  :val-type list-type-description-p
+(defprod a2a-info
+  ((a2a-fn symbolp) ;; the alist-to-array function
+   (thm symbolp))) ;; the theorem justifying the return type of alist-to-array
+
+(defoption maybe-a2a-info a2a-info-p)
+
+(defalist alist-info
+  :key-type symbolp ;; the alist type recognizer
+  :val-type a2a-info-p
   :true-listp t)
 
-(defprod alist-type-description
-  ((recognizer symbolp)
-   (fixer symbolp)
-   (key-type symbolp)
-   (val-type symbolp)
-   (acons-thm symbolp)
-   (assoc-equal-thm symbolp)))
+(defthm assoc-equal-of-alist-info-p
+  (implies (and (alist-info-p ai)
+                (assoc-equal x ai))
+           (and (consp (assoc-equal x ai))
+                )))
 
-(defalist alist-type-description-alist
-  :key-type symbolp
-  :val-type alist-type-description-p
+(defthm maybe-of-assoc-equal-of-alist-info-p
+  (implies (alist-info-p ai)
+           (maybe-a2a-info-p (cdr (assoc-equal x ai)))))
+
+(defalist alist-array-map
+  :key-type symbolp ;; function name
+  :val-type symbolp ;; equivalence theorem name
   :true-listp t)
 )
 
@@ -129,68 +109,28 @@
                               acl2::true-list-listp-of-cdr-when-true-list-listp)
                              (:definition true-listp)
                              (:definition symbol-listp))))
-(defprod prod-type-description
-  ((recognizer symbolp)
-   (fixer symbolp)
-   (field-types symbol-listp)
-   (constructor-thm symbolp)
-   (destructor-thms symbol-listp)))
-
-(defalist prod-type-description-alist
-  :key-type symbolp
-  :val-type prod-type-description-p
-  :true-listp t)
-
-(defprod option-type-description
-  ((recognizer symbolp)
-   (fixer symbolp)
-   (some-type symbolp)
-   (some-constructor-thm symbolp)
-   (none-constructor-thm symbolp)
-   (some-destructor-thm symbolp)))
-
-(defalist option-type-description-alist
-  :key-type symbolp
-  :val-type option-type-description-p
-  :true-listp t)
-
-(defprod sum-type-description
-  ((prod-list prod-type-description-alist-p)))
-
-(defalist sum-type-description-alist
-  :key-type symbolp
-  :val-type sum-type-description-p
-  :true-listp t)
-
-(defprod abstract-type-description
-  ((recognizer symbolp)
-   (fixer symbolp)))
-
-(defalist abstract-type-description-alist
-  :key-type symbolp
-  :val-type abstract-type-description-p
-  :true-listp t)
-
 (defprod type-options
   ((supertype type-to-types-alist-p)
    (supertype-thm type-tuple-to-thm-alist-p)
    (subtype type-to-types-alist-p)
    (subtype-thm type-tuple-to-thm-alist-p)
    (functions function-description-alist-p)
-   (consp cons-type-description-alist-p)
-   (basic basic-type-description-alist-p)
-   (list list-type-description-alist-p)
-   (alist alist-type-description-alist-p)
-   (prod prod-type-description-alist-p)
-   (option option-type-description-alist-p)
-   (sum sum-type-description-alist-p)
-   (abstract abstract-type-description-alist-p)))
+   (alist alist-info-p)
+   (aa-map alist-array-map-p)))
 )
 
 (define is-type? ((type symbolp)
                   (supertype-alst type-to-types-alist-p))
   :returns (ok booleanp)
   (not (null (assoc-equal type (type-to-types-alist-fix supertype-alst)))))
+
+(define is-alist? ((type symbolp)
+                   (options type-options-p))
+  :returns (a2a maybe-a2a-info-p)
+  (b* ((options (type-options-fix options))
+       ((type-options to) options)
+       (yes? (assoc-equal type to.alist)))
+    (cdr yes?)))
 
 (define construct-type-options ((smtlink-hint smtlink-hint-p))
   :returns (type-options type-options-p)

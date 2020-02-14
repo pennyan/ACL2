@@ -38,7 +38,7 @@
                       :name booleanp-of-alist-val-as-bool))
 
     (local (define alist-val-default ()
-             :returns (default-v any-p)
+             :returns (default-v acl2::any-p)
              :enabled t
              0))
     (more-returns alist-val-default
@@ -110,7 +110,7 @@
     ;;   more-returns theorems.
     (local (define array-p (ar)
              :guard t
-             :returns (ok any-p)
+             :returns (ok acl2::any-p)
              (if (null ar) t
                  (and (consp ar)
                       (consp (car ar))
@@ -128,17 +128,17 @@
 
     (local (define array-init ()
              :guard t
-             :returns (ar any-p)
+             :returns (ar acl2::any-p)
              nil))
 
-    (local (define array-store ((k alist-key-p) (v array-val-p) (ar0 array-p))
-             :returns (ar any-p)
+    (local (define array-store ((ar0 array-p) (k alist-key-p) (v array-val-p))
+             :returns (ar acl2::any-p)
              (if (and (alist-key-p k) (array-val-p v) (array-p ar0))
                  (acons k v ar0)
                nil)))
 
-    (local (define array-select ((k alist-key-p) (ar array-p))
-             :returns (v any-p)
+    (local (define array-select ((ar array-p) (k alist-key-p))
+             :returns (v acl2::any-p)
              :guard-hints(("Goal"
                            :do-not-induct t
                            :in-theory (disable array-p--implies--alistp)
@@ -178,13 +178,13 @@
                      :name array-select-of-bogus-key))
 
     (defthm array-select-of-array-init
-      (equal (array-select k (array-init)) (array-val-default)))
+      (equal (array-select (array-init) k) (array-val-default)))
 
     (defthm array-select-of-array-store
       (implies (and (alist-key-p k1) (alist-key-p k0) (array-val-p v0)
                     (array-p ar))
-               (equal (array-select k1 (array-store k0 v0 ar))
-                      (if (equal k1 k0) v0 (array-select k1 ar)))))))
+               (equal (array-select (array-store ar k0 v0) k1)
+                      (if (equal k1 k0) v0 (array-select ar k1)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -202,40 +202,41 @@
 ;  (defthm array-and-alist-match-when-not-alist-key-p
 ;    (implies 
 ;     (and (alist-alist-p al) (array-p ar) (not (alist-key-p k)))
-;     (array-val-assoc-equiv (array-select k ar) (assoc-equal k al))))
+;     (array-val-assoc-equiv (array-select ar k) (assoc-equal k al))))
 ;  (local (in-theory (disable alist-assoc-p)))
 
-  (defun-sk array-alist-equiv (ar al)
+  (defun-sk alist-array-equiv (ar al)
     (forall (k)
             (implies (and (array-p ar) (alist-p al) (alist-key-p k))
-                     (equal (array-select k ar) (assoc-equal k al)))))
+                     (equal (array-select ar k) (assoc-equal k al)))))
 
-  (defthm array-alist-equiv--bogus-witness-implies-all-match
+  (defthm alist-array-equiv--bogus-witness-implies-all-match
     (implies
      (and (alist-p al) (array-p ar) (alist-key-p k)
           (equal
-           (array-select (array-alist-equiv-witness ar al) ar)
-           (assoc-equal  (array-alist-equiv-witness ar al) al)))
-     (equal (array-select k ar) (assoc-equal k al)))
+           (array-select ar (alist-array-equiv-witness ar al))
+           (assoc-equal  (alist-array-equiv-witness ar al) al)))
+     (equal (array-select ar k) (assoc-equal k al)))
     :hints(("Goal"
-            :in-theory (disable array-alist-equiv-necc)
-            :use((:instance array-alist-equiv-necc (ar ar) (al al) (k k))))))
+            :in-theory (disable alist-array-equiv-necc)
+            :use((:instance alist-array-equiv-necc (ar ar) (al al) (k k))))))
 
   (defthm equiv-of-array-alist-store
     (implies (and (array-p ar) (alist-p al)
                   (alist-key-p k) (alist-val-p v)
-                  (array-alist-equiv ar al))
-	     (array-alist-equiv (array-store k (cons k v) ar)
+                  (alist-array-equiv ar al))
+	     (alist-array-equiv (array-store ar k (cons k v))
                                 (acons k v al)))
     :hints(("Goal"
-            :in-theory (e/d (array-val-p) (array-alist-equiv-necc array-select-of-array-store))
+            :in-theory (e/d (array-val-p) (alist-array-equiv-necc array-select-of-array-store))
             :use(
-                 (:instance array-alist-equiv-necc (ar ar) (al al)
-                                  (k (array-alist-equiv-witness (array-store k (cons k v) ar)
-                                                                (acons k v al))))
+                 (:instance alist-array-equiv-necc (ar ar) (al al)
+                            (k (alist-array-equiv-witness
+                                (array-store ar k (cons k v))
+                                (acons k v al))))
                  (:instance array-select-of-array-store (ar ar) (k0 k) (k1 k) (v0 (cons k v)))
                  (:instance array-select-of-array-store (ar ar) (k0 k) (v0 (cons k v))
-                            (k1 (array-alist-equiv-witness (array-store k (cons k v) ar)
+                            (k1 (alist-array-equiv-witness (array-store ar k (cons k v))
 							   (acons k v al)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -250,13 +251,13 @@
   ;;   theorem, ACL2 fails with relatively easy easy to debug subgoals.  If
   ;;   ACL2 goes wild with induction, the proof debugging is harder (for me).
   (defthm translation-of-nil
-    (array-alist-equiv (array-init) nil))
+    (alist-array-equiv (array-init) nil))
 
   (defthm translation-of-acons
     (implies
      (and (array-p ar) (alist-p al) (alist-key-p k)
-          (alist-val-p v) (array-alist-equiv ar al))
-     (array-alist-equiv (array-store k (cons k v) ar)
+          (alist-val-p v) (alist-array-equiv ar al))
+     (alist-array-equiv (array-store ar k (cons k v))
                         (acons k v al)))
     :hints(("Goal"
             :in-theory (disable equiv-of-array-alist-store)
@@ -264,12 +265,12 @@
 
   (defthm translation-of-assoc-equal
     (implies (and (array-p ar) (alist-p al) (alist-key-p k)
-                              (array-alist-equiv ar al))
-                   (equal (array-select k ar) (assoc-equal k al)))
+                              (alist-array-equiv ar al))
+                   (equal (array-select ar k) (assoc-equal k al)))
     :hints(("Goal"
             :do-not-induct t
-            :in-theory (disable array-alist-equiv--bogus-witness-implies-all-match)
-            :use((:instance array-alist-equiv--bogus-witness-implies-all-match
+            :in-theory (disable alist-array-equiv--bogus-witness-implies-all-match)
+            :use((:instance alist-array-equiv--bogus-witness-implies-all-match
                             (ar ar) (al al) (k k))))))
 )
 
