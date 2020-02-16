@@ -409,7 +409,7 @@
 
 (defthm good-typed-term-of-make-typed-term-list-change
   (good-typed-term-list-p
-   (change-typed-term-list (make-typed-term-list) :path-cond path-cond)
+   (typed-term-list nil path-cond ''t)
    options)
   :hints (("Goal" :in-theory (enable good-typed-term-list-p))))
 
