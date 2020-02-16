@@ -83,8 +83,7 @@
 (defthm assoc-equal-of-alist-info-p
   (implies (and (alist-info-p ai)
                 (assoc-equal x ai))
-           (and (consp (assoc-equal x ai))
-                )))
+           (and (consp (assoc-equal x ai)))))
 
 (defthm maybe-of-assoc-equal-of-alist-info-p
   (implies (alist-info-p ai)
@@ -109,6 +108,7 @@
                               acl2::true-list-listp-of-cdr-when-true-list-listp)
                              (:definition true-listp)
                              (:definition symbol-listp))))
+
 (defprod type-options
   ((supertype type-to-types-alist-p)
    (supertype-thm type-tuple-to-thm-alist-p)

@@ -241,80 +241,20 @@
                                      'return-of-integerp))))))
     ))
 
-(defun basic ()
-  `((integerp . ,(make-basic-type-description :recognizer 'integerp
-                                              :fixer 'ifix))
-    (rationalp . ,(make-basic-type-description :recognizer 'rationalp
-                                               :fixer 'rfix))
-    (symbolp . ,(make-basic-type-description :recognizer 'symbolp
-                                             :fixer 'symbol-fix))
-    (booleanp . ,(make-basic-type-description :recognizer 'booleanp
-                                             :fixer 'bool-fix))))
-
-(defun consp-info ()
-  `((rational-integer-cons-p . ,(make-cons-type-description :recognizer
-                                                            'rational-integer-cons-p
-                                                            :fixer
-                                                            'rational-integer-cons-fix
-                                                            :car-type 'rationalp
-                                                            :cdr-type 'integerp
-                                                            :cdr-thm nil))))
-
-(defun alist ()
-  `((rational-integer-alistp . ,(make-alist-type-description :recognizer 'rational-integer-alistp
-                                                             :fixer 'rational-integer-alist-fix
-                                                             :key-type 'rationalp
-                                                             :val-type 'integerp
-                                                             :acons-thm nil
-                                                             :assoc-equal-thm nil
-                                                             ))))
-
-(defun option ()
-  `((maybe-integerp . ,(make-option-type-description :recognizer
-                                                     'maybe-integerp
-                                                     :fixer 'maybe-integer-fix
-                                                     :some-type 'integerp
-                                                     :some-constructor-thm nil
-                                                     :none-constructor-thm nil
-                                                     :some-destructor-thm nil
-                                                     ))
-    (maybe-rational-integer-consp . ,(make-option-type-description :recognizer 'maybe-rational-integer-consp
-                                                                   :fixer 'maybe-rational-integer-cons-fix
-                                                                   :some-type
-                                                                   'rational-integer-cons-p
-                                                                   :some-constructor-thm nil
-                                                                   :none-constructor-thm nil
-                                                                   :some-destructor-thm
-                                                                   nil))))
-
 (defun options ()
   (b* ((supertype (supertype))
        (supertype-thm (supertype-thm))
        (subtype (subtype))
        (subtype-thm (subtype-thm))
-       (functions (functions))
-       (basic (basic))
-       (consp (consp-info))
-       (list nil)
-       (alist (alist))
-       (prod nil)
-       (option (option))
-       (sum nil)
-       (abstract nil))
+       (functions (functions)))
     (make-type-options
      :supertype supertype
      :supertype-thm supertype-thm
      :subtype subtype
      :subtype-thm subtype-thm
      :functions functions
-     :basic basic
-     :consp consp
-     :list list
-     :alist alist
-     :prod prod
-     :option option
-     :sum sum
-     :abstract abstract)))
+     :alist nil
+     :aa-map nil)))
 
 (defun term ()
   '(if (if (rational-integer-alistp al)
