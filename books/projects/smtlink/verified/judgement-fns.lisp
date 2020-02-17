@@ -203,7 +203,7 @@
              (('implies (!root-type var) (!type var)) t)
              (('implies type-predicates (!type var))
               (b* (((if (equal type 'quote)) nil)
-                   (substed (term-substitution type-predicates var term t)))
+                   (substed (term-substitution type-predicates `((,var . ,term)) t)))
                 (path-test-list `(if (,root-type ,term) ,path-cond 'nil)
                                 substed state)))
              (& nil))))

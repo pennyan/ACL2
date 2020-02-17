@@ -46,14 +46,14 @@
           (('implies hypo ('equal (!fn !formals) (new-fn !formals)))
            (b* (((if (equal new-fn 'quote)) (mv t nil))
                 (substed
-                 (term-substitution-conj hypo formals actuals t))
+                 (term-substitution hypo (pairlis$ formals actuals) t))
                 (yes? (path-test-list actual-judges substed state))
                 ((if yes?) (mv nil new-fn)))
              (mv nil nil)))
           (('implies hypo ('equal (new-fn !formals) (!fn !formals)))
            (b* (((if (equal new-fn 'quote)) (mv t nil))
                 (substed
-                 (term-substitution-conj hypo formals actuals t))
+                 (term-substitution hypo (pairlis$ formals actuals) t))
                 (yes? (path-test-list actual-judges substed state))
                 ((if yes?) (mv nil new-fn)))
              (mv nil nil)))
@@ -77,9 +77,7 @@
   :measure (len returns)
   :guard (not (equal fn 'quote))
   (b* ((returns (returns-list-fix returns))
-       ((unless returns)
-        (er hard? 'term-rectify=>rectify-list
-            "None of the replaces matches.~%"))
+       ((unless returns) fn)
        ((cons returns-hd returns-tl) returns)
        (rectify-hd (rectify fn actuals actual-judges returns-hd options state))
        ((if rectify-hd) rectify-hd))
@@ -117,7 +115,7 @@
          ((typed-term-list rtta) (term-list-rectify tta options state))
          ((typed-term rttb) (term-rectify ttb options state))
          (new-term `((lambda ,formals ,rttb.term) ,@rtta.term-lst))
-         (new-top-judge (term-substitution ttt.judgements ttt.term new-term t))
+         (new-top-judge (term-substitution ttt.judgements `((,ttt.term . ,new-term)) t))
          (new-top (make-typed-term :term new-term
                                    :path-cond ttt.path-cond
                                    :judgements new-top-judge)))
@@ -146,7 +144,7 @@
          ((typed-term rttt) (term-rectify ttt options state))
          ((typed-term rtte) (term-rectify tte options state))
          (new-term `(if ,rttc.term ,rttt.term ,rtte.term))
-         (new-top-judge (term-substitution tttop.judgements tttop.term new-term t))
+         (new-top-judge (term-substitution tttop.judgements `((,tttop.term . ,new-term)) t))
          (new-top (make-typed-term :term new-term
                                    :path-cond tttop.path-cond
                                    :judgements new-top-judge)))
@@ -187,7 +185,7 @@
           (rectify-list fn rtta.term-lst rtta.judgements returns options state))
          (new-term `(,new-fn ,@rtta.term-lst))
          (new-judge
-          (term-substitution ttt.judgements ttt.term new-term t))
+          (term-substitution ttt.judgements `((,ttt.term . ,new-term)) t))
          (new-top (make-typed-term :term new-term
                                    :path-cond ttt.path-cond
                                    :judgements new-judge)))

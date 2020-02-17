@@ -78,7 +78,7 @@
          ((unless (mbt (and (pseudo-lambdap fn) flatten?))) nil)
          (body (lambda-body fn))
          (formals (lambda-formals fn))
-         (new-term (term-substitution-multi body formals actuals nil)))
+         (new-term (term-substitution body (pairlis$ formals actuals) nil)))
       (flatten-lambda new-term flatten? (1- clock))))
 
   (define flatten-lambda-list ((term-lst pseudo-term-listp)

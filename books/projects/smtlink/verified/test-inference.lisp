@@ -1,6 +1,7 @@
 (in-package "SMT")
 (include-book "type-inference-bottomup")
 (include-book "type-inference-topdown")
+(include-book "term-rectify")
 (set-state-ok t)
 
 (defalist rational-integer-alist
@@ -21,6 +22,10 @@
 (defoption maybe-rational-integer-consp rational-integer-cons-p
   :pred maybe-rational-integer-consp)
 
+(deflist rational-list
+  :elt-type rationalp
+  :true-listp t)
+
 (defun supertype ()
   `((integerp . (rationalp maybe-integerp))
     (rationalp . nil)
@@ -30,6 +35,7 @@
     (rational-integer-alistp . nil)
     (maybe-integerp . nil)
     (maybe-rational-integer-consp . nil)
+    (rational-list-p . nil)
     ))
 
 (defun subtype ()
@@ -41,6 +47,7 @@
     (maybe-rational-integer-consp . (rational-integer-cons-p))
     (rational-integer-alistp . nil)
     (rational-integer-cons-p . nil)
+    (rational-list-p . nil)
     ))
 
 (defthm integerp-implies-maybe-integerp
@@ -94,6 +101,19 @@
            (integerp (cdr x)))
   :hints (("Goal" :in-theory (enable rational-integer-cons-p))))
 
+(defthm return-of-car-rlistp
+  (implies (and (rational-list-p x) x)
+           (rationalp (car x))))
+
+(defthm return-of-cdr-rlistp
+  (implies (rational-list-p x)
+           (rational-list-p (cdr x))))
+
+(defthm return-of-cons
+  (implies (and (rationalp x)
+                (rational-list-p y))
+           (rational-list-p (cons x y))))
+
 (defthm return-of-<
   (implies (and (rationalp x)
                 (rationalp y))
@@ -119,6 +139,9 @@
 
 (defthm return-of-rational-integer-alistp
   (booleanp (rational-integer-alistp x)))
+
+(defthm return-of-rational-listp
+  (booleanp (rational-listp x)))
 
 (defthm return-of-rationalp
   (booleanp (rationalp x)))
@@ -161,7 +184,16 @@
                                    :r (make-return-spec
                                        :formals '(y x)
                                        :return-type 'maybe-rational-integer-consp
-                                       :returns-thm 'return-of-assoc-equal)))))))))
+                                       :returns-thm
+                                       'return-of-assoc-equal)))))))))
+    (car
+     . ,(make-arg-decl-next
+         :next `((rational-list-p
+                  . ,(make-arg-decl-done
+                      :r (make-return-spec
+                          :formals '(x)
+                          :return-type 'rationalp
+                          :returns-thm 'return-of-car-rlistp))))))
     (cdr
      . ,(make-arg-decl-next
          :next `((maybe-rational-integer-consp
@@ -175,7 +207,24 @@
                       :r (make-return-spec
                           :formals '(x)
                           :return-type 'integerp
-                          :returns-thm 'return-of-cdr))))))
+                          :returns-thm 'return-of-cdr)))
+                 (rational-list-p
+                  . ,(make-arg-decl-done
+                      :r (make-return-spec
+                          :formals '(x)
+                          :return-type 'rational-list-p
+                          :returns-thm 'return-of-cdr-rlistp))))))
+    (cons
+     . ,(make-arg-decl-next
+         :next `((rationalp
+                  . ,(make-arg-decl-next
+                      :next `((rational-list-p
+                               . ,(make-arg-decl-done
+                                   :r (make-return-spec
+                                       :formals '(x y)
+                                       :return-type 'rational-list-p
+                                       :returns-thm
+                                       'return-of-cons)))))))))
     (<
      . ,(make-arg-decl-next
          :next `((rationalp
@@ -225,6 +274,13 @@
                                                     :return-type 'booleanp
                                                     :returns-thm
                                                     'return-of-rational-integer-alistp))))))
+    (rational-list-p . ,(make-arg-decl-next
+                         :next `((t . ,(make-arg-decl-done
+                                        :r (make-return-spec
+                                            :formals '(x)
+                                            :return-type 'booleanp
+                                            :returns-thm
+                                            'return-of-rational-list-p))))))
     (rationalp . ,(make-arg-decl-next
                    :next `((t . ,(make-arg-decl-done
                                   :r (make-return-spec
@@ -309,12 +365,24 @@
         al r1)
      't))
 
+(defun term6 ()
+  '(if (if (rational-list-p l1)
+           (if (integerp i1)
+               l1
+             'nil)
+         'nil)
+       (< (binary-+ (car (cdr (cons i1 l1)))
+                    (unary-- (car (cons (car l1) nil))))
+          '2)
+     't))
+
 (type-judgement (term) ''t (options) state)
 (type-judgement (term2) ''t (options) state)
 (type-judgement (term3) ''t (options) state)
 (type-judgement (term4) ''t (options) state)
 (type-judgement (term5) ''t (options) state)
-
+(type-judgement (term6) ''t (options) state)
+stop
 ;; ;; -----------------------------------------
 ;; ;; ;; testing guard utilities
 
@@ -462,3 +530,60 @@
             ''t
             (options)
             state)
+
+;; ------------------------------------------------------------------
+
+(term-rectify
+ (unify-type (make-typed-term :term (term)
+                              :path-cond ''t
+                              :judgements (type-judgement (term) ''t (options)
+                                                          state))
+             ''t
+             (options)
+             state)
+ (options)
+ state)
+
+(term-rectify
+ (unify-type (make-typed-term :term (term2)
+                              :path-cond ''t
+                              :judgements (type-judgement (term2) ''t (options)
+                                                          state))
+             ''t
+             (options)
+             state)
+ (options)
+ state)
+
+(term-rectify
+ (unify-type (make-typed-term :term (term3)
+                              :path-cond ''t
+                              :judgements (type-judgement (term3) ''t (options)
+                                                          state))
+             ''t
+             (options)
+             state)
+ (options)
+ state)
+
+(term-rectify
+ (unify-type (make-typed-term :term (term4)
+                              :path-cond ''t
+                              :judgements (type-judgement (term4) ''t (options)
+                                                          state))
+             ''t
+             (options)
+             state)
+ (options)
+ state)
+
+(term-rectify
+ (unify-type (make-typed-term :term (term5)
+                              :path-cond ''t
+                              :judgements (type-judgement (term5) ''t (options)
+                                                          state))
+             ''t
+             (options)
+             state)
+ (options)
+ state)

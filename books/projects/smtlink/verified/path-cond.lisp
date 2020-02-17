@@ -27,7 +27,7 @@
   :returns (ok booleanp)
   (b* ((path-cond (pseudo-term-fix path-cond))
        (expr (pseudo-term-fix expr))
-       (substed-cond (term-substitution path-cond expr ''nil t))
+       (substed-cond (term-substitution path-cond `((,expr . 'nil)) t))
        ((mv err eval-cond) (partial-eval substed-cond nil state))
        ((if err) nil)
        ((unless eval-cond) t))

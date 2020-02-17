@@ -140,7 +140,7 @@
     (b* ((hypo (pseudo-term-fix hypo))
          (actual (pseudo-term-fix actual))
          (formal-judges (look-up-path-cond formal hypo supertype))
-         (actual-judges (term-substitution formal-judges formal actual t))
+         (actual-judges (term-substitution formal-judges `((,formal . ,actual)) t))
          (actuals-judges-alst (pseudo-term-alist-fix actuals-judges-alst))
          (yes? (assoc-equal actual actuals-judges-alst))
          ((unless yes?)
@@ -233,12 +233,12 @@
          ((mv hypo concl)
           (case-match re.returns-thm
             ((('lambda (r) conclusions) (!fn . !re.formals))
-             (mv ''t (term-substitution conclusions r `(,fn ,@re.formals) t)))
+             (mv ''t (term-substitution conclusions `((,r . (,fn ,@re.formals))) t)))
             (('implies type-predicates conclusions)
              (mv type-predicates conclusions))
             (& (mv ''t re.returns-thm))))
          (substed-concl
-          (term-substitution concl `(,fn ,@re.formals) `(,fn ,@actuals) t))
+          (term-substitution concl `(((,fn ,@re.formals) . (,fn ,@actuals))) t))
          (extended-concl (extend-judgements substed-concl path-cond options state))
          ;; return-judge implies extended-concl
          ((unless (path-test-list-or return-judge extended-concl state))
@@ -489,7 +489,7 @@
                                    :path-cond tt-top.path-cond
                                    :judgements judge-top))
          (body-expected
-          (term-substitution judge-top tt-top.term tt-body.term t))
+          (term-substitution judge-top `((,tt-top.term . ,tt-body.term)) t))
          (new-body (unify-type tt-body body-expected to state))
          ((typed-term nbd) new-body)
          (formals (lambda-formals (car tt-top.term)))
@@ -530,9 +530,9 @@
          (new-top (make-typed-term :term tt-top.term
                                    :path-cond tt-top.path-cond
                                    :judgements judge-top))
-         (then-expected (term-substitution judge-top tt-top.term tt-then.term t))
+         (then-expected (term-substitution judge-top `((,tt-top.term . ,tt-then.term)) t))
          (new-then (unify-type tt-then then-expected to state))
-         (else-expected (term-substitution judge-top tt-top.term tt-else.term t))
+         (else-expected (term-substitution judge-top `((,tt-top.term . ,tt-else.term)) t))
          (new-else (unify-type tt-else else-expected to state)))
       (make-typed-if new-top new-cond new-then new-else to)))
 

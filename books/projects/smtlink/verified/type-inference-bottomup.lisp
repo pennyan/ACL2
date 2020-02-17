@@ -167,7 +167,7 @@
          (actuals-judgements
           (type-judgement-list actuals path-cond options state))
          (substed-actuals-judgements
-          (term-substitution-conj actuals-judgements actuals formals t))
+          (term-substitution actuals-judgements (pairlis$ actuals formals) t))
          (body-judgements
           (type-judgement body `(if ,shadowed-path-cond
                                     ,substed-actuals-judgements 'nil)
@@ -178,7 +178,7 @@
             ,@actuals))
          (return-judgement
           (term-substitution (type-judgement-top body-judgements body options)
-                             body term t)))
+                             `((,body . ,term)) t)))
       `(if ,return-judgement
            (if ,lambda-judgements
                ,actuals-judgements
@@ -211,8 +211,8 @@
                           options state))
          (judge-then-top (type-judgement-top judge-then then options))
          (judge-else-top (type-judgement-top judge-else else options))
-         (judge-from-then (term-substitution judge-then-top then term t))
-         (judge-from-else (term-substitution judge-else-top else term t))
+         (judge-from-then (term-substitution judge-then-top `((,then . ,term)) t))
+         (judge-from-else (term-substitution judge-else-top `((,else . ,term)) t))
          (judge-if-top (intersect-judgements judge-from-then judge-from-else
                                          state))
          (judge-if-top-extended

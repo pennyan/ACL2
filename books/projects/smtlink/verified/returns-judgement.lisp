@@ -29,30 +29,6 @@
   :elt-type returns-p
   :true-listp t)
 
-;; ---------------------------------------------------------------
-(define term-substitution-conj ((term pseudo-termp)
-                                (subterm-lst pseudo-term-listp)
-                                (subst-lst pseudo-term-listp)
-                                (skip-conj booleanp))
-  :returns (substed pseudo-termp)
-  :measure (acl2-count (pseudo-term-fix term))
-  (b* ((term (pseudo-term-fix term))
-       (subterm-lst (pseudo-term-list-fix subterm-lst))
-       (subst-lst (pseudo-term-list-fix subst-lst))
-       ((if (equal term ''t)) ''t)
-       ((unless (and (consp subterm-lst)
-                     (consp subst-lst)))
-        (er hard? 'type-inference-bottomup=>term-substitution-conj
-            "Subterm-lst or subst-lst is empty.~%"))
-       ((cons subterm-hd subterm-tl) subterm-lst)
-       ((cons subst-hd subst-tl) subst-lst)
-       ((unless (is-conjunct? term))
-        (term-substitution term subterm-hd subst-hd skip-conj))
-       ((list & first rest &) term))
-    `(if ,(term-substitution first subterm-hd subst-hd skip-conj)
-         ,(term-substitution-conj rest subterm-tl subst-tl skip-conj)
-       'nil)))
-
 ;;-------------------------------------------------------
 ;; Returns judgmenets
 
@@ -101,26 +77,24 @@
            (mv t `(,return-type (,fn ,@actuals))))
           ((('lambda (r) conclusions) (!fn . !formals))
            (b* ((substed-conclusions
-                 (term-substitution conclusions r `(,fn ,@actuals) t))
+                 (term-substitution conclusions `((,r . '(,fn ,@actuals))) t))
                 (return-judge
                  (look-up-path-cond `(,fn ,@actuals) substed-conclusions supertype)))
              (mv t return-judge)))
           (('implies type-predicates conclusions)
            (b* ((substed
-                 (term-substitution-conj type-predicates formals actuals t))
+                 (term-substitution type-predicates (pairlis$ formals actuals) t))
                 (yes?
                  (path-test-list `(if ,path-cond ,actuals-judgements 'nil)
                                  substed state))
                 ((unless yes?) (mv nil nil))
                 (substed-conclusions
-                 (term-substitution conclusions `(,fn ,@formals)
-                                    `(,fn ,@actuals) t))
+                 (term-substitution conclusions `(('(,fn ,@formals) . '(,fn ,@actuals))) t))
                 (return-judge
                  (look-up-path-cond `(,fn ,@actuals) substed-conclusions supertype)))
              (mv t return-judge)))
           (& (b* ((substed-conclusions
-                   (term-substitution returns-thm `(,fn ,@formals)
-                                      `(,fn ,@actuals) t))
+                   (term-substitution returns-thm `(('(,fn ,@formals) . '(,fn ,@actuals))) t))
                   (return-judge
                    (look-up-path-cond `(,fn ,@actuals) substed-conclusions supertype)))
                (mv t return-judge)))))
