@@ -77,24 +77,30 @@
            (mv t `(,return-type (,fn ,@actuals))))
           ((('lambda (r) conclusions) (!fn . !formals))
            (b* ((substed-conclusions
-                 (term-substitution conclusions `((,r . '(,fn ,@actuals))) t))
+                 (term-substitution conclusions `((,r . (,fn ,@actuals))) t))
                 (return-judge
                  (look-up-path-cond `(,fn ,@actuals) substed-conclusions supertype)))
              (mv t return-judge)))
           (('implies type-predicates conclusions)
            (b* ((substed
-                 (term-substitution type-predicates (pairlis$ formals actuals) t))
+                 (term-substitution type-predicates (pairlis$ formals actuals)
+                                    t))
                 (yes?
                  (path-test-list `(if ,path-cond ,actuals-judgements 'nil)
                                  substed state))
-                ((unless yes?) (mv nil nil))
+                ((unless yes?)
+                 (mv nil (er hard? 'type-inference-bottomup=>construct-returns-judgement
+                             "Hypotheses of returns theorem is not discharged.~%")))
                 (substed-conclusions
-                 (term-substitution conclusions `(('(,fn ,@formals) . '(,fn ,@actuals))) t))
+                 (term-substitution conclusions
+                                    `(((,fn ,@formals) . (,fn ,@actuals)))
+                                    t))
                 (return-judge
-                 (look-up-path-cond `(,fn ,@actuals) substed-conclusions supertype)))
+                 (look-up-path-cond `(,fn ,@actuals) substed-conclusions
+                                    supertype)))
              (mv t return-judge)))
           (& (b* ((substed-conclusions
-                   (term-substitution returns-thm `(('(,fn ,@formals) . '(,fn ,@actuals))) t))
+                   (term-substitution returns-thm `(((,fn ,@formals) . (,fn ,@actuals))) t))
                   (return-judge
                    (look-up-path-cond `(,fn ,@actuals) substed-conclusions supertype)))
                (mv t return-judge)))))

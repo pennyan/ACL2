@@ -112,7 +112,8 @@
 (defthm return-of-cons
   (implies (and (rationalp x)
                 (rational-list-p y))
-           (rational-list-p (cons x y))))
+           (and (rational-list-p (cons x y))
+                (cons x y))))
 
 (defthm return-of-<
   (implies (and (rationalp x)
@@ -371,8 +372,8 @@
                l1
              'nil)
          'nil)
-       (< (binary-+ (car (cdr (cons i1 l1)))
-                    (unary-- (car (cons (car l1) nil))))
+       (< (binary-+ (car (cons i1 l1))
+                    (unary-- i1))
           '2)
      't))
 
@@ -382,7 +383,7 @@
 (type-judgement (term4) ''t (options) state)
 (type-judgement (term5) ''t (options) state)
 (type-judgement (term6) ''t (options) state)
-stop
+
 ;; ;; -----------------------------------------
 ;; ;; ;; testing guard utilities
 

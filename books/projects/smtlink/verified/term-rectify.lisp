@@ -77,6 +77,8 @@
   :measure (len returns)
   :guard (not (equal fn 'quote))
   (b* ((returns (returns-list-fix returns))
+       ((unless (mbt (and (symbolp fn) (not (equal fn 'quote)))))
+        nil)
        ((unless returns) fn)
        ((cons returns-hd returns-tl) returns)
        (rectify-hd (rectify fn actuals actual-judges returns-hd options state))

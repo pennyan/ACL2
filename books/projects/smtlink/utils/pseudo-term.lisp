@@ -148,6 +148,11 @@
                 (pseudo-term-listp x))
            (pseudo-term-alistp (pairlis$ y x))))
 
+(defthm pseudo-term-alistp-of-pairlis$-of-pseudo-term-listp-and-symbol-listp
+  (implies (and (symbol-listp y)
+                (pseudo-term-listp x))
+           (pseudo-term-alistp (pairlis$ x y))))
+
 (defthm nil-of-assoc-equal-of-pseudo-term-alistp
   (implies (and (pseudo-term-alistp x) (not (consp (assoc-equal y x))))
            (not (assoc-equal y x))))
