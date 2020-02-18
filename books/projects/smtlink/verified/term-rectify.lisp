@@ -43,22 +43,27 @@
        (formals (returns->formals return))
        ((mv err new-fn)
         (case-match replace-thm
-          (('implies hypo ('equal (!fn !formals) (new-fn !formals)))
+          (('equal (!fn . !formals) (new-fn . !formals))
+           (if (equal new-fn 'quote) (mv t nil) (mv nil new-fn)))
+          (('equal (new-fn . !formals) (!fn . !formals))
+           (if (equal new-fn 'quote) (mv t nil) (mv nil new-fn)))
+          (('implies hypo ('equal (!fn . !formals) (new-fn . !formals)))
            (b* (((if (equal new-fn 'quote)) (mv t nil))
                 (substed
                  (term-substitution hypo (pairlis$ formals actuals) t))
                 (yes? (path-test-list actual-judges substed state))
                 ((if yes?) (mv nil new-fn)))
-             (mv nil nil)))
-          (('implies hypo ('equal (new-fn !formals) (!fn !formals)))
+             (mv t nil)))
+          (('implies hypo ('equal (new-fn . !formals) (!fn . !formals)))
            (b* (((if (equal new-fn 'quote)) (mv t nil))
                 (substed
                  (term-substitution hypo (pairlis$ formals actuals) t))
                 (yes? (path-test-list actual-judges substed state))
                 ((if yes?) (mv nil new-fn)))
-             (mv nil nil)))
+             (mv t nil)))
+          (''t (mv nil nil))
           (& (mv t nil))))
-       ((unless err)
+       ((if err)
         (er hard? 'term-rectify=>rectify
             "The replace theorem is malformed: ~q0" replace-thm)))
     new-fn)
@@ -180,11 +185,12 @@
            tterm))
          (fn-description (cdr conspair))
          ((mv & returns)
-          (returns-judgement fn rtta.term-lst rtta.term-lst tta.judgements
-                             tta.judgements fn-description tta.path-cond
+          (returns-judgement fn rtta.term-lst rtta.term-lst rtta.judgements
+                             rtta.judgements fn-description rtta.path-cond
                              to.supertype ''t nil state))
          (new-fn
-          (rectify-list fn rtta.term-lst rtta.judgements returns options state))
+          (rectify-list fn rtta.term-lst rtta.judgements returns options
+                        state))
          (new-term `(,new-fn ,@rtta.term-lst))
          (new-judge
           (term-substitution ttt.judgements `((,ttt.term . ,new-term)) t))

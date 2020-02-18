@@ -141,8 +141,8 @@
 (defthm return-of-rational-integer-alistp
   (booleanp (rational-integer-alistp x)))
 
-(defthm return-of-rational-listp
-  (booleanp (rational-listp x)))
+(defthm return-of-rational-list-p
+  (booleanp (rational-list-p x)))
 
 (defthm return-of-rationalp
   (booleanp (rationalp x)))
@@ -155,6 +155,19 @@
                 (integerp y)
                 (rational-integer-alistp z))
            (rational-integer-alistp (acons x y z))))
+
+(defun rational-list-car (x)
+  (if (consp x) (car x) (rfix x)))
+
+(defthm replace-of-car
+  (implies (and (rational-list-p x) x)
+           (equal (car x) (rational-list-car x))))
+
+(defun rational-list-cons (x y)
+  (cons x y))
+
+(defthm replace-of-cons
+  (equal (cons x y) (rational-list-cons x y)))
 
 ;; assoc-equal: rational-integer-alistp -> maybe-rational-integer-consp
 ;; cdr: maybe-rational-integer-consp -> maybe-integerp &
@@ -194,7 +207,8 @@
                       :r (make-return-spec
                           :formals '(x)
                           :return-type 'rationalp
-                          :returns-thm 'return-of-car-rlistp))))))
+                          :returns-thm 'return-of-car-rlistp
+                          :replace-thm 'replace-of-car))))))
     (cdr
      . ,(make-arg-decl-next
          :next `((maybe-rational-integer-consp
@@ -225,7 +239,8 @@
                                        :formals '(x y)
                                        :return-type 'rational-list-p
                                        :returns-thm
-                                       'return-of-cons)))))))))
+                                       'return-of-cons
+                                       :replace-thm 'replace-of-cons)))))))))
     (<
      . ,(make-arg-decl-next
          :next `((rationalp
@@ -582,6 +597,17 @@
  (unify-type (make-typed-term :term (term5)
                               :path-cond ''t
                               :judgements (type-judgement (term5) ''t (options)
+                                                          state))
+             ''t
+             (options)
+             state)
+ (options)
+ state)
+
+(term-rectify
+ (unify-type (make-typed-term :term (term6)
+                              :path-cond ''t
+                              :judgements (type-judgement (term6) ''t (options)
                                                           state))
              ''t
              (options)
