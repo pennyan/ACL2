@@ -61,8 +61,10 @@
        (equal term (cadr judge)))
   ///
   (more-returns
-   (ok (implies ok (pseudo-termp judge))
-       :name pseudo-termp-of-type-predicate-of-term)))
+   (ok (implies ok (and (pseudo-termp judge)
+                        (consp judge)
+                        (symbolp (car judge))))
+       :name implies-of-type-predicate-of-term)))
 
 (define single-var-fncall-of-term ((judge pseudo-termp)
                                    (term pseudo-termp))

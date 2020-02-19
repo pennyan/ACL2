@@ -273,9 +273,28 @@
             :in-theory (disable alist-array-equiv--bogus-witness-implies-all-match)
             :use((:instance alist-array-equiv--bogus-witness-implies-all-match
                             (ar ar) (al al) (k k))))))
+
+  ;; TODO
+  (define alist-to-array ((al alist-p))
+    :guard-hints(("Goal" :in-theory (enable alist-p)))
+    :returns (ar array-p)
+    (b* (((unless (mbt (alist-p al))) (array-init))
+         ((unless (consp al)) (array-init))
+         ((cons (cons key val) rest) al))
+      (array-store (alist-to-array rest) key (cons key val)))
+    ;; (if (and (consp (car al)) (alist-key-p (caar al)) (alist-val-p (cdar al)))
+    ;;     (array-store (caar al) (cons (caar al) (cdar al)) (alist-to-array (cdr al)))
+    ;;   (array-init))
+    ///
+    (local (in-theory (enable alist-to-array alist-p alist-consp)))
+    (more-returns
+     (ar (implies (alist-p al) (alist-array-equiv al ar))
+         ;; :hints(("Goal" :in-theory (enable alist-p)))
+         :name equiv-of-alist-to-array)))
 )
 
-(defun equal-or-aaequiv (x y)
+(defun alist-array-equal (x y)
   (if (alist-p x)
       (alist-array-equiv x y)
     (equal x y)))
+
