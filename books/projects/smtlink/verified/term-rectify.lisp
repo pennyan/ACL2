@@ -33,6 +33,7 @@
                  state)
   :returns (new-fn symbolp)
   :guard (not (equal fn 'quote))
+  :ignore-ok t
   (b* (((unless (mbt (and (symbolp fn)
                           (pseudo-term-listp actuals)
                           (pseudo-termp actual-judges)
@@ -40,21 +41,20 @@
                           (type-options-p options))))
         nil)
        (replace-thm (returns->replace-thm return))
-       (formals (returns->formals return))
        ((mv err new-fn)
         (case-match replace-thm
-          (('equal (!fn . !formals) (new-fn . !formals))
+          (('equal (!fn . formals) (new-fn . formals))
            (if (equal new-fn 'quote) (mv t nil) (mv nil new-fn)))
-          (('equal (new-fn . !formals) (!fn . !formals))
+          (('equal (new-fn . formals) (!fn . formals))
            (if (equal new-fn 'quote) (mv t nil) (mv nil new-fn)))
-          (('implies hypo ('equal (!fn . !formals) (new-fn . !formals)))
+          (('implies hypo ('equal (!fn . formals) (new-fn . formals)))
            (b* (((if (equal new-fn 'quote)) (mv t nil))
                 (substed
                  (term-substitution hypo (pairlis$ formals actuals) t))
                 (yes? (path-test-list actual-judges substed state))
                 ((if yes?) (mv nil new-fn)))
              (mv t nil)))
-          (('implies hypo ('equal (new-fn . !formals) (!fn . !formals)))
+          (('implies hypo ('equal (new-fn . formals) (!fn . formals)))
            (b* (((if (equal new-fn 'quote)) (mv t nil))
                 (substed
                  (term-substitution hypo (pairlis$ formals actuals) t))

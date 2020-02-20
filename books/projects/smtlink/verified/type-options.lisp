@@ -89,9 +89,13 @@
   (implies (alist-info-p ai)
            (maybe-a2a-info-p (cdr (assoc-equal x ai)))))
 
+(defprod equiv-p
+  ((formal-map symbol-alistp)
+   (thm symbolp)))
+
 (defalist alist-array-map
   :key-type symbolp ;; function name
-  :val-type symbolp ;; equivalence theorem name
+  :val-type equiv-p ;; equivalence theorem name
   :true-listp t)
 )
 
