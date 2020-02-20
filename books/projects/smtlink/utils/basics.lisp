@@ -84,3 +84,26 @@
   :elt-type symbol-listp
   :pred symbol-list-listp
   :true-listp t)
+
+(define symbol-alist-fix ((x symbol-alistp))
+  :returns (fix-x symbol-alistp)
+  (mbe :logic (if (symbol-alistp x) x nil)
+       :exec x)
+  ///
+  (more-returns
+   (fix-x (implies (symbol-alistp x) (equal fix-x x))
+          :name symbol-alist-fix-when-symbol-alistp)))
+
+(deffixtype symbol-alist
+  :pred symbol-alistp
+  :fix symbol-alist-fix
+  :equiv symbol-alist-equiv
+  :define t
+  :topic symbol-alist)
+
+(local
+ (defthm symbol-alistp-of-pairlis$-of-symbol-listp
+   (implies (symbol-listp x)
+            (symbol-alistp (pairlis$ x y)))
+   :hints (("Goal" :in-theory (enable symbol-alistp))))
+ )

@@ -101,6 +101,10 @@
            (integerp (cdr x)))
   :hints (("Goal" :in-theory (enable rational-integer-cons-p))))
 
+(defthm return-of-not
+  (implies (booleanp x)
+           (booleanp (not x))))
+
 (defthm return-of-car-rlistp
   (implies (and (rational-list-p x) x)
            (rationalp (car x))))
@@ -124,6 +128,11 @@
   (implies (and (integerp x)
                 (integerp y))
            (integerp (binary-+ x y))))
+
+(defthm return-of-binary-*
+  (implies (and (integerp x)
+                (integerp y))
+           (integerp (binary-* x y))))
 
 (defthm return-of-binary-+-rationalp
   (implies (and (rationalp x)
@@ -269,7 +278,19 @@
                                    :r (make-return-spec
                                        :formals '(x y)
                                        :return-type 'rationalp
-                                       :returns-thm 'return-of-binary-+-rationalp)))))))))
+                                       :returns-thm
+                                       'return-of-binary-+-rationalp)))))))))
+    (binary-*
+     . ,(make-arg-decl-next
+         :next `((integerp
+                  . ,(make-arg-decl-next
+                      :next `((integerp
+                               . ,(make-arg-decl-done
+                                   :r (make-return-spec
+                                       :formals '(x y)
+                                       :return-type 'integerp
+                                       :returns-thm
+                                       'return-of-binary-*)))))))))
     (unary-- . ,(make-arg-decl-next
                  :next `((integerp . ,(make-arg-decl-done
                                        :r (make-return-spec
@@ -283,6 +304,13 @@
                                             :return-type 'rationalp
                                             :returns-thm
                                             'return-of-unary---rationalp))))))
+    (not . ,(make-arg-decl-next
+             :next `((booleanp . ,(make-arg-decl-done
+                                   :r (make-return-spec
+                                       :formals '(x)
+                                       :return-type 'booleanp
+                                       :returns-thm
+                                       'return-of-not))))))
     (rational-integer-alistp . ,(make-arg-decl-next
                                  :next `((t . ,(make-arg-decl-done
                                                 :r (make-return-spec
@@ -614,3 +642,19 @@
              state)
  (options)
  state)
+
+;; --------------------------------------------------
+;; test
+(defun test ()
+  '(if (integerp x)
+       (not (< (binary-* x x) '0))
+     't))
+
+(type-judgement (test) ''t (options) state)
+(unify-type (make-typed-term :term (test)
+                             :path-cond ''t
+                             :judgements (type-judgement (test) ''t (options)
+                                                         state))
+            ''t
+            (options)
+            state)
