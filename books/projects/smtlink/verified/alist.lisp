@@ -288,7 +288,8 @@
     ///
     (local (in-theory (enable alist-to-array alist-p alist-consp)))
     (more-returns
-     (ar (implies (alist-p al) (alist-array-equiv al ar))
+     (ar (implies (and (alist-p al) (equal x ar))
+                  (alist-array-equiv al x))
          ;; :hints(("Goal" :in-theory (enable alist-p)))
          :name equiv-of-alist-to-array)))
 )

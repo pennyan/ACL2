@@ -69,9 +69,17 @@
 (encapsulate ()
 (local (in-theory (disable (:rewrite default-cdr))))
 
+;; example: alist-term = (integer-integer-alistp x)
+;; fresh-var = y
+;; 1. Generate constraint: y = (alist-to-array-fn x)
+;; 2. Use the theorem to establish (alist-array-equiv x y):
+;; thm: (implies (and (integer-integer-alistp a)
+;;                    (equal b (integer-integer-alist-to-array a)))
+;;               (alist-array-equiv a b))
 (defprod a2a-info
   ((a2a-fn symbolp) ;; the alist-to-array function
-   (thm symbolp))) ;; the theorem justifying the return type of alist-to-array
+   (formals symbol-listp)
+   (thm symbolp))) ;; the theorem justifying the equiv relationship
 
 (defoption maybe-a2a-info a2a-info-p)
 

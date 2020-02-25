@@ -37,9 +37,14 @@
 
 (define new-fresh-var ((current symbol-listp))
   :returns (new-var symbolp)
-  (new-fresh-vars 1 current))
+  (car (new-fresh-vars 1 current)))
 
 ;; --------------------------------------------------------------
+(encapsulate ()
+  (local (in-theory (disable symbol-listp
+                             pseudo-termp
+                             pseudo-term-listp)))
+
 (defprod projection-triple
   ((term pseudo-termp)
    (new-term pseudo-termp)
@@ -49,6 +54,7 @@
   ((term-lst pseudo-term-listp)
    (new-term-lst pseudo-term-listp)
    (projection pseudo-termp)))
+)
 
 ;; ---------------------------------------------------------------
 ;; find the alist-array-equiv of term from projection
@@ -74,9 +80,57 @@
 
 ;; ---------------------------------------------------------------
 
-(define new-projection )
-
-(define new-projection-list )
+;; example: alist-term = (integer-integer-alistp x)
+;; fresh-var = y
+;; 1. Generate constraint: y = (alist-to-array-fn x)
+;; 2. Use the theorem to establish (alist-array-equiv x y):
+;; thm: (implies (and (integer-integer-alistp a)
+;;                    (equal b (integer-integer-alist-to-array a)))
+;;               (alist-array-equiv a b))
+(define new-projection ((alist-term pseudo-termp)
+                        (fresh-var symbolp)
+                        (options type-options-p))
+  :returns (new-proj pseudo-termp)
+  :guard (and (consp alist-term)
+              (is-alist? (car alist-term) options))
+  (b* (((unless (mbt (and (pseudo-termp alist-term)
+                          (symbolp fresh-var)
+                          (type-options-p options)
+                          (consp alist-term)
+                          (is-alist? (car alist-term) options))))
+        nil)
+       ((type-options to) options)
+       ((cons fn actuals) alist-term)
+       (var (car actuals))
+       (yes? (assoc-equal fn to.alist))
+       ((unless yes?)
+        (er hard? 'term-projection=>new-projection
+            "An alist-info item is required for alist type: ~q0" fn))
+       ((a2a-info a) (cdr yes?))
+       (new-constraint `(equal ,fresh-var (,a.a2a-fn ,var)))
+       (equiv-thm
+        (acl2::meta-extract-formula-w a.thm (w state)))
+       ((unless (pseudo-termp equiv-thm))
+        (er hard? 'term-projection=>new-projection
+            "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
+            a.thm equiv-thm))
+       ((mv ok proj)
+        (case-match equiv-thm
+          (('implies hypo ('alist-array-equiv !a.formals))
+           (b* ((substed-hypo
+                 (term-substitution hypo
+                                    (pairlis$ a.formals
+                                              `(,var ,fresh-var))
+                                    t))
+                (yes? (path-test-list `(if ,alist-term ,new-constraint 'nil)
+                                      substed-hypo state))
+                ((unless yes?) (mv nil nil)))
+             (mv t `(alist-array-equiv ,var ,fresh-var))))
+          (& (mv nil nil))))
+       ((unless ok)
+        (er hard? 'term-projection=>new-projection
+            "Can't match the theorem: ~q0" equiv-thm)))
+    proj))
 
 (define generate-fncall-proj ((fn symbolp)
                               (actuals-proj projection-list-triple-p)
@@ -135,9 +189,37 @@
                               (body-proj projection-triple-p)
                               (actuals-proj projection-list-triple-p))
   :returns (mv new-term new-proj)
-  (b* ()
-    ()))
+  (b* ((formals-proj (projection-list-triple-fix formals-proj))
+       ((projection-list-triple fp) formals-proj)
+       (body-proj (projection-triple-fix body-proj))
+       ((projection-triple bp) body-proj)
+       (actuals-proj (projection-list-triple-fix actuals-proj))
+       ((projection-list-triple ap) actuals-proj)
+       (term `((lambda ,fp.term-lst ,bp.term) ap.term-lst))
+       (new-term `((lambda ,fp.new-term-lst ,bp.new-term) ap.new-term-lst)))
+    (cond ((path-test bp.proj `(equal ,bp.term ,bp.new-term))
+           (mv new-term `(equal ,term ,new-term)))
+          ((path-test bp.proj `(equiv ,bp.term ,bp.new-term))
+           (mv new-term `(equiv ,term ,new-term)))
+          (t (mv (er hard? 'term-projection=>generate-lambda-proj
+                     "Inconsistent lambda projections.~%body: ~p0~%"
+                     bp)
+                 nil)))))
 
+;; There are 8 cases:
+;; 1. cond equal, then equal, else equal:
+;; new-term = (if cond then else), new-proj = equal
+;; 2. cond equal, then equal, else equiv: error
+;; 3. cond equal, then equiv, else equal: error
+;; 4. cond equal, then equiv, else equiv:
+;; new-term = (if cond then else), new-proj = equiv
+;; 5. cond equiv, then equal, else equal:
+;; new-term = (if cond then else), new-proj = equal
+;; 6. cond equiv, then equal, else equiv: error
+;; 7. cond equiv, then equiv, else equal: error
+;; 8. cond equiv, then equiv, else equiv:
+;; new-term = (if cond then else), new-proj = equiv
+;;
 (define generate-if-proj ((cond-proj projection-triple-p)
                           (then-proj projection-triple-p)
                           (else-proj projection-triple-p))
@@ -148,14 +230,44 @@
        ((projection-triple tp) then-proj)
        (else-proj (projection-triple-fix else-proj))
        ((projection-triple ep) else-proj)
-       (
-        (case-match tp.projection
-          ))
-       (
-        (case-match tp.projection
-          ))
-       )
-    ()))
+       (term `(if ,cp.term ,tp.term ,ep.term))
+       (new-term `(if ,cp.new-term ,tp.new-term ,ep.new-term)))
+    (cond ((and (path-test tp.proj `(equal ,tp.term tp.new-term))
+                (path-test ep.proj `(equal ,ep.term ep.new-term)))
+           (mv new-term `(equal ,term ,new-term)))
+          ((and (path-test tp.proj `(equiv ,tp.term tp.new-term))
+                (path-test ep.proj `(equiv ,ep.term ep.new-term)))
+           (mv new-term `(equal ,term ,new-term)))
+          (t (mv (er hard? 'term-projection=>generate-if-proj
+                     "Inconsistent if projections.~%cond: ~p0~%then: ~p1~% ~
+                      else: ~p2~%" cp tp ep)
+                 nil)))))
+
+(define generate-projection-list-for-single ((actuals pseudo-term-listp)
+                                             (the-proj projection-triple-p)
+                                             (acc projection-list-triple-p))
+  :returns (proj-triple projection-list-triple-p)
+  :guard (single-var-fncall-of-term judge old-term)
+  (b* ((actuals (pseudo-term-list-fix actuals))
+       (the-proj (projection-triple-fix the-proj))
+       (acc (projection-list-triple-fix acc))
+       ((projection-triple p) the-proj)
+       ((projection-triple-list a) acc)
+       ((unless (consp actuals)) a)
+       ((cons actuals-hd actuals-tl) actuals)
+       ((if (equal actuals-hd p.term))
+        (make-projection-list-triple
+         :term-lst `(,p.term ,@a.term-lst)
+         :new-term-lst `(,p.new-term ,@a.new-term-lst)
+         :projection `(if ,p.projection
+                          ,a.projection
+                        'nil))))
+    (make-projection-list-triple
+     :term-lst `(,actuals-hd ,@a.term-lst)
+     :new-term-lst `(,actuals-hd ,@a.new-term-lst)
+     :projection `(if (equal ,actuals-hd ,actuals-hd)
+                      ,a.projection
+                    'nil))))
 
 ;; judge is a judgement about old-term. We want to project it into a judgement
 ;; about new-term.
@@ -189,10 +301,24 @@
             "The projection ~p0 doesn't justify updating the judgement ~p1.~%"
             projection judge))
        ((if (equal which 'equal))
-        (term-substitution judge `((,old-term . ,new-term)) t))
-       ;; there are three types of judgements...
-       ((mv new-term &) (generate-fncall-proj ...)))
-    new-term))
+        (term-substitution judge `((,old-term . ,new-term)) t)))
+    (cond ((type-predicate-of-term judge old-term to.supertype)
+           (generate-fncall-proj (car judge)
+                                 (projection-list-triple
+                                  :term-lst (list old-term)
+                                  :new-term-lst (list new-term)
+                                  :projection projection)
+                                 to.aa-map))
+          ((single-var-fncall-of-term judge old-term)
+           (b* ((proj-list-triple
+                 (generate-projection-list-for-single-var-fncall
+                  (cdr judge)
+                  (projection-triple old-term new-term projection)
+                  (make-projection-list-triple))))
+             (generate-fncall-proj (car judge) proj-list-triple to.aa-map)))
+          ((equal judge old-term) new-term)
+          (t (er hard? 'term-projection=>project-one-judge
+                 "Judge is malformed: ~p0~%" judge)))))
 
 ;; project judgements to using functions for arrays
 (define project-judge ((judge pseudo-termp)
@@ -299,17 +425,27 @@
          ((typed-term rtta) rtta)
          (new-formals (new-fresh-vars (len formals) (append formals namesa)))
          (namesf (append new-formals namesa))
-         (formals-proj (new-projection-list ...))
          (both-actuals (append actuals rtta.term-lst))
          (both-formals (append formals new-formals))
-         (substed-proja (term-substitution proja (pairlis$ both-actuals both-formals) t))
+         (substed-actuals-judgements
+          (term-substitution rtta.judgements (pairlis$ actuals formals) t))
+         (shadowed-proj (shadow-path-cond formals projection))
+         (substed-proja
+          (term-substitution proja (pairlis$ both-actuals both-formals) t))
          ((mv rttb projb namesb)
-          (term-projection ttb shadowed-path-cond substed-proja namesf options state))
+          (term-projection ttb
+                           `(if ,shadowed-path-cond
+                                ,substed-actuals-judgements
+                              'nil)
+                           `(if ,shadowed-proj
+                                ,substed-proja
+                              'nil)
+                           namesf options state))
          ((mv new-term new-proj)
           (generate-lambda-proj (make-projection-list-triple
                                  :term-lst formals
                                  :new-term-lst new-formals
-                                 :projection formals-proj)
+                                 :projection substed-proja)
                                 (make-projection-triple
                                  :term-lst ttb.term
                                  :new-term-lst rttb.term
@@ -368,7 +504,18 @@
                            projection namest options state))
          ((typed-term ntte) ntte)
          (new-term `(if ,nttc.term ,nttt.term ,ntte.term))
-         (new-proj (generate-if-proj ...))
+         (new-proj (generate-if-proj (make-projection-triple
+                                      :term ttc.term
+                                      :new-term nttc.term
+                                      :projection projc)
+                                     (make-projection-triple
+                                      :term ttt.term
+                                      :new-term nttt.term
+                                      :projection projt)
+                                     (make-projection-triple
+                                      :term tte.term
+                                      :new-term ntte.term
+                                      :projection proje)))
          (new-top-judge (project-judge tttop.judgements tttop.term new-term new-proj
                                        options state))
          (new-top (make-typed-term :term new-term
@@ -406,7 +553,6 @@
          ((typed-term ttt) (typed-term->top tterm to))
          ((cons fn actuals) tt.term)
          ((if (is-alist? fn options))
-          ;; do something
           (b* (((unless (and (equal (len actuals 1))
                              (symbolp (car actuals))))
                 (prog2$
@@ -415,10 +561,15 @@
                      a single variable: ~q0" tt.term)
                  (mv tt projection names)))
                (var (car actuals))
-               (fresh-var (new-fresh-var 1 'x names))
-               (new-proj-var (new-projection ...))
+               (fresh-var (new-fresh-var names))
+               (new-proj-var (new-projection tt.term fresh-var to.alist))
                ((mv new-term new-proj)
-                (generate-fncall-proj fn actuals fresh-var new-proj-var to.aa-map))
+                (generate-fncall-proj fn
+                                      (make-projection-triple-list
+                                       :term-lst actuals
+                                       :new-term-lst (list fresh-var)
+                                       :projection new-proj-var)
+                                      to.aa-map))
                (new-judge (project-judge tt.judgements var fresh-var new-proj
                                          options state)))
             (mv (make-typed-term :term new-term
@@ -437,8 +588,9 @@
                                  :new-term-lst ptta.term-lst
                                  :projection proja)
                                 to.aa-map))
-         (new-top-judge (project-judge ttt.judgements ttt.term new-term new-proj
-                                       options state))
+         (new-top-judge
+          (project-judge ttt.judgements ttt.term new-term new-proj options
+                         state))
          (new-top (make-typed-term :term new-term
                                    :path-cond path-cond
                                    :judgement new-top-judge)))
@@ -470,7 +622,8 @@
          ((if (equal (typed-term->kind tterm) 'variablep))
           (variable-projection tterm path-cond projection names options state))
          ((if (equal (typed-term->kind tterm) 'quotep))
-          (change-typed-term tterm :path-cond path-cond))
+          (mv (change-typed-term tterm :path-cond path-cond)
+              projection names))
          ((if (equal (typed-term->kind tterm) 'lambdap))
           (lambda-projection tterm path-cond projection names options state))
          ((if (equal (typed-term->kind tterm) 'ifp))
