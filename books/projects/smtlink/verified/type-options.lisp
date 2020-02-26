@@ -91,20 +91,34 @@
 (defthm assoc-equal-of-alist-info-p
   (implies (and (alist-info-p ai)
                 (assoc-equal x ai))
-           (and (consp (assoc-equal x ai)))))
+           (consp (assoc-equal x ai))))
 
 (defthm maybe-of-assoc-equal-of-alist-info-p
   (implies (alist-info-p ai)
            (maybe-a2a-info-p (cdr (assoc-equal x ai)))))
 
-(defprod equiv-p
-  ((formal-map symbol-alistp)
+(defthm a2a-of-assoc-equal-of-alist-info-p
+  (implies (and (alist-info-p ai)
+                (assoc-equal x ai))
+           (a2a-info-p (cdr (assoc-equal x ai)))))
+
+(defprod equiv
+  ((formal-map symbol-symbol-alistp)
    (thm symbolp)))
+
+(defthm strip-cars-of-equiv->formal-map
+  (implies (equiv-p x)
+           (symbol-listp (strip-cars (equiv->formal-map x)))))
 
 (defalist alist-array-map
   :key-type symbolp ;; function name
   :val-type equiv-p ;; equivalence theorem name
   :true-listp t)
+
+(defthm assoc-equal-of-alist-array-map-p
+  (implies (and (alist-array-map-p aa)
+                (assoc-equal x aa))
+           (consp (assoc-equal x aa))))
 )
 
 (encapsulate ()

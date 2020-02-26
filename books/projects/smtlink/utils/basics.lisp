@@ -80,6 +80,14 @@
   (implies (symbol-symbol-alistp x)
            (symbol-symbol-alistp (cdr x))))
 
+(defthm strip-cars-of-symbol-symbol-alistp
+  (implies (symbol-symbol-alistp x)
+           (symbol-listp (strip-cars x))))
+
+(defthm strip-cdrs-of-symbol-symbol-alistp
+  (implies (symbol-symbol-alistp x)
+           (symbol-listp (strip-cdrs x))))
+
 (deflist symbol-list-list
   :elt-type symbol-listp
   :pred symbol-list-listp

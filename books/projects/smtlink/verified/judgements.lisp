@@ -63,7 +63,8 @@
   (more-returns
    (ok (implies ok (and (pseudo-termp judge)
                         (consp judge)
-                        (symbolp (car judge))))
+                        (symbolp (car judge))
+                        (not (equal (car judge) 'quote))))
        :name implies-of-type-predicate-of-term)))
 
 (define single-var-fncall-of-term ((judge pseudo-termp)
@@ -76,8 +77,11 @@
        (only-one-var (cdr judge) term))
   ///
   (more-returns
-   (ok (implies ok (pseudo-termp judge))
-       :name pseudo-termp-of-single-var-fncall-of-term)))
+   (ok (implies ok (and (pseudo-termp judge)
+                        (consp judge)
+                        (symbolp (car judge))
+                        (not (equal (car judge) 'quote))))
+       :name implies-of-single-var-fncall-of-term)))
 
 (define judgement-of-term ((judge pseudo-termp)
                            (term pseudo-termp)
