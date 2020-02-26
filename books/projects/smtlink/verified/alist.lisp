@@ -66,8 +66,8 @@
     (if (null al) t
       (and (consp al)
            (consp (car al))
-                 (alist-consp (car al))
-                 (alist-p (cdr al))))
+           (alist-consp (car al))
+           (alist-p (cdr al))))
     ///
     (more-returns
      (ok (implies ok (alistp al))
@@ -76,7 +76,7 @@
 
   (defthm assoc-of-bogus-key
     (implies (and (alist-p al) (not (alist-key-p k)))
-                   (not (assoc-equal k al)))
+             (not (assoc-equal k al)))
     :hints(("Goal" :in-theory (enable alist-p alist-consp)))))
 
 
@@ -87,15 +87,15 @@
     :guard t
     :returns (ok booleanp)
     (or (null x)
-	(and (consp x)
-	     (alist-key-p (car x))
-	     (alist-val-p (cdr x)))))
+        (and (consp x)
+             (alist-key-p (car x))
+             (alist-val-p (cdr x)))))
 
-    (define array-val-default ()
-      :guard t
-      :enabled t
-      :returns (def array-val-p :hints(("Goal" :in-theory (enable array-val-p))))
-      nil)
+  (define array-val-default ()
+    :guard t
+    :enabled t
+    :returns (def array-val-p :hints(("Goal" :in-theory (enable array-val-p))))
+    nil)
 
   (encapsulate ;; generic properties of arrays
     (((array-p *) => *)
@@ -112,19 +112,19 @@
              :guard t
              :returns (ok acl2::any-p)
              (if (null ar) t
-                 (and (consp ar)
-                      (consp (car ar))
-                      (alist-key-p (caar ar))
-                      (array-val-p (cdar ar))
-                      (array-p (cdr ar))))
+               (and (consp ar)
+                    (consp (car ar))
+                    (alist-key-p (caar ar))
+                    (array-val-p (cdar ar))
+                    (array-p (cdr ar))))
              ///
              (more-returns
               (ok (implies ok (alistp ar))
-                        :name array-p--implies--alistp
-                        :hints(("Goal" :in-theory (enable array-p)))))))
+                  :name array-p--implies--alistp
+                  :hints(("Goal" :in-theory (enable array-p)))))))
     (more-returns array-p
-     (ok (booleanp ok) :name booleanp-of-array-p
-         :hints(("Goal" :in-theory (enable array-p)))))
+                  (ok (booleanp ok) :name booleanp-of-array-p
+                      :hints(("Goal" :in-theory (enable array-p)))))
 
     (local (define array-init ()
              :guard t
@@ -168,11 +168,11 @@
                   (v (array-val-p v)
                      :name array-val-p-of-array-select
                      :hints(
-		      ("Goal"
-		       :in-theory (enable array-p)
-		       :use((:instance array-assoc-p-of-assoc-equal (k k) (ar ar))))
-		      ("Subgoal 6"
-		       :expand (hide (array-val-default)))))
+                            ("Goal"
+                             :in-theory (enable array-p)
+                             :use((:instance array-assoc-p-of-assoc-equal (k k) (ar ar))))
+                            ("Subgoal 6"
+                             :expand (hide (array-val-default)))))
                   (v (implies (not (alist-key-p k))
                               (equal v (array-val-default)))
                      :name array-select-of-bogus-key))
@@ -266,36 +266,30 @@
 
   (defthm translation-of-assoc-equal
     (implies (and (array-p ar) (alist-p al) (alist-key-p k)
-                              (alist-array-equiv al ar))
-                   (equal (array-select ar k) (assoc-equal k al)))
+                  (alist-array-equiv al ar))
+             (equal (array-select ar k) (assoc-equal k al)))
     :hints(("Goal"
             :do-not-induct t
             :in-theory (disable alist-array-equiv--bogus-witness-implies-all-match)
             :use((:instance alist-array-equiv--bogus-witness-implies-all-match
                             (ar ar) (al al) (k k))))))
+  )
 
-  ;; TODO
-  (define alist-to-array ((al alist-p))
-    :guard-hints(("Goal" :in-theory (enable alist-p)))
-    :returns (ar array-p)
-    (b* (((unless (mbt (alist-p al))) (array-init))
-         ((unless (consp al)) (array-init))
-         ((cons (cons key val) rest) al))
-      (array-store (alist-to-array rest) key (cons key val)))
-    ;; (if (and (consp (car al)) (alist-key-p (caar al)) (alist-val-p (cdar al)))
-    ;;     (array-store (caar al) (cons (caar al) (cdar al)) (alist-to-array (cdr al)))
-    ;;   (array-init))
-    ///
-    (local (in-theory (enable alist-to-array alist-p alist-consp)))
-    (more-returns
-     (ar (implies (and (alist-p al) (equal x ar))
-                  (alist-array-equiv al x))
-         ;; :hints(("Goal" :in-theory (enable alist-p)))
-         :name equiv-of-alist-to-array)))
-)
-
-(defun alist-array-equal (x y)
-  (if (alist-p x)
-      (alist-array-equiv x y)
-    (equal x y)))
-
+;; TODO
+(define alist-to-array ((al alist-p))
+  :guard-hints(("Goal" :in-theory (enable alist-p)))
+  :returns (ar array-p)
+  (b* (((unless (mbt (alist-p al))) (array-init))
+       ((unless (consp al)) (array-init))
+       ((cons (cons key val) rest) al))
+    (array-store (alist-to-array rest) key (cons key val)))
+  ;; (if (and (consp (car al)) (alist-key-p (caar al)) (alist-val-p (cdar al)))
+  ;;     (array-store (caar al) (cons (caar al) (cdar al)) (alist-to-array (cdr al)))
+  ;;   (array-init))
+  ///
+  (local (in-theory (enable alist-to-array alist-p alist-consp)))
+  (more-returns
+   (ar (implies (and (alist-p al) (equal x ar))
+                (alist-array-equiv al x))
+       ;; :hints(("Goal" :in-theory (enable alist-p)))
+       :name equiv-of-alist-to-array)))
