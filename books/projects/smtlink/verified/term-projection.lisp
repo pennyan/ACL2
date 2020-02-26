@@ -455,6 +455,9 @@
         (mv tt ''t names)))
     (mv new-tt the-proj names)))
 
+(local (in-theory (disable (:executable-counterpart typed-term)
+                           (:executable-counterpart typed-term-list))))
+
 (defines term-projection
   :well-founded-relation l<
   :verify-guards nil
@@ -640,11 +643,12 @@
                                        :projection new-proj-var)
                                       to.aa-map
                                       state))
-               (new-judge (project-judge tt.judgements var fresh-var new-proj
-                                         options state)))
-            (mv (make-typed-term :term new-term
-                                 :path-cond path-cond
-                                 :judgements new-judge)
+               (new-top-judge (project-judge ttt.judgements var fresh-var new-proj
+                                             options state))
+               (new-top (make-typed-term :term new-term
+                                         :path-cond path-cond
+                                         :judgements new-top-judge)))
+            (mv (make-typed-fncall new-top ptta to)
                 new-proj
                 (cons fresh-var names))))
          ((mv ptta proja namesa)
