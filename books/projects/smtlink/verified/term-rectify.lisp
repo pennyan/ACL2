@@ -99,6 +99,66 @@
    (new-fn (not (equal new-fn 'quote))
            :name not-quote-of-rectify-list)))
 
+(define find-nil-fn ((tterm typed-term-p)
+                     (nil-alst symbol-symbol-alistp)
+                     (options type-options-p)
+                     state)
+  :returns (new-tt (and (typed-term-p new-tt)
+                        (good-typed-term-p new-tt options)))
+  :guard (and (good-typed-term-p tterm options)
+              (equal (typed-term->term tterm) ''nil))
+  (b* (((unless (mbt (and (typed-term-p tterm)
+                          (good-typed-term-p tterm options)
+                          (equal (typed-term->term tterm) ''nil)
+                          (symbol-symbol-alistp nil-alst)
+                          (type-options-p options))))
+        (make-typed-term))
+       ((typed-term tt) tterm)
+       ((unless (consp nil-alst))
+        (prog2$ (er hard? 'term-rectify=>find-nil-fn
+                    "Don't know how to dispatch nil.~%")
+                (make-typed-term)))
+       ((cons (cons type nil-fn) nil-tl) nil-alst)
+       ((if (equal nil-fn 'quote))
+        (prog2$ (er hard? 'term-rectify=>find-nil-fn
+                    "nil-fn is quote, something is wrong.~%")
+                (make-typed-term)))
+       (yes? (path-test tt.judgements `(,type 'nil) state))
+       ((unless yes?) (find-nil-fn tterm nil-tl options state))
+       (new-term `(,nil-fn))
+       (test `(equal ''nil ,new-term))
+       ((mv err val) (partial-eval test nil state))
+       ((if (or err (not val)))
+        (prog2$
+         (er hard? 'term-rectify=>find-nil-fn
+             "Cannot estabilish that ~p0 but ~p1 is of type ~p2~%"
+             test tt.term tt.judgements)
+         (make-typed-term)))
+       (substed-judge
+        (term-substitution tt.judgements `((,tt.term . ,new-term)) t))
+       (new-judge `(if ,substed-judge 't 'nil)))
+    (change-typed-term tterm
+                       :term new-term
+                       :judgements new-judge)))
+
+;; Dispatching nil
+(define quote-rectify ((tterm typed-term-p)
+                       (options type-options-p)
+                       state)
+  :returns (new-tt (and (typed-term-p new-tt)
+                        (good-typed-term-p new-tt)))
+  :guard (and (good-typed-term-p tterm options)
+              (equal (typed-term->kind tterm) 'quotep))
+  (b* (((unless (mbt (and (typed-term-p tterm)
+                          (good-typed-term-p tterm options)
+                          (equal (typed-term->kind tterm) 'quotep)
+                          (type-options-p options))))
+        (make-typed-term))
+       ((typed-term tt) tterm)
+       ((type-options to) options)
+       ((unless (equal tt.term ''nil)) tterm))
+    (find-nil-fn tt to.nil-alst options state)))
+
 (defines term-rectify
   :well-founded-relation l<
   :verify-guards nil
@@ -215,9 +275,10 @@
                           (type-options-p options)
                           (good-typed-term-p tterm options))))
         (make-typed-term))
-       ((if (or (equal (typed-term->kind tterm) 'variablep)
-                (equal (typed-term->kind tterm) 'quotep)))
+       ((if (equal (typed-term->kind tterm) 'variablep))
         tterm)
+       ((if (equal (typed-term->kind tterm) 'quotep))
+        (quote-rectify tterm options state))
        ((if (equal (typed-term->kind tterm) 'lambdap))
         (lambda-rectify tterm options state))
        ((if (equal (typed-term->kind tterm) 'ifp))

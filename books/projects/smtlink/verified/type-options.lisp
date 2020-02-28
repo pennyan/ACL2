@@ -141,6 +141,7 @@
    (subtype type-to-types-alist-p)
    (subtype-thm type-tuple-to-thm-alist-p)
    (functions function-description-alist-p)
+   (nil-alst symbol-symbol-alistp)  ;; map from type recognizers to its nil-fn
    (alist alist-info-p)
    (aa-map alist-array-map-p)))
 )
