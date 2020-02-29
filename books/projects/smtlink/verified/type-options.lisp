@@ -118,7 +118,8 @@
 (defthm assoc-equal-of-alist-array-map-p
   (implies (and (alist-array-map-p aa)
                 (assoc-equal x aa))
-           (consp (assoc-equal x aa))))
+           (and (consp (assoc-equal x aa))
+                (equiv-p (cdr (assoc-equal x aa))))))
 )
 
 (encapsulate ()
