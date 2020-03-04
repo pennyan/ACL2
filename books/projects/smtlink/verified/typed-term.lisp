@@ -67,7 +67,11 @@
       (implies (consp tterm-lst)
                (< (acl2-count (typed-term->term (car tterm-lst)))
                   (acl2-count term-lst)))
-      :name acl2-count-of-car-of-typed-term-list-p)))
+      :name acl2-count-of-car-of-typed-term-list-p)
+     (term-lst
+      (implies (and (consp tterm-lst) (typed-term-list-p tterm-lst))
+               (equal (len term-lst) (len tterm-lst)))
+      :name typed-term-list->term-lst-maintains-len)))
 
   (defthm acl2-count-of-cdr-of-typed-term-list-p
     (implies (consp tterm-lst)
@@ -75,6 +79,39 @@
                 (acl2-count (typed-term-list->term-lst tterm-lst))))
     :hints (("Goal"
              :expand (typed-term-list->term-lst tterm-lst))))
+
+  (define typed-term-list->judgements ((tterm-lst typed-term-list-p))
+    :measure (len (typed-term-list-fix tterm-lst))
+    :returns (judges pseudo-termp)
+    (b* ((tterm-lst (typed-term-list-fix tterm-lst))
+         ((unless (consp tterm-lst)) ''t)
+         ((cons tterm-hd tterm-tl) tterm-lst)
+         ((typed-term tth) tterm-hd))
+      `(if ,tth.judgements
+           ,(typed-term-list->judgements tterm-tl)
+         'nil)))
+
+  (define uniform-path-cond? ((tterm-lst typed-term-list-p))
+    :returns (ok booleanp)
+    :measure (len (typed-term-list-fix tterm-lst))
+    (b* ((tterm-lst (typed-term-list-fix tterm-lst))
+         ((unless (consp tterm-lst)) t)
+         ((cons tterm-1 tterm-tl) tterm-lst)
+         ((unless (consp tterm-tl)) t)
+         ((cons tterm-2 &) tterm-tl)
+         ((typed-term tt1) tterm-1)
+         ((typed-term tt2) tterm-2))
+      (and (equal tt1.path-cond tt2.path-cond)
+           (uniform-path-cond? tterm-tl))))
+
+  (define typed-term-list->path-cond ((tterm-lst typed-term-list-p))
+    :returns (path-cond pseudo-termp)
+    (b* ((tterm-lst (typed-term-list-fix tterm-lst))
+         ((unless (uniform-path-cond? tterm-lst)) ''t)
+         ((unless (consp tterm-lst)) ''t)
+         ((cons tterm-hd &) tterm-lst)
+         ((typed-term tth) tterm-hd))
+      tth.path-cond))
 
   (define make-typed-term-list ((term-lst pseudo-term-listp)
                                 (path-cond pseudo-termp)
@@ -404,7 +441,8 @@
                    (equal (typed-term->kind tterm) 'fncallp))
               (iff (good-typed-term-p tterm options)
                    (good-typed-fncall-p tterm options))))
-   )
+   (defthm good-typed-term-list-of-nil
+     (good-typed-term-list-p nil options)))
 
 (local (in-theory (disable pseudo-termp
                            symbol-listp
@@ -412,6 +450,49 @@
                            pseudo-term-listp-of-symbol-listp)))
 
 (verify-guards good-typed-term-p)
+
+(skip-proofs
+ (defthm good-typed-term-list-of-make-typed-term-list
+   (implies (and (typed-term-list-p tterm-lst)
+                 (type-options-p options)
+                 (good-typed-term-list-p tterm-lst options))
+            (good-typed-term-list-p
+             (make-typed-term-list (typed-term-list->term-lst tterm-lst)
+                                   (typed-term-list->path-cond tterm-lst)
+                                   (typed-term-list->judgements tterm-lst))
+             options)))
+ )
+
+(defthm good-typed-term-list-of-cons
+  (implies (and (type-options-p options)
+                (typed-term-p tterm)
+                (good-typed-term-p tterm options)
+                (typed-term-list-p tterm-lst)
+                (good-typed-term-list-p tterm-lst options))
+           (good-typed-term-list-p (cons tterm tterm-lst) options))
+  :hints (("Goal"
+           :in-theory (enable good-typed-term-list-p)
+           :expand (good-typed-term-list-p (cons tterm tterm-lst) options))))
+
+(defthm good-typed-term-of-car
+  (implies (and (type-options-p options)
+                (typed-term-list-p tterm-lst)
+                (good-typed-term-list-p tterm-lst options)
+                (consp tterm-lst))
+           (good-typed-term-p (car tterm-lst) options))
+  :hints (("Goal"
+           :in-theory (enable good-typed-term-list-p)
+           :expand (good-typed-term-list-p tterm-lst options))))
+
+(defthm good-typed-term-list-of-car
+  (implies (and (type-options-p options)
+                (typed-term-list-p tterm-lst)
+                (good-typed-term-list-p tterm-lst options)
+                (consp tterm-lst))
+           (good-typed-term-list-p (cdr tterm-lst) options))
+  :hints (("Goal"
+           :in-theory (enable good-typed-term-list-p)
+           :expand (good-typed-term-list-p tterm-lst options))))
 
 (defthm good-typed-term-of-make-typed-term
   (good-typed-term-p (make-typed-term) options)
@@ -560,32 +641,6 @@
                  options)))
   :hints (("Goal"
            :expand (good-typed-lambda-p tterm options))))
-
-;; (defthm implies-of-good-typed-term-list
-;;   (implies (and (typed-term-list-p tterm-lst)
-;;                 (type-options-p options)
-;;                 (good-typed-term-list-p tterm-lst options)
-;;                 (typed-term-list-consp tterm-lst))
-;;            (and (consp (typed-term-list->judgements tterm-lst))
-;;                 (pseudo-termp (cadr (typed-term-list->judgements tterm-lst)))
-;;                 (not (cddddr (typed-term-list->judgements tterm-lst)))
-;;                 (consp (cddr (typed-term-list->judgements tterm-lst)))
-;;                 (consp (cdr (typed-term-list->judgements tterm-lst)))
-;;                 (consp (cdddr (typed-term-list->judgements tterm-lst)))
-;;                 (pseudo-termp (caddr (typed-term-list->judgements tterm-lst)))
-;;                 (good-typed-term-p
-;;                  (typed-term (car (typed-term-list->term-lst tterm-lst))
-;;                              (typed-term-list->path-cond tterm-lst)
-;;                              (cadr (typed-term-list->judgements tterm-lst)))
-;;                  options)
-;;                 (good-typed-term-list-p
-;;                  (typed-term-list (cdr (typed-term-list->term-lst tterm-lst))
-;;                                   (typed-term-list->path-cond tterm-lst)
-;;                                   (caddr (typed-term-list->judgements
-;;                                           tterm-lst)))
-;;                  options)))
-;;   :hints (("Goal" :expand ((good-typed-term-list-p tterm-lst options)
-;;                            (typed-term-list-consp tterm-lst)))))
 
 ;; ---------------------------------------------
 ;;       Destructors for typed-terms
@@ -738,7 +793,7 @@
                     (and (consp (typed-term->term new-tt))
                          (pseudo-lambdap (car (typed-term->term new-tt)))))
            :name implies-of-typed-term->top)))
-stop
+
 ;; fncallp destructors
 (define typed-term-fncall->actuals ((tterm typed-term-p)
                                     (options type-options-p))
@@ -750,7 +805,7 @@ stop
                           (type-options-p options)
                           (equal (typed-term->kind tterm) 'fncallp)
                           (good-typed-term-p tterm options))))
-        (make-typed-term-list))
+        nil)
        ((typed-term tt) tterm)
        ((cons & actuals) tt.term)
        ((mv err actuals-judgements)
@@ -815,7 +870,9 @@ stop
                           (good-typed-term-p tterm options))
                      (equal (len (cdr (typed-term->term tterm)))
                             (len (typed-term-list->term-lst new-ttl))))
-            :name typed-term-lambda->actuals-preserve-len)))
+            :name typed-term-lambda->actuals-preserve-len
+            :hints (("Goal"
+                     :in-theory (enable typed-term-list->term-lst))))))
 
 (define typed-term-lambda->body ((tterm typed-term-p)
                                  (options type-options-p))
@@ -831,20 +888,23 @@ stop
                           (good-typed-term-p tterm options))))
         (make-typed-term))
        ((typed-term tt) tterm)
-       ((cons fn &) tt.term)
+       ((cons fn actuals) tt.term)
        (formals (lambda-formals fn))
        (body (lambda-body fn))
        (shadowed-path-cond (shadow-path-cond formals tt.path-cond))
-       ((mv err body-judgements)
+       ((mv err body-judgements actuals-judges)
         (case-match tt.judgements
-          ((& & (& ((& & body-judge) . &) & &) &)
-           (mv nil body-judge))
-          (& (mv t nil))))
+          ((& & (& ((& & body-judge) . &) actuals-judges &) &)
+           (mv nil body-judge actuals-judges))
+          (& (mv t nil nil))))
        ((if err)
         (er hard? 'typed-term=>typed-term-lambda->body
-            "Malformed lambda judgements ~q0" tt.judgements)))
+            "Malformed lambda judgements ~q0" tt.judgements))
+       (substed-actuals-judgements
+        (term-substitution actuals-judges (pairlis$ actuals formals) t)))
     (make-typed-term :term body
-                     :path-cond shadowed-path-cond
+                     :path-cond `(if ,shadowed-path-cond
+                                     ,substed-actuals-judgements 'nil)
                      :judgements body-judgements))
   ///
   (more-returns
@@ -856,124 +916,6 @@ stop
                     (< (acl2-count (typed-term->term new-tt))
                        (acl2-count (typed-term->term tterm))))
            :name acl2-count-of-typed-term-lambda->body)))
-
-;; typed-term-list
-(define typed-term-list->car ((tterm-lst typed-term-list-p)
-                              (options type-options-p))
-  :guard (and (good-typed-term-list-p tterm-lst options)
-              (typed-term-list-consp tterm-lst))
-  :returns (new-tt (and (typed-term-p new-tt)
-                        (good-typed-term-p new-tt options)))
-  (b* (((unless (mbt (and (typed-term-list-p tterm-lst)
-                          (type-options-p options)
-                          (good-typed-term-list-p tterm-lst options)
-                          (typed-term-list-consp tterm-lst))))
-        (make-typed-term))
-       ((typed-term-list ttl) tterm-lst)
-       ((cons lst-hd &) ttl.term-lst)
-       ((mv err judge-hd)
-        (case-match ttl.judgements
-          ((& judge-hd & &)
-           (mv nil judge-hd))
-          (& (mv t nil))))
-       ((if err)
-        (er hard? 'typed-term=>typed-term-list->car
-            "Malformed fncall judgements ~q0" ttl.judgements)))
-    (make-typed-term :term lst-hd
-                     :path-cond ttl.path-cond
-                     :judgements judge-hd))
-  ///
-  (more-returns
-   (new-tt (implies (and (typed-term-list-p tterm-lst)
-                         (type-options-p options)
-                         (good-typed-term-list-p tterm-lst options)
-                         (typed-term-list-consp tterm-lst))
-                    (< (acl2-count (typed-term->term new-tt))
-                       (acl2-count (typed-term-list->term-lst tterm-lst))))
-           :name acl2-count-of-typed-term-list->car)
-   (new-tt (implies (and (typed-term-list-p tterm-lst)
-                         (type-options-p options)
-                         (good-typed-term-list-p tterm-lst options)
-                         (typed-term-list-consp tterm-lst))
-                    (equal (typed-term->path-cond new-tt)
-                           (typed-term-list->path-cond tterm-lst)))
-           :name typed-term-list->car-maintains-path-cond)))
-
-(define typed-term-list->cdr ((tterm-lst typed-term-list-p)
-                              (options type-options-p))
-  :guard (and (good-typed-term-list-p tterm-lst options)
-              (typed-term-list-consp tterm-lst))
-  :returns (new-ttl (and (typed-term-list-p new-ttl)
-                         (good-typed-term-list-p new-ttl options)))
-  (b* (((unless (mbt (and (typed-term-list-p tterm-lst)
-                          (type-options-p options)
-                          (good-typed-term-list-p tterm-lst options)
-                          (typed-term-list-consp tterm-lst))))
-        nil)
-       ((typed-term-list ttl) tterm-lst)
-       ((cons & lst-tl) ttl.term-lst)
-       ((mv err judge-tl)
-        (case-match ttl.judgements
-          ((& & judge-tl &)
-           (mv nil judge-tl))
-          (& (mv t nil))))
-       ((if err)
-        (er hard? 'typed-term=>typed-term-list->cdr
-            "Malformed fncall judgements ~q0" ttl.judgements)))
-    (make-typed-term-list lst-tl ttl.path-cond judge-tl))
-  ///
-  (more-returns
-   (new-ttl (implies (and (typed-term-list-p tterm-lst)
-                          (type-options-p options)
-                          (good-typed-term-list-p tterm-lst options)
-                          (typed-term-list-consp tterm-lst))
-                     (< (acl2-count (typed-term-list->term-lst new-ttl))
-                        (acl2-count (typed-term-list->term-lst tterm-lst))))
-            :name acl2-count-of-typed-term-list->cdr)
-   (new-ttl (implies (and (typed-term-list-p tterm-lst)
-                          (good-typed-term-list-p tterm-lst options)
-                          (type-options-p options)
-                          (typed-term-list-consp tterm-lst))
-                     (equal (len (typed-term-list->term-lst tterm-lst))
-                            (+ 1 (len (typed-term-list->term-lst new-ttl)))))
-            :name len-of-typed-term-list->cdr)
-   (new-ttl (implies (and (typed-term-list-p tterm-lst)
-                          (type-options-p options)
-                          (good-typed-term-list-p tterm-lst options)
-                          (typed-term-list-consp tterm-lst))
-                     (equal (typed-term-list->path-cond new-ttl)
-                            (typed-term-list->path-cond tterm-lst)))
-            :name typed-term-list->cdr-maintains-path-cond)))
-
-;; -----------------------------------------------
-;; Theorems for constructors
-(defthm implies-of-good-typed-term
-  (implies (and (typed-term-p tterm)
-                (typed-term-list-p tterm-lst)
-                (type-options-p options)
-                (good-typed-term-p tterm options)
-                (good-typed-term-list-p tterm-lst options)
-                (equal (typed-term->path-cond tterm)
-                       (typed-term-list->path-cond tterm-lst)))
-           (good-typed-term-list-p
-            (typed-term-list (cons (typed-term->term tterm)
-                                   (typed-term-list->term-lst tterm-lst))
-                             (typed-term->path-cond tterm)
-                             (list* 'if
-                                    (typed-term->judgements tterm)
-                                    (typed-term-list->judgements tterm-lst)
-                                    '('nil)))
-            options))
-  :hints (("Goal"
-           :expand (good-typed-term-list-p
-                    (typed-term-list (cons (typed-term->term tterm)
-                                           (typed-term-list->term-lst tterm-lst))
-                                     (typed-term->path-cond tterm)
-                                     (list* 'if
-                                            (typed-term->judgements tterm)
-                                            (typed-term-list->judgements tterm-lst)
-                                            '('nil)))
-                    options))))
 
 ;; --------------------------------------------------------------------
 ;;      Constructors
@@ -1032,17 +974,6 @@ stop
        ((typed-term ttc) tt-cond)
        ((typed-term ttt) tt-then)
        ((typed-term tte) tt-else)
-       (- (cw "tt-top: ~q0" tt-top))
-       (- (cw "tt-cond: ~q0" tt-cond))
-       (- (cw "tt-then: ~q0" tt-then))
-       (- (cw "tt-else: ~q0" tt-else))
-       (- (cw "first: ~q0" (equal ttc.path-cond ttp.path-cond)))
-       (- (cw "second: ~q0" (equal ttt.path-cond
-                                  `(if ,(simple-transformer ttc.term)
-                                       ,ttc.path-cond 'nil))))
-       (- (cw "third: ~q0" (equal tte.path-cond
-                                  `(if ,(simple-transformer `(not ,ttc.term))
-                                       ,ttc.path-cond 'nil))))
        ((unless (and (equal ttc.path-cond ttp.path-cond)
                      (equal ttt.path-cond
                             `(if ,(simple-transformer ttc.term)
@@ -1121,7 +1052,9 @@ stop
         (make-typed-term))
        ((typed-term ttt) tt-top)
        ((typed-term ttb) tt-body)
-       ((typed-term-list tta) tt-actuals)
+       (tta.term-lst (typed-term-list->term-lst tt-actuals))
+       (tta.path-cond (typed-term-list->path-cond tt-actuals))
+       (tta.judgements (typed-term-list->judgements tt-actuals))
        ((unless (and (consp ttt.term)
                      (pseudo-lambdap (car ttt.term))))
         (prog2$ (er hard? 'typed-term=>make-typed-term-lambda
@@ -1130,11 +1063,22 @@ stop
        (formals (lambda-formals (car ttt.term)))
        (body (lambda-body (car ttt.term)))
        (actuals (cdr ttt.term))
+       (body-path-cond
+        `(if ,(shadow-path-cond formals ttt.path-cond)
+             ,(term-substitution tta.judgements
+                                 (pairlis$ tta.term-lst formals) t)
+           'nil))
+       (- (cw "formals: ~p0 actuals ~p1 body: ~p2~%" formals actuals body))
+       (- (cw "tta.term-lst: ~q0" tta.term-lst))
+       (- (cw "ttb.path-cond: ~q0" ttb.path-cond))
+       (- (cw "ttb.term: ~q0" ttb.term))
+       (- (cw "body-path-cond: ~q0" body-path-cond))
+       (- (cw "ttt.path-cond: ~q0" ttt.path-cond))
+       (- (cw "tta.path-cond: ~q0" tta.path-cond))
        ((unless (and (equal tta.term-lst actuals)
                      (equal body ttb.term)
                      (equal (len formals) (len actuals))
-                     (equal ttb.path-cond
-                            (shadow-path-cond formals ttt.path-cond))
+                     (equal ttb.path-cond body-path-cond)
                      (equal ttt.path-cond tta.path-cond)))
         (prog2$ (er hard? 'typed-term=>make-typed-term-lambda
                     "Inconsistent inputs.~%")
@@ -1188,13 +1132,15 @@ stop
                           (good-typed-term-list-p tt-actuals options))))
         (make-typed-term))
        ((typed-term ttt) tt-top)
-       ((typed-term-list tta) tt-actuals)
+       (tta.term-lst (typed-term-list->term-lst tt-actuals))
+       (tta.path-cond (typed-term-list->path-cond tt-actuals))
+       (tta.judgements (typed-term-list->judgements tt-actuals))
        ((unless (and (consp ttt.term)
                      (symbolp (car ttt.term))
                      (equal (cdr ttt.term) tta.term-lst)
                      (equal ttt.path-cond tta.path-cond)
-                     (not (equal (car (typed-term->term tt-top)) 'quote))
-                     (not (equal (car (typed-term->term tt-top)) 'if))))
+                     (not (equal (car ttt.term) 'quote))
+                     (not (equal (car ttt.term) 'if))))
         (prog2$ (er hard? 'typed-term=>make-typed-fncall
                     "Inconsistent inputs.~%")
                 (make-typed-term))))
@@ -1202,55 +1148,3 @@ stop
      :term ttt.term
      :path-cond ttt.path-cond
      :judgements `(if ,ttt.judgements ,tta.judgements 'nil))))
-
-(define typed-term-list->cons ((tterm typed-term-p)
-                               (tterm-lst typed-term-list-p)
-                               (options type-options-p))
-  :guard (and (good-typed-term-p tterm options)
-              (good-typed-term-list-p tterm-lst options)
-              (equal (typed-term->path-cond tterm)
-                     (typed-term-list->path-cond tterm-lst)))
-  :returns (new-ttl (and (typed-term-list-p new-ttl)
-                         (good-typed-term-list-p new-ttl options)))
-  (b* (((unless (mbt (and (typed-term-p tterm)
-                          (typed-term-list-p tterm-lst)
-                          (type-options-p options)
-                          (good-typed-term-p tterm options)
-                          (good-typed-term-list-p tterm-lst options))))
-        nil)
-       ((typed-term tt) tterm)
-       ((typed-term-list ttl) tterm-lst)
-       ((unless (equal tt.path-cond ttl.path-cond))
-        (prog2$ (er hard? 'typed-term=>typed-term-list->cons
-                    "tterm and tterm-lst of cons must have the same path-cond.~%")
-                (make-typed-term-list `(,tt.term ,@ttl.term-lst)
-                                      tt.path-cond
-                                      `(if ,tt.judgements ,ttl.judgements 'nil)))))
-    (make-typed-term-list `(,tt.term ,@ttl.term-lst)
-                          tt.path-cond
-                          `(if ,tt.judgements ,ttl.judgements 'nil)))
-  ///
-  (defthm len-of-typed-term-list->cons
-    (implies (and (typed-term-p tterm)
-                  (typed-term-list-p tterm-lst)
-                  (type-options-p options)
-                  (good-typed-term-p tterm options)
-                  (good-typed-term-list-p tterm-lst options))
-             (equal (len (typed-term-list->term-lst
-                          (typed-term-list->cons tterm tterm-lst options)))
-                    (+ 1
-                       (len (typed-term-list->term-lst tterm-lst)))))))
-
-(define typed-term-list->cdr-induct ((ttl typed-term-list-p)
-                                     (options type-options-p))
-  :guard (good-typed-term-list-p ttl options)
-  :measure (acl2-count (typed-term-list->term-lst ttl))
-  :hints (("Goal" :in-theory (enable typed-term-list->cdr
-                                     typed-term-list-consp)))
-  (if (and (typed-term-list-consp ttl)
-           (good-typed-term-list-p ttl options)
-           (typed-term-list-p ttl)
-           (type-options-p options))
-      (typed-term-list->cdr-induct
-       (typed-term-list->cdr ttl options) options)
-      nil))

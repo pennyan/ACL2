@@ -22,8 +22,7 @@
 
 (set-state-ok t)
 
-(local (in-theory (disable (:executable-counterpart typed-term)
-                           (:executable-counterpart typed-term-list))))
+(local (in-theory (disable (:executable-counterpart typed-term))))
 
 (define rectify ((fn symbolp)
                  (actuals pseudo-term-listp)
@@ -163,14 +162,15 @@
        ((typed-term tt) tterm)
        ((type-options to) options)
        ((unless (equal tt.term ''nil))
-        (make-typed-term)))
+        (change-typed-term tterm :path-cond path-cond)))
     (find-nil-fn tt path-cond to.nil-alst options state)))
 
 (defines term-rectify
   :well-founded-relation l<
   :verify-guards nil
   :hints (("Goal"
-           :in-theory (disable acl2-count implies-of-fncall-kind)))
+           :in-theory (e/d ()
+                           (acl2-count implies-of-fncall-kind))))
 
   (define lambda-rectify ((tterm typed-term-p)
                           (path-cond pseudo-termp)
@@ -193,8 +193,9 @@
          (tta (typed-term-lambda->actuals tterm options))
          (ttb (typed-term-lambda->body tterm options))
          ((typed-term ttt) (typed-term->top tt options))
-         ((typed-term-list rtta)
-          (term-list-rectify tta path-cond options state))
+         (rtta (term-list-rectify tta path-cond options state))
+         (rtta.term-lst (typed-term-list->term-lst rtta))
+         (rtta.judgements (typed-term-list->judgements rtta))
          (shadowed-path-cond (shadow-path-cond formals path-cond))
          (substed-actuals-judgements
           (term-substitution rtta.judgements
@@ -204,6 +205,13 @@
                                  ,substed-actuals-judgements
                                'nil)
                         options state))
+         (- (cw "rttb: ~q0" rttb))
+         ;; TODO: is it possible to change the code to make this provable?
+         ((unless (equal (len formals) (len rtta.term-lst)))
+          (prog2$ (er hard? 'term-rectify=>lambda-rectify
+                      "Length of formals and actuals should be the same for ~
+                       pseudo-lambda: ~p0 and ~p1.~%" formals rtta.term-lst)
+                  (make-typed-term)))
          (new-term `((lambda ,formals ,rttb.term) ,@rtta.term-lst))
          (new-top-judge
           (term-substitution ttt.judgements `((,ttt.term . ,new-term)) t))
@@ -269,8 +277,11 @@
           (make-typed-term))
          ((type-options to) options)
          ((typed-term tt) tterm)
-         ((typed-term-list tta) (typed-term-fncall->actuals tterm to))
-         ((typed-term-list rtta) (term-list-rectify tta path-cond to state))
+         (tta (typed-term-fncall->actuals tterm to))
+         (rtta (term-list-rectify tta path-cond to state))
+         (rtta.term-lst (typed-term-list->term-lst rtta))
+         (rtta.path-cond (typed-term-list->path-cond rtta))
+         (rtta.judgements (typed-term-list->judgements rtta))
          ((typed-term ttt) (typed-term->top tterm to))
          ((cons fn &) tt.term)
          (conspair (assoc-equal fn to.functions))
@@ -330,105 +341,41 @@
                           (pseudo-termp path-cond)
                           (type-options-p options)
                           (good-typed-term-list-p tterm-lst options))))
-        (make-typed-term-list))
-       ((unless (typed-term-list-consp tterm-lst)) tterm-lst)
-       ((typed-term tt-car)
-        (term-rectify
-         (typed-term-list->car tterm-lst options) path-cond options state))
-       ((typed-term-list tt-cdr)
-        (term-list-rectify
-         (typed-term-list->cdr tterm-lst options) path-cond options state)))
-    (typed-term-list->cons tt-car tt-cdr options)))
+        nil)
+       ((unless (consp tterm-lst)) nil)
+       ((cons tterm-hd tterm-tl) tterm-lst)
+       (tt-car (term-rectify tterm-hd path-cond options state))
+       (tt-cdr (term-list-rectify tterm-tl path-cond options state)))
+    (cons tt-car tt-cdr)))
 ///
-(defthm term-list-rectify-maintains-len-nil
-  (implies (and (typed-term-list-p tterm-lst)
-                (type-options-p options)
-                (pseudo-termp path-cond)
-                (good-typed-term-list-p tterm-lst options)
-                (not (typed-term-list-consp tterm-lst)))
-           (equal (len (typed-term-list->term-lst
-                        (term-list-rectify tterm-lst path-cond options state)))
-                  (len (typed-term-list->term-lst tterm-lst))))
-  :hints (("Goal"
-           :in-theory (enable term-list-rectify)
-           :expand (term-list-rectify tterm-lst path-cond options state))))
-
-(defthm term-list-rectify-maintains-len
-  (implies (and (typed-term-list-p tterm-lst)
-                (type-options-p options)
-                (pseudo-termp path-cond)
-                (good-typed-term-list-p tterm-lst options))
-           (equal (len (typed-term-list->term-lst
-                        (term-list-rectify tterm-lst path-cond options state)))
-                  (len (typed-term-list->term-lst tterm-lst))))
-  :hints (("Goal"
-           :in-theory (e/d (term-list-rectify
-                            (:induction typed-term-list->cdr-induct))
-                           (term-rectify pseudo-termp))
-           :expand (term-list-rectify tterm-lst path-cond options state)
-           :induct (typed-term-list->cdr-induct tterm-lst options))))
-)
-
-;; (defthm if-rectify-maintains-path-cond
-;;   (implies (and (good-typed-term-p tterm options)
+;; (defthm term-list-rectify-maintains-len-nil
+;;   (implies (and (typed-term-list-p tterm-lst)
 ;;                 (type-options-p options)
 ;;                 (pseudo-termp path-cond)
-;;                 (typed-term-p tterm)
-;;                 (equal (typed-term->kind tterm) 'ifp))
-;;            (equal (typed-term->path-cond
-;;                    (if-rectify tterm path-cond options state))
-;;                   path-cond))
+;;                 (good-typed-term-list-p tterm-lst options)
+;;                 (not (consp tterm-lst)))
+;;            (equal (len (typed-term-list->term-lst
+;;                         (term-list-rectify tterm-lst path-cond options state)))
+;;                   (len (typed-term-list->term-lst tterm-lst))))
 ;;   :hints (("Goal"
-;;            :expand (if-rectify tterm path-cond options state))))
-
-;; (defthm lambda-rectify-maintains-path-cond
-;;   (implies (and (good-typed-term-p tterm options)
-;;                 (type-options-p options)
-;;                 (pseudo-termp path-cond)
-;;                 (typed-term-p tterm)
-;;                 (equal (typed-term->kind tterm) 'lambdap))
-;;            (equal (typed-term->path-cond
-;;                    (lambda-rectify tterm path-cond options state))
-;;                   path-cond))
-;;   :hints (("Goal"
-;;            :expand (lambda-rectify tterm path-cond options state))))
-
-;; (defthm fncall-rectify-maintains-path-cond
-;;   (implies (and (good-typed-term-p tterm options)
-;;                 (type-options-p options)
-;;                 (pseudo-termp path-cond)
-;;                 (typed-term-p tterm)
-;;                 (equal (typed-term->kind tterm) 'fncallp))
-;;            (equal (typed-term->path-cond
-;;                    (fncall-rectify tterm path-cond options state))
-;;                   path-cond))
-;;   :hints (("Goal"
-;;            :expand (fncall-rectify tterm path-cond options state))))
-
-;; (defthm term-rectify-maintains-path-cond
-;;   (implies (and (good-typed-term-p tterm options)
-;;                 (type-options-p options)
-;;                 (pseudo-termp path-cond)
-;;                 (typed-term-p tterm))
-;;            (equal (typed-term->path-cond
-;;                    (term-rectify tterm path-cond options state))
-;;                   path-cond))
-;;   :hints (("Goal"
-;;            :expand (term-rectify tterm path-cond options state))))
-
-;; (defthm term-list-rectify-maintains-path-cond
-;;   (implies (and (good-typed-term-list-p tterm-lst options)
-;;                 (type-options-p options)
-;;                 (pseudo-termp path-cond)
-;;                 (typed-term-list-p tterm-lst))
-;;            (equal (typed-term-list->path-cond
-;;                    (term-list-rectify tterm-lst path-cond options state))
-;;                   path-cond))
-;;   :hints (("Goal"
+;;            :in-theory (enable term-list-rectify)
 ;;            :expand (term-list-rectify tterm-lst path-cond options state))))
 
-(verify-guards term-rectify
-  :guard-debug t)
+;; (defthm term-list-rectify-maintains-len
+;;   (implies (and (typed-term-list-p tterm-lst)
+;;                 (type-options-p options)
+;;                 (pseudo-termp path-cond)
+;;                 (good-typed-term-list-p tterm-lst options))
+;;            (equal (len (typed-term-list->term-lst
+;;                         (term-list-rectify tterm-lst path-cond options state)))
+;;                   (len (typed-term-list->term-lst tterm-lst))))
+;;   :hints (("Goal"
+;;            :in-theory (e/d (term-list-rectify typed-term-list->term-lst)
+;;                            (term-rectify pseudo-termp))
+;;            :expand (term-list-rectify tterm-lst path-cond options state))))
+)
+
+(verify-guards term-rectify)
 
 (define term-rectify-fn ((cl pseudo-term-listp)
                          (smtlink-hint t)
@@ -454,7 +401,7 @@
        ((unless (good-typed-term-p tt options))
         (er hard? 'term-rectify=>term-rectify-fn
             "Expected a good-typed-term-p.~%"))
-       (rectified-tterm (term-rectify tt options state))
+       (rectified-tterm (term-rectify tt ''t options state))
        (new-cl (typed-term->term rectified-tterm))
        (next-cp (cdr (assoc-equal 'term-rectify *SMT-architecture*)))
        ((if (null next-cp)) (list cl))

@@ -60,14 +60,14 @@
        (returns-thm
         (acl2::meta-extract-formula-w returns-name (w state)))
        ((unless (pseudo-termp returns-thm))
-        (mv (er hard? 'type-inference-bottomup=>construct-returns-judgement
+        (mv (er hard? 'returns-judgement=>construct-returns-judgement
                 "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
                 returns-name returns-thm)
             (make-returns)))
        (replace-thm
         (acl2::meta-extract-formula-w replace-name (w state)))
        ((unless (pseudo-termp replace-thm))
-        (mv (er hard? 'type-inference-bottomup=>construct-returns-judgement
+        (mv (er hard? 'returns-judgement=>construct-returns-judgement
                 "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
                 replace-name replace-thm)
             (make-returns)))
@@ -89,7 +89,7 @@
                  (path-test-list `(if ,path-cond ,actuals-judgements 'nil)
                                  substed state))
                 ((unless yes?)
-                 (mv nil (er hard? 'type-inference-bottomup=>construct-returns-judgement
+                 (mv nil (er hard? 'returns-judgement=>construct-returns-judgement
                              "Hypotheses of returns theorem is not discharged.~%")))
                 (substed-conclusions
                  (term-substitution conclusions
@@ -105,7 +105,7 @@
                    (look-up-path-cond `(,fn ,@actuals) substed-conclusions supertype)))
                (mv t return-judge)))))
        ((unless ok)
-        (mv (er hard? 'type-inference-bottomup=>construct-returns-judgement
+        (mv (er hard? 'returns-judgement=>construct-returns-judgement
                 "The returns theorem for function ~p0 is of the wrong syntactic ~
                form ~p1~%" fn returns-thm)
             (make-returns))))
@@ -149,7 +149,7 @@
        (acc (pseudo-term-fix acc))
        (thm-acc (returns-list-fix thm-acc))
        ((unless (is-conjunct? actuals-judgements))
-        (mv (er hard? 'type-inference-bottomup=>returns-judgement-single-arg
+        (mv (er hard? 'returns-judgement=>returns-judgement-single-arg
                 "Actuals judgements is not a conjunct ~p0.~%"
                 actuals-judgements)
             nil))
@@ -213,12 +213,12 @@
           (mv `(if ,the-judge ,acc 'nil) (cons the-thm thm-acc))))
        ((if (and (equal (arg-decl-kind arg-decl) :done)
                  (or actuals (not (equal actuals-judgements ''t)))))
-        (mv (er hard? 'type-inference-bottomup=>returns-judgement
+        (mv (er hard? 'returns-judgement=>returns-judgement
                 "Run out of arg-decls.~%")
             nil))
        ((if (or (null actuals)
                 (equal actuals-judgements ''t)))
-        (mv (er hard? 'type-inference-bottomup=>returns-judgement
+        (mv (er hard? 'returns-judgement=>returns-judgement
                 "Run out of actuals or actuals-judgements.~%")
             nil))
        (arg-check (arg-decl-next->next arg-decl)))

@@ -38,6 +38,10 @@
     (implies (pseudo-lambdap x)
              (true-listp (cdr x))))
 
+  (defthm true-listp-of-cadr-of-pseudo-lambdap
+    (implies (pseudo-lambdap x)
+             (true-listp (cadr x))))
+
   (defthm equal-len-of-pseudo-lambda-formals-and-actuals
     (implies (and (pseudo-termp term)
                   (consp term)

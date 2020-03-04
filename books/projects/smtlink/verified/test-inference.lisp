@@ -479,6 +479,7 @@
 
 ;; ------------------------------------------------------
 
+
 (unify-type (make-typed-term :term (term)
                              :path-cond ''t
                              :judgements (type-judgement (term) ''t (options)
@@ -529,6 +530,7 @@
              ''t
              (options)
              state)
+ ''t
  (options)
  state)
 
@@ -540,6 +542,7 @@
              ''t
              (options)
              state)
+ ''t
  (options)
  state)
 
@@ -551,6 +554,7 @@
              ''t
              (options)
              state)
+ ''t
  (options)
  state)
 
@@ -562,6 +566,7 @@
              ''t
              (options)
              state)
+ ''t
  (options)
  state)
 
@@ -573,6 +578,7 @@
              ''t
              (options)
              state)
+ ''t
  (options)
  state)
 
@@ -584,6 +590,7 @@
              ''t
              (options)
              state)
+ ''t
  (options)
  state)
 

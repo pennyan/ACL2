@@ -36,8 +36,7 @@
             "~p0 is not a conjunct.~%" judge-hd)))
     (cons judge-hd (look-up-judge-list term-tl judge supertype))))
 
-(local (in-theory (disable (:executable-counterpart typed-term)
-                           (:executable-counterpart typed-term-list))))
+(local (in-theory (disable (:executable-counterpart typed-term))))
 
 (encapsulate ()
   (local
@@ -407,8 +406,6 @@
   :verify-guards nil
   :hints (("Goal"
            :in-theory (disable acl2-count implies-of-fncall-kind)))
-  ;; :returns-hints (("Goal"
-  ;;                  :in-theory (disable )))
 
   (define unify-fncall ((tterm typed-term-p)
                         (expected pseudo-termp)
@@ -429,7 +426,8 @@
          ((typed-term tt) tterm)
          ((cons fn actuals) tt.term)
          (tt-actuals (typed-term-fncall->actuals tt to))
-         ((typed-term-list tta) tt-actuals)
+         (tta.path-cond (typed-term-list->path-cond tt-actuals))
+         (tta.judgements (typed-term-list->judgements tt-actuals))
          ((typed-term ttt) (typed-term->top tt to))
          (judge-top (if (equal expected ''t)
                         (choose-judge ttt.judgements ttt.term to.supertype)
@@ -459,7 +457,7 @@
                        covered. ~%")
                   tterm))
          (expected-actuals (get-actuals-judges actuals actuals-alst))
-         (new-actuals (unify-type-list tta expected-actuals to state)))
+         (new-actuals (unify-type-list tt-actuals expected-actuals to state)))
       (make-typed-fncall new-top new-actuals options)))
 
   (define unify-lambda ((tterm typed-term-p)
@@ -478,7 +476,7 @@
           (make-typed-term))
          ((type-options to) options)
          ((typed-term tt) tterm)
-         ((typed-term tt-actuals) (typed-term-lambda->actuals tt to))
+         (tt-actuals (typed-term-lambda->actuals tt to))
          ((typed-term tt-body) (typed-term-lambda->body tt to))
          ((typed-term tt-top) (typed-term->top tt to))
          (judge-top (if (equal expected ''t)
@@ -572,81 +570,19 @@
                             (type-options-p options)
                             (pseudo-term-listp expected-lst)
                             (good-typed-term-list-p tterm-lst options))))
-          (make-typed-term-list))
-         ((typed-term-list ttl) tterm-lst)
-         ((unless (typed-term-list-consp ttl)) ttl)
+          nil)
+         ((unless (consp tterm-lst)) nil)
+         ((cons tterm-hd tterm-tl) tterm-lst)
          ((unless (consp expected-lst))
           (prog2$
            (er hard? 'type-inference-topdown=>unify-type-list
                "Expected-lst is already empty while there are still ~
              typed-terms.~%")
-           ttl))
+           tterm-lst))
          ((cons expected-hd expected-tl) expected-lst)
-         ((typed-term tt-car)
-          (unify-type (typed-term-list->car ttl options)
-                      expected-hd options state))
-         ((typed-term-list tt-cdr)
-          (unify-type-list (typed-term-list->cdr ttl options)
-                           expected-tl options state))
-         ((unless (mbt (equal tt-car.path-cond
-                              tt-cdr.path-cond)))
-          ttl))
-      (typed-term-list->cons tt-car tt-cdr options)))
-  ///
+         (tt-car (unify-type tterm-hd expected-hd options state))
+         (tt-cdr (unify-type-list tterm-tl expected-tl options state)))
+      (cons tt-car tt-cdr)))
   )
-
-(defthm unify-if-maintains-path-cond
-  (implies (and (typed-term-p tterm)
-                (pseudo-termp expected)
-                (type-options-p options)
-                (equal (typed-term->kind tterm) 'ifp)
-                (good-typed-term-p tterm options))
-           (equal (typed-term->path-cond (unify-if tterm expected options state))
-                  (typed-term->path-cond tterm)))
-  :hints (("Goal"
-           :expand (unify-if tterm expected options state))))
-
-(defthm unify-fncall-maintains-path-cond
-  (implies (and (typed-term-p tterm)
-                (pseudo-termp expected)
-                (type-options-p options)
-                (equal (typed-term->kind tterm) 'fncallp)
-                (good-typed-term-p tterm options))
-           (equal (typed-term->path-cond (unify-fncall tterm expected options state))
-                  (typed-term->path-cond tterm)))
-  :hints (("Goal"
-           :expand (unify-fncall tterm expected options state))))
-
-(defthm unify-lambda-maintains-path-cond
-  (implies (and (typed-term-p tterm)
-                (pseudo-termp expected)
-                (type-options-p options)
-                (equal (typed-term->kind tterm) 'lambdap)
-                (good-typed-term-p tterm options))
-           (equal (typed-term->path-cond (unify-lambda tterm expected options state))
-                  (typed-term->path-cond tterm)))
-  :hints (("Goal"
-           :expand (unify-lambda tterm expected options state))))
-
-(defthm unify-type-maintains-path-cond
-  (implies (and (typed-term-p tterm)
-                (pseudo-termp expected)
-                (type-options-p options)
-                (good-typed-term-p tterm options))
-           (equal (typed-term->path-cond (unify-type tterm expected options state))
-                  (typed-term->path-cond tterm)))
-  :hints (("Goal"
-           :expand (unify-type tterm expected options state))))
-
-(defthm unify-type-list-maintains-path-cond
-  (implies (and (typed-term-list-p tterm-lst)
-                (pseudo-term-listp expected-lst)
-                (type-options-p options)
-                (good-typed-term-list-p tterm-lst options))
-           (equal (typed-term-list->path-cond
-                   (unify-type-list tterm-lst expected-lst options state))
-                  (typed-term-list->path-cond tterm-lst)))
-  :hints (("Goal"
-           :expand (unify-type-list tterm-lst expected-lst options state))))
 
 (verify-guards unify-type)
