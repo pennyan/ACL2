@@ -341,18 +341,35 @@
                                      'return-of-integerp))))))
     ))
 
+(defun symbol-nil () nil)
+(defun boolean-nil () nil)
+(defun rational-integer-alist-nil () nil)
+(defun maybe-integer-nil () nil)
+(defun maybe-rational-integer-cons-nil () nil)
+(defun rational-list-nil () nil)
+
+(defun nil-alst ()
+  '((symbolp . symbol-nil)
+    (booleanp . boolean-nil)
+    (rational-integer-alistp . rational-integer-alist-nil)
+    (maybe-integerp . maybe-integer-nil)
+    (maybe-rational-integer-consp . maybe-rational-integer-cons-nil)
+    (rational-list-p . rational-list-nil)))
+
 (defun options ()
   (b* ((supertype (supertype))
        (supertype-thm (supertype-thm))
        (subtype (subtype))
        (subtype-thm (subtype-thm))
-       (functions (functions)))
+       (functions (functions))
+       (nil-alst (nil-alst)))
     (make-type-options
      :supertype supertype
      :supertype-thm supertype-thm
      :subtype subtype
      :subtype-thm subtype-thm
      :functions functions
+     :nil-alst nil-alst
      :alist nil
      :aa-map nil)))
 

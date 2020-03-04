@@ -46,8 +46,6 @@
     ((term-lst pseudo-term-listp :default nil)
      (path-cond pseudo-termp :default ''t)
      (judgements pseudo-termp :default ''t)))
-
-  (defoption maybe-typed-term typed-term-p)
   )
 
 (define typed-term-list-consp ((tterm-lst typed-term-list-p))
@@ -59,10 +57,22 @@
   (more-returns
    (ok (implies (and (typed-term-list-p tterm-lst) ok)
                 (consp (typed-term-list->term-lst tterm-lst)))
-       :name consp-of-term-lst-of-typed-term-list-consp)))
+       :name consp-of-term-lst-of-typed-term-list-consp)
+   (ok (implies (not ok)
+                (equal (len (typed-term-list->term-lst tterm-lst)) 0))
+       :name not-consp-of-term-lst-of-typed-term-list-consp)))
 
 ;; ---------------------------------------------
 ;;       Recognizers
+
+(local
+ (defthm type-of-0-input-fn
+   (implies (and (symbolp fn)
+                 (not (equal fn 'quote)))
+            (and (not (pseudo-lambdap `(,fn)))
+                 (pseudo-termp `(,fn))))
+   :hints (("Goal"
+            :in-theory (enable pseudo-lambdap)))))
 
 (define typed-term->kind ((tterm typed-term-p))
   :returns (kind symbolp)
@@ -108,7 +118,21 @@
                   (equal (typed-term->kind
                           (typed-term (typed-term->term tterm) a b))
                          x))
-         :name kind-preserved)))
+         :name kind-preserved)
+   (kind (implies (not (equal kind x))
+                  (not (equal (typed-term->kind
+                               (typed-term (typed-term->term tterm) a b))
+                              x)))
+         :name not-kind-preserved))
+  (defthm good-typed-fncall-of-0-input-fn
+    (implies (and (symbolp fn)
+                  (not (equal fn 'quote))
+                  (not (equal fn 'if))
+                  (pseudo-termp path-cond)
+                  (pseudo-termp judges))
+             (equal (typed-term->kind
+                     (typed-term `(,fn) path-cond `(if ,judges 't 'nil)))
+                    'fncallp))))
 
 (define good-typed-variable-p ((tterm typed-term-p)
                                (options type-options-p))
@@ -151,6 +175,7 @@
 |#
 
 (defines good-typed-term
+  :flag-local nil
   :well-founded-relation l<
   :verify-guards nil
   :hints (("Goal"
@@ -365,7 +390,7 @@
                    (equal (typed-term->kind tterm) 'fncallp))
               (iff (good-typed-term-p tterm options)
                    (good-typed-fncall-p tterm options))))
-  )
+   )
 
 (local (in-theory (disable pseudo-termp
                            symbol-listp
@@ -412,6 +437,30 @@
    (typed-term-list nil path-cond ''t)
    options)
   :hints (("Goal" :in-theory (enable good-typed-term-list-p))))
+
+(local
+ (defthm crock
+   (implies (pseudo-termp judges)
+            (and (pseudo-termp `(if ,judges 't 'nil))
+                 (consp `(if ,judges 't 'nil))
+                 (consp (cdddr `(if ,judges 't 'nil))))))
+ )
+
+(defthm good-typed-term-of-0-input-fn
+  (implies (and (symbolp fn)
+                (not (equal fn 'quote))
+                (not (equal fn 'if))
+                (pseudo-termp path-cond)
+                (pseudo-termp judges)
+                (type-options-p options))
+           (good-typed-term-p
+            (typed-term `(,fn) path-cond `(if ,judges 't 'nil))
+            options))
+  :hints (("Goal"
+           :in-theory (enable pseudo-termp)
+           :expand (good-typed-fncall-p
+                    (typed-term `(,fn) path-cond `(if ,judges 't 'nil))
+                    options))))
 
 ;; -------------------------------------------------------------------
 ;; Theorems for destructors
@@ -1011,6 +1060,17 @@
        ((typed-term ttc) tt-cond)
        ((typed-term ttt) tt-then)
        ((typed-term tte) tt-else)
+       (- (cw "tt-top: ~q0" tt-top))
+       (- (cw "tt-cond: ~q0" tt-cond))
+       (- (cw "tt-then: ~q0" tt-then))
+       (- (cw "tt-else: ~q0" tt-else))
+       (- (cw "first: ~q0" (equal ttc.path-cond ttp.path-cond)))
+       (- (cw "second: ~q0" (equal ttt.path-cond
+                                  `(if ,(simple-transformer ttc.term)
+                                       ,ttc.path-cond 'nil))))
+       (- (cw "third: ~q0" (equal tte.path-cond
+                                  `(if ,(simple-transformer `(not ,ttc.term))
+                                       ,ttc.path-cond 'nil))))
        ((unless (and (equal ttc.path-cond ttp.path-cond)
                      (equal ttt.path-cond
                             `(if ,(simple-transformer ttc.term)
