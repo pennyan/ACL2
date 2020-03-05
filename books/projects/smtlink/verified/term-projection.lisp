@@ -158,8 +158,8 @@
                              pseudo-lambdap-of-fn-call-of-pseudo-termp)))
 
   (define generate-fncall-proj-cases ((fn symbolp)
-                                      (att typed-term-list-p)
-                                      (natt typed-term-list-p)
+                                      (tta typed-term-list-p)
+                                      (ntta typed-term-list-p)
                                       (actuals-proj pseudo-termp)
                                       (hypo pseudo-termp)
                                       (concl pseudo-termp)
@@ -169,25 +169,27 @@
                               (good-typed-term-p new-tt options)))
                  (new-proj pseudo-termp))
     :guard (and (not (equal fn 'quote))
-                (good-typed-term-list-p att options)
-                (good-typed-term-list-p natt options))
+                (good-typed-term-list-p tta options)
+                (good-typed-term-list-p ntta options))
     :verify-guards nil
     (b* (((unless (mbt (and (symbolp fn)
                             (not (equal fn 'quote))
-                            (typed-term-list-p att)
-                            (good-typed-term-list-p att options)
-                            (typed-term-list-p natt)
-                            (good-typed-term-list-p natt options)
+                            (typed-term-list-p tta)
+                            (good-typed-term-list-p tta options)
+                            (typed-term-list-p ntta)
+                            (good-typed-term-list-p ntta options)
                             (pseudo-termp actuals-proj)
                             (pseudo-termp hypo)
                             (pseudo-termp concl)
                             (type-options-p options))))
           (mv (make-typed-term) nil))
-         ((typed-term-list att) att)
-         ((typed-term-list natt) natt)
+         (tta.term-lst (typed-term-list->term-lst tta))
+         (tta.judgements (typed-term-list->judgements tta))
+         (ntta.judgements (typed-term-list->judgements ntta))
+         (ntta.path-cond (typed-term-list->path-cond ntta))
          ((type-options to) options)
-         (all-known `(if ,att.judgements
-                         (if ,natt.judgements
+         (all-known `(if ,tta.judgements
+                         (if ,ntta.judgements
                              ,actuals-proj
                            'nil)
                        'nil))
@@ -196,7 +198,7 @@
           (prog2$ (er hard? 'term-projection=>generate-fncall-proj-cases
                       "Can't discharge the hypotheses: ~q0" hypo)
                   (mv (make-typed-term) nil)))
-         (term `(,fn ,@att.term-lst))
+         (term `(,fn ,@tta.term-lst))
          (new-proj (find-projection term concl))
          ((mv ok new-term new-judge)
           (case-match new-proj
@@ -211,10 +213,10 @@
                             (mv nil nil))
                            (cons-term `(,cons-fn ,k ,v))
                            (store-term `(,store-fn ,k (,cons-fn ,k ,v) ,ar))
-                           (judge-k (look-up-path-cond natt.judgements k to.supertype))
-                           (judge-v (look-up-path-cond natt.judgements v to.supertype))
+                           (judge-k (look-up-path-cond ntta.judgements k to.supertype))
+                           (judge-v (look-up-path-cond ntta.judgements v to.supertype))
                            (judge-ar
-                            (look-up-path-cond natt.judgements ar to.supertype))
+                            (look-up-path-cond ntta.judgements ar to.supertype))
                            (judge-cons-fn
                             (look-up-path-cond cons-term concl to.supertype))
                            (judge-cons-full `(if ,judge-cons-fn
@@ -245,7 +247,7 @@
            (mv (make-typed-term) nil))))
       (mv (make-typed-term
            :term new-term
-           :path-cond natt.path-cond
+           :path-cond ntta.path-cond
            :judgements new-judge)
           new-proj)))
   )
