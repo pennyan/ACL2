@@ -863,16 +863,17 @@
                          (typed-term-list->term-lst new-ttl))
                         (acl2-count (typed-term->term tterm))))
             :name acl2-count-of-typed-term-lambda->actuals)
-   (new-ttl (implies (and (typed-term-p tterm)
-                          (type-options-p options)
-                          (equal (typed-term->kind tterm)
-                                 'lambdap)
-                          (good-typed-term-p tterm options))
-                     (equal (len (cdr (typed-term->term tterm)))
-                            (len (typed-term-list->term-lst new-ttl))))
-            :name typed-term-lambda->actuals-preserve-len
-            :hints (("Goal"
-                     :in-theory (enable typed-term-list->term-lst))))))
+   ;; (new-ttl (implies (and (typed-term-p tterm)
+   ;;                        (type-options-p options)
+   ;;                        (equal (typed-term->kind tterm)
+   ;;                               'lambdap)
+   ;;                        (good-typed-term-p tterm options))
+   ;;                   (equal (len (cdr (typed-term->term tterm)))
+   ;;                          (len (typed-term-list->term-lst new-ttl))))
+   ;;          :name typed-term-lambda->actuals-preserve-len
+   ;;          :hints (("Goal"
+   ;;                   :in-theory (enable typed-term-list->term-lst))))
+   ))
 
 (define typed-term-lambda->body ((tterm typed-term-p)
                                  (options type-options-p))
