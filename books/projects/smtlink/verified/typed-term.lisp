@@ -299,10 +299,17 @@
                   (good-typed-term-list-p
                    (make-typed-term-list actuals tt.path-cond actuals-judge)
                    to)
-                  (b* ((shadowed-path-cond (shadow-path-cond formals tt.path-cond)))
+                  (b* ((shadowed-path-cond
+                        (shadow-path-cond formals tt.path-cond))
+                       (substed-actuals-judgements
+                        (term-substitution actuals-judge
+                                           (pairlis$ actuals formals)
+                                           t)))
                     (good-typed-term-p
                      (make-typed-term :term body
-                                      :path-cond shadowed-path-cond
+                                      :path-cond `(if ,shadowed-path-cond
+                                                      ,substed-actuals-judgements
+                                                    'nil)
                                       :judgements body-judge)
                      to))))
             (& nil))))
@@ -635,8 +642,14 @@
                  options)
                 (good-typed-term-p
                  (typed-term (caddr (car (typed-term->term tterm)))
-                             (shadow-path-cond (cadr (car (typed-term->term tterm)))
-                                               (typed-term->path-cond tterm))
+                             (list* 'if
+                                    (shadow-path-cond (cadr (car (typed-term->term tterm)))
+                                                      (typed-term->path-cond tterm))
+                                    (term-substitution (caddr (caddr (typed-term->judgements tterm)))
+                                                       (pairlis$ (cdr (typed-term->term tterm))
+                                                                 (cadr (car (typed-term->term tterm))))
+                                                       t)
+                                    '('nil))
                              (caddr (car (cadr (caddr (typed-term->judgements tterm))))))
                  options)))
   :hints (("Goal"
