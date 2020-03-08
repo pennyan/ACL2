@@ -25,6 +25,11 @@
 
 (set-state-ok t)
 
+(defthm symbol-list-of-append
+  (implies (and (symbol-listp x)
+                (symbol-listp y))
+           (symbol-listp (append x y))))
+
 ;; This clause-processor projections a term that uses alists into a term that
 ;; uses arrays. Supposedly other isomorphic projectionations can also be made in
 ;; a similar way.
@@ -200,56 +205,48 @@
                   (mv (make-typed-term) nil)))
          (term `(,fn ,@tta.term-lst))
          (new-proj (find-projection term concl))
-         ((mv ok new-term new-judge)
+         ((mv ok new-tterm)
           (case-match new-proj
             (('alist-array-equiv !term new-term)
-             (b* (((mv ok new-judge)
-                   (case-match new-term
-                     ((store-fn k (cons-fn k v) ar)
-                      (b* (((unless (and (symbolp store-fn)
-                                         (symbolp cons-fn)
-                                         (not (equal store-fn 'quote))
-                                         (not (equal cons-fn 'quote))))
-                            (mv nil nil))
-                           (cons-term `(,cons-fn ,k ,v))
-                           (store-term `(,store-fn ,k (,cons-fn ,k ,v) ,ar))
-                           (judge-k (look-up-path-cond ntta.judgements k to.supertype))
-                           (judge-v (look-up-path-cond ntta.judgements v to.supertype))
-                           (judge-ar
-                            (look-up-path-cond ntta.judgements ar to.supertype))
-                           (judge-cons-fn
-                            (look-up-path-cond cons-term concl to.supertype))
-                           (judge-cons-full `(if ,judge-cons-fn
-                                                 (if ,judge-k
-                                                     (if ,judge-v
-                                                         't
-                                                       'nil))))
-                           (judge-store-fn
-                            (look-up-path-cond store-term concl to.supertype)))
-                        (mv t `(if ,judge-store-fn
-                                   (if ,judge-k
-                                       (if ,judge-cons-full
-                                           (if ,judge-ar
-                                               't
-                                             'nil)
-                                         'nil)
-                                     'nil)
-                                 'nil))))
-                     ;; other cases need to be implemented
-                     (& (mv nil nil)))))
-               (mv ok new-term new-judge)))
-            (& (mv nil nil nil))))
+             (case-match new-term
+               ((store-fn k (cons-fn k v) ar)
+                (b* (((unless (and (symbolp store-fn)
+                                   (symbolp cons-fn)
+                                   (not (equal store-fn 'quote))
+                                   (not (equal cons-fn 'quote))
+                                   (equal (len ntta) 3)))
+                      (mv nil (make-typed-term)))
+                     (cons-term `(,cons-fn ,k ,v))
+                     (judge-cons-fn
+                      (look-up-path-cond cons-term concl to.supertype))
+                     (cons-top (make-typed-term :term cons-term
+                                                :path-cond ntta.path-cond
+                                                :judgements judge-cons-fn))
+                     (cons-actuals (list (car ntta) (cadr ntta)))
+                     (cons-tterm
+                      (make-typed-fncall cons-top cons-actuals options))
+                     (store-term `(,store-fn ,k (,cons-fn ,k ,v) ,ar))
+                     (judge-store-fn
+                      (look-up-path-cond store-term concl to.supertype))
+                     (store-top
+                      (make-typed-term :term store-term
+                                       :path-cond ntta.path-cond
+                                       :judgements judge-store-fn))
+                     (store-actuals
+                      (list (caddr ntta) (car ntta) cons-tterm))
+                     (store-tterm
+                      (make-typed-fncall store-top store-actuals options)))
+                  (mv t store-tterm)))
+               ;; other cases need to be implemented
+               (& (mv nil nil))))
+            (& (mv nil (make-typed-term)))))
          ((unless ok)
           (prog2$
            (er hard? 'term-projection=>generate-fncall-proj-cases
                "Malformed hypotheses and conclusion: ~p0 and ~p1~%"
                hypo concl)
            (mv (make-typed-term) nil))))
-      (mv (make-typed-term
-           :term new-term
-           :path-cond ntta.path-cond
-           :judgements new-judge)
-          new-proj)))
+      (mv new-tterm new-proj)))
   )
 
 (verify-guards generate-fncall-proj-cases
@@ -307,8 +304,8 @@
                             (pseudo-termp actuals-proj)
                             (type-options-p options))))
           (mv (make-typed-term) nil))
-         ((typed-term-list att) actuals-tterm)
-         ((typed-term-list natt) new-actuals-tterm)
+         (att.term-lst (typed-term-list->term-lst actuals-tterm))
+         (natt.term-lst (typed-term-list->term-lst new-actuals-tterm))
          ((type-options to) options)
          (exist? (assoc-equal fn to.aa-map))
          ((unless exist?)
@@ -332,7 +329,9 @@
           (case-match substed-thm
             (('implies hypo concl)
              (b* (((mv new-tt new-proj)
-                   (generate-fncall-proj-cases fn att natt actuals-proj hypo
+                   (generate-fncall-proj-cases fn actuals-tterm
+                                               new-actuals-tterm
+                                               actuals-proj hypo
                                                concl to state)))
                (mv t new-tt new-proj)))
             (& (mv nil (make-typed-term) nil))))
@@ -392,7 +391,7 @@
                 (len (typed-term-list->term-lst actuals-tterm)))
   (b* ((term (pseudo-term-fix term))
        (new-formals (symbol-list-fix new-formals))
-       ((typed-term-list att) (typed-term-list-fix actuals-tterm))
+       (att.term-lst (typed-term-list->term-lst actuals-tterm))
        ((unless (mbt (equal (len new-formals) (len att.term-lst))))
         (mv nil nil))
        (body (pseudo-term-fix body))
@@ -442,26 +441,67 @@
           (('alist-array-equiv !tt.term new-term) (mv nil new-term))
           (& (mv t nil))))
        ((if err) (mv (make-typed-term) ''t names))
-       ((unless (acl2::variablep new-term))
-        (prog2$ (er hard? 'term-projection=>variable-projection
-                    "Projecting a variable into a non-variable: ~p0 and ~p1~%"
-                    tt.term new-term)
-                (mv (make-typed-term) ''t names)))
        (judge (look-up-path-cond new-term path-cond to.supertype))
        (new-tt (make-typed-term :term new-term
                                 :path-cond path-cond
-                                :judgements judge)))
+                                :judgements judge))
+       ((unless (equal (typed-term->kind new-tt) 'variablep))
+        (prog2$ (er hard? 'term-projection=>variable-projection
+                    "Projecting a variable into a non-variable: ~p0 and ~p1~%"
+                    tt.term new-term)
+                (mv (make-typed-term) ''t names))))
     (mv new-tt the-proj names)))
 
-(local (in-theory (disable (:executable-counterpart typed-term)
-                           (:executable-counterpart typed-term-list))))
+;; Defining it so that the returns theorem for the below defines is easy
+(define quote-projection ((tterm typed-term-p)
+                          (path-cond pseudo-termp)
+                          (names symbol-listp)
+                          (options type-options-p))
+  :returns (mv (new-tt (and (typed-term-p new-tt)
+                            (good-typed-term-p new-tt options)))
+               (new-proj pseudo-termp)
+               (new-names symbol-listp))
+  :guard (and (good-typed-term-p tterm options)
+              (equal (typed-term->kind tterm) 'quotep))
+  (b* (((unless (mbt (and (typed-term-p tterm)
+                          (type-options-p options)
+                          (pseudo-termp path-cond)
+                          (good-typed-term-p tterm options)
+                          (equal (typed-term->kind tterm) 'quotep)
+                          (symbol-listp names))))
+        (mv (make-typed-term) nil nil))
+       ((typed-term tt) tterm))
+    (mv (make-typed-term :term tt.term
+                         :path-cond path-cond
+                         :judgements tt.judgements)
+        `(alist-array-equiv ,tt.term ,tt.term) names)))
+
+(local (in-theory (disable (:executable-counterpart typed-term))))
+
+(local
+ (defthm pseudo-termp-of-lambda
+   (implies (and (symbol-listp formals)
+                 (pseudo-termp body-judgements)
+                 (pseudo-term-listp actuals)
+                 (equal (len formals) (len actuals)))
+            (pseudo-termp `((lambda ,formals
+                              ,body-judgements)
+                            ,@actuals))))
+ )
 
 (defines term-projection
   :well-founded-relation l<
   :verify-guards nil
   :returns-hints (("Goal"
                    :in-theory (disable consp-of-is-conjunct?
-                                       pseudo-term-listp-of-symbol-listp)))
+                                       pseudo-term-listp-of-symbol-listp
+                                       acl2::car-of-append
+                                       pseudo-termp symbol-listp
+                                       acl2::pseudo-termp-opener
+                                       binary-append pairlis$
+                                       lambda-of-pseudo-lambdap
+                                       consp-of-pseudo-lambdap
+                                       acl2::symbol-listp-when-not-consp)))
 
   (define lambda-projection ((tterm typed-term-p)
                              (path-cond pseudo-termp)
@@ -488,15 +528,24 @@
               (symbol-list-fix names)))
          ((typed-term tt) tterm)
          (formals (lambda-formals (car tt.term)))
-         ((typed-term-list tta) (typed-term-lambda->actuals tterm options))
+         (tta (typed-term-lambda->actuals tterm options))
+         (tta.term-lst (typed-term-list->term-lst tta))
+         ;; TODO: is it possible to change the code to make this provable?
+         ((unless (equal (len (cdr tt.term)) (len tta)))
+          (prog2$ (er hard? 'term-projection=>lambda-projection
+                      "Length of formals and actuals should be the same for ~
+                       pseudo-lambda: ~p0 and ~p1.~%" formals tta.term-lst)
+                  (mv (make-typed-term)
+                      nil nil)))
          ((typed-term ttb) (typed-term-lambda->body tterm options))
          ((typed-term ttt) (typed-term->top tt options))
          ((mv ptta proja namesa)
           (term-list-projection tta path-cond projection names options state))
-         ((typed-term-list ptta) ptta)
+         (ptta.term-lst (typed-term-list->term-lst ptta))
+         (ptta.judgements (typed-term-list->judgements ptta))
          (new-formals (new-fresh-vars (len formals) (append formals namesa)))
          (namesf (append new-formals namesa))
-         (both-actuals (append tta.term-lst ptta))
+         (both-actuals (append tta.term-lst ptta.term-lst))
          (both-formals (append formals new-formals))
          (shadowed-path-cond (shadow-path-cond new-formals path-cond))
          (substed-actuals-judgements
@@ -603,7 +652,7 @@
               (symbol-list-fix names)))
          ((type-options to) options)
          ((typed-term tt) tterm)
-         ((typed-term-list tta) (typed-term-fncall->actuals tterm to))
+         (tta (typed-term-fncall->actuals tterm to))
          ((typed-term ttt) (typed-term->top tterm to))
          ((cons fn actuals) tt.term)
          ((mv ptta proja namesa)
@@ -617,14 +666,14 @@
                      a single variable: ~q0" tt.term)
                  (mv tt projection names)))
                (fresh-var (new-fresh-var namesa))
-               (new-var-proj (new-projection tt.term fresh-var to.alist state))
+               (new-var-proj (new-projection tt.term fresh-var to state))
                (new-names (cons fresh-var namesa))
                ((mv new-tt new-proj)
                 (generate-fncall-proj fn tta ptta new-var-proj to state)))
             ;; adding array-p info into projection
             (mv new-tt new-proj new-names)))
          ((mv new-tt new-proj)
-          (generate-fncall-proj fn tta ptta proja to.aa-map state)))
+          (generate-fncall-proj fn tta ptta proja to state)))
       (mv new-tt new-proj namesa)))
 
   (define term-projection ((tterm typed-term-p)
@@ -646,11 +695,10 @@
                             (type-options-p options)
                             (good-typed-term-p tterm options))))
           (mv (make-typed-term) nil nil))
-         ((typed-term tt) tterm)
          ((if (equal (typed-term->kind tterm) 'variablep))
           (variable-projection tterm path-cond projection names options))
          ((if (equal (typed-term->kind tterm) 'quotep))
-          (mv tt `(alist-array-equiv ,tt.term ,tt.term) names))
+          (quote-projection tterm path-cond names options))
          ((if (equal (typed-term->kind tterm) 'lambdap))
           (lambda-projection tterm path-cond projection names options state))
          ((if (equal (typed-term->kind tterm) 'ifp))
@@ -676,21 +724,63 @@
                             (symbol-listp names)
                             (type-options-p options)
                             (good-typed-term-list-p tterm-lst options))))
-          (mv (make-typed-term-list)
+          (mv nil
               (pseudo-term-fix projection)
               (symbol-list-fix names)))
-         ((typed-term-list ttl) tterm-lst)
-         ((unless (typed-term-list-consp ttl))
-          (mv (make-typed-term-list) ''t names))
+         ((unless (consp tterm-lst))
+          (mv nil ''t names))
          ((mv tt-car proj-car names-car)
-          (term-projection (typed-term-list->car ttl options) path-cond
-                           projection names options state))
+          (term-projection (car tterm-lst) path-cond projection names options
+                           state))
          ((mv ttl-cdr proj-cdr names-cdr)
-          (term-list-projection (typed-term-list->cdr ttl options) path-cond
-                                projection names-car options state)))
-      (mv (typed-term-list->cons tt-car ttl-cdr options)
+          (term-list-projection (cdr tterm-lst) path-cond projection names-car
+                                options state)))
+      (mv (cons tt-car ttl-cdr)
           `(if ,proj-car ,proj-cdr 'nil)
           names-cdr)))
+  ///
+  (defthm term-list-projection-maintains-length-nil
+    (implies (and (pseudo-termp path-cond)
+                  (pseudo-termp projection)
+                  (symbol-listp names)
+                  (type-options-p options)
+                  (good-typed-term-list-p tterm-lst options))
+             (equal (len
+                     (mv-nth 0
+                             (term-list-projection nil path-cond projection
+                                                   names options state)))
+                    0))
+    :hints (("Goal"
+             :in-theory (e/d ()
+                             (pseudo-termp symbol-listp)))))
   )
 
-(verify-guards term-projection)
+(skip-proofs
+ (defthm term-list-projection-maintains-length
+   (implies (and (typed-term-list-p tterm-lst)
+                 (pseudo-termp path-cond)
+                 (pseudo-termp projection)
+                 (symbol-listp names)
+                 (type-options-p options)
+                 (good-typed-term-list-p tterm-lst options))
+            (equal (len
+                    (mv-nth 0
+                            (term-list-projection tterm-lst path-cond projection
+                                                  names options state)))
+                   (len tterm-lst)))
+   :hints (("Goal"
+            :in-theory (e/d ()
+                            (pseudo-termp symbol-listp))
+            ;; :expand (term-list-projection tterm-lst path-cond
+            ;;                               projection names1 options state)
+            ))))
+
+(verify-guards term-projection
+  :hints (("Goal"
+           :in-theory (disable pseudo-termp symbol-listp))
+          ("Subgoal 3.2"
+           :in-theory (disable pseudo-termp
+                               term-list-projection-maintains-length)
+           :use ((:instance term-list-projection-maintains-length
+                            (tterm-lst
+                             (typed-term-lambda->actuals tterm options)))))))
