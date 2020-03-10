@@ -755,8 +755,7 @@
     (implies (and (pseudo-termp path-cond)
                   (pseudo-termp projection)
                   (symbol-listp names)
-                  (type-options-p options)
-                  (good-typed-term-list-p tterm-lst options))
+                  (type-options-p options))
              (equal (len
                      (mv-nth 0
                              (term-list-projection nil path-cond projection
@@ -767,25 +766,40 @@
                              (pseudo-termp symbol-listp)))))
   )
 
-(skip-proofs
- (defthm term-list-projection-maintains-length
-   (implies (and (typed-term-list-p tterm-lst)
-                 (pseudo-termp path-cond)
-                 (pseudo-termp projection)
-                 (symbol-listp names)
-                 (type-options-p options)
-                 (good-typed-term-list-p tterm-lst options))
-            (equal (len
-                    (mv-nth 0
-                            (term-list-projection tterm-lst path-cond projection
-                                                  names options state)))
-                   (len tterm-lst)))
-   :hints (("Goal"
-            :in-theory (e/d ()
-                            (pseudo-termp symbol-listp))
-            ;; :expand (term-list-projection tterm-lst path-cond
-            ;;                               projection names1 options state)
-            ))))
+(define cdr-induct-term-list-projection ((tterm-lst)
+                                         (path-cond)
+                                         (projection)
+                                         (names)
+                                         (options)
+                                         state)
+  :irrelevant-formals-ok t
+  :verify-guards nil
+  (b* (((if (atom tterm-lst)) nil)
+       ((mv & & new-names) (term-projection (car tterm-lst)
+                                            path-cond
+                                            projection names options state)))
+    (cdr-induct-term-list-projection
+     (cdr tterm-lst) path-cond projection new-names options state)))
+
+(defthm term-list-projection-maintains-length
+  (implies (and (typed-term-list-p tterm-lst)
+                (pseudo-termp path-cond)
+                (pseudo-termp projection)
+                (symbol-listp names)
+                (type-options-p options)
+                (good-typed-term-list-p tterm-lst options))
+           (equal (len
+                   (mv-nth 0
+                           (term-list-projection tterm-lst path-cond projection
+                                                 names options state)))
+                  (len tterm-lst)))
+  :hints (("Goal"
+           :in-theory (e/d (term-list-projection
+                            cdr-induct-term-list-projection)
+                           (pseudo-termp symbol-listp))
+           :induct (cdr-induct-term-list-projection tterm-lst path-cond
+                                                    projection names options
+                                                    state))))
 
 (verify-guards term-projection
   :hints (("Goal"
