@@ -190,6 +190,7 @@
           (mv (make-typed-term) nil))
          (tta.term-lst (typed-term-list->term-lst tta))
          (tta.judgements (typed-term-list->judgements tta))
+         (ntta.term-lst (typed-term-list->term-lst ntta))
          (ntta.judgements (typed-term-list->judgements ntta))
          (ntta.path-cond (typed-term-list->path-cond ntta))
          ((type-options to) options)
@@ -233,10 +234,21 @@
                                        :path-cond ntta.path-cond
                                        :judgements judge-store-fn))
                      (store-actuals
-                      (list (caddr ntta) (car ntta) cons-tterm))
+                      (list (car ntta) cons-tterm (caddr ntta)))
                      (store-tterm
                       (make-typed-fncall store-top store-actuals options)))
                   (mv t store-tterm)))
+               ((new-fn . !ntta.term-lst) ;; assumes the same order of actuals
+                (b* (((unless (and (symbolp new-fn)
+                                   (not (equal new-fn 'quote))))
+                      (mv nil (make-typed-term)))
+                     (judge-new-term
+                      (look-up-path-cond new-term concl to.supertype))
+                     (top-tt (make-typed-term :term new-term
+                                              :path-cond ntta.path-cond
+                                              :judgements judge-new-term))
+                     (new-tt (make-typed-fncall top-tt ntta options)))
+                  (mv t new-tt)))
                ;; other cases need to be implemented
                (& (mv nil nil))))
             (& (mv nil (make-typed-term)))))

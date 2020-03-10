@@ -1,5 +1,5 @@
 ;; Copyright (C) 2015, University of British Columbia
-;; Written by Mark Greenstreet (Dec 18th 2019)
+;; Written by Yan Peng (March 8th 2020)
 ;;
 ;; License: A 3-clause BSD license.
 ;; See the LICENSE file distributed with ACL2
@@ -11,8 +11,7 @@
   (encapsulate ;; generic properties of ACL2 alist's
     (((alist-key-p *) => *)
      ((alist-val-p *) => *)
-     ((alist-val-as-bool *) => *)
-     ((alist-val-default) => *))
+     ((alist-val-as-bool *) => *))
 
     (local (define alist-key-p (x)
              :guard t
@@ -35,15 +34,7 @@
              t))
     (more-returns alist-val-as-bool
                   (ok (booleanp ok)
-                      :name booleanp-of-alist-val-as-bool))
-
-    (local (define alist-val-default ()
-             :returns (default-v acl2::any-p)
-             :enabled t
-             0))
-    (more-returns alist-val-default
-                  (default-v (alist-val-p default-v)
-                    :name alist-val-p-of-alist-val-default)))
+                      :name booleanp-of-alist-val-as-bool)))
 
   (define alist-consp (x)
     :guard t
@@ -189,22 +180,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defsection equivalence-of-arrays-and-alists
-;  (define array-val-assoc-equiv ((array-v array-val-p) (assoc-v alist-assoc-p))
-;    :returns (equiv booleanp)
-;    :guard-hints(("Goal" :in-theory (enable alist-assoc-p)))
-;    :enabled t
-;    (and (array-val-p array-v) (alist-assoc-p assoc-v)
-;         (or (and (not (array-val->valid array-v)) (null assoc-v))
-;                   (and (array-val->valid array-v)
-;                              assoc-v
-;                              (equal (array-val->value array-v) (cdr assoc-v))))))
-;
-;  (defthm array-and-alist-match-when-not-alist-key-p
-;    (implies 
-;     (and (alist-alist-p al) (array-p ar) (not (alist-key-p k)))
-;     (array-val-assoc-equiv (array-select ar k) (assoc-equal k al))))
-;  (local (in-theory (disable alist-assoc-p)))
-
   (defun-sk alist-array-equiv (al ar)
     (forall (k)
             (implies (and (array-p ar) (alist-p al) (alist-key-p k))
@@ -228,14 +203,18 @@
              (alist-array-equiv (acons k v al)
                                 (array-store ar k (cons k v))))
     :hints(("Goal"
-            :in-theory (e/d (array-val-p) (alist-array-equiv-necc array-select-of-array-store))
+            :in-theory (e/d (array-val-p)
+                            (alist-array-equiv-necc array-select-of-array-store))
             :use(
                  (:instance alist-array-equiv-necc (ar ar) (al al)
                             (k (alist-array-equiv-witness
                                 (acons k v al)
                                 (array-store ar k (cons k v)))))
-                 (:instance array-select-of-array-store (ar ar) (k0 k) (k1 k) (v0 (cons k v)))
-                 (:instance array-select-of-array-store (ar ar) (k0 k) (v0 (cons k v))
+                 (:instance array-select-of-array-store
+                            (ar ar) (k0 k)
+                            (k1 k) (v0 (cons k v)))
+                 (:instance array-select-of-array-store
+                            (ar ar) (k0 k) (v0 (cons k v))
                             (k1 (alist-array-equiv-witness (acons k v al)
                                                            (array-store ar k
                                                                         (cons k v))))))))))
