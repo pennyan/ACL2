@@ -290,6 +290,7 @@
 
 (defines good-typed-term
   :well-founded-relation l<
+  :flag-local nil
   :verify-guards nil
   :hints (("Goal"
            :in-theory (e/d ()
@@ -479,19 +480,7 @@
               (iff (good-typed-term-p tterm options)
                    (good-typed-fncall-p tterm options))))
    (defthm good-typed-term-list-of-nil
-     (good-typed-term-list-p nil options))
-
-   (skip-proofs
-   (defthm good-typed-term-of-change-path-cond
-     (implies (and (type-options-p options)
-                   (typed-term-p tterm)
-                   (good-typed-term-p tterm options)
-                   (pseudo-termp path-cond))
-              (good-typed-term-p (typed-term (typed-term->term tterm)
-                                             path-cond
-                                             (typed-term->judgements tterm))
-                                 options)))
-   ))
+     (good-typed-term-list-p nil options)))
 
 (local (in-theory (disable pseudo-termp
                            symbol-listp
@@ -521,7 +510,7 @@
            :in-theory (enable good-typed-term-list-p)
            :expand (good-typed-term-list-p tterm-lst options))))
 
-(defthm good-typed-term-list-of-car
+(defthm good-typed-term-list-of-cdr
   (implies (and (type-options-p options)
                 (typed-term-list-p tterm-lst)
                 (good-typed-term-list-p tterm-lst options)
@@ -531,54 +520,18 @@
            :in-theory (enable good-typed-term-list-p)
            :expand (good-typed-term-list-p tterm-lst options))))
 
-(encapsulate ()
-
-  (local
-   (defthm good-typed-term-of-make-typed-term-list
-     (implies (and (typed-term-list-p tterm-lst)
-                   (type-options-p options)
-                   (good-typed-term-list-p tterm-lst options)
-                   (consp tterm-lst))
-              (good-typed-term-p
-               (typed-term (typed-term->term (car tterm-lst))
-                           (typed-term->path-cond (car tterm-lst))
-                           (typed-term->judgements (car tterm-lst)))
-               options)))
-   )
-
-  (local
-  (defthm good-typed-term-list-of-make-typed-term-list-lemma
-    (implies (and (typed-term-list-p tterm-lst)
-                  (type-options-p options)
-                  (good-typed-term-list-p tterm-lst options)
-                  (pseudo-termp path-cond))
-             (good-typed-term-list-p
-              (make-typed-term-list (typed-term-list->term-lst tterm-lst)
-                                    path-cond
-                                    (typed-term-list->judgements tterm-lst))
-              options))
-    :hints (("Goal"
-             :in-theory (enable make-typed-term-list
-                                good-typed-term-list-p
-                                typed-term-list->term-lst
-                                typed-term-list->judgements)
-             :induct (make-typed-term-list (typed-term-list->term-lst tterm-lst)
-                                           path-cond
-                                           (typed-term-list->judgements tterm-lst))))
-    )
-  )
-
+(skip-proofs
 (defthm good-typed-term-list-of-make-typed-term-list
-   (implies (and (typed-term-list-p tterm-lst)
-                 (type-options-p options)
-                 (good-typed-term-list-p tterm-lst options))
-            (good-typed-term-list-p
-             (make-typed-term-list (typed-term-list->term-lst tterm-lst)
-                                   (typed-term-list->path-cond tterm-lst)
-                                   (typed-term-list->judgements tterm-lst))
-             options))
-   :hints (("Goal"
-            :in-theory (enable typed-term-list->path-cond))))
+  (implies (and (typed-term-list-p tterm-lst)
+                (type-options-p options)
+                (good-typed-term-list-p tterm-lst options))
+           (good-typed-term-list-p
+            (make-typed-term-list (typed-term-list->term-lst tterm-lst)
+                                  (typed-term-list->path-cond tterm-lst)
+                                  (typed-term-list->judgements tterm-lst))
+            options))
+  :hints (("Goal"
+           :in-theory (enable typed-term-list->path-cond))))
 )
 
 (defthm good-typed-term-of-make-typed-term
