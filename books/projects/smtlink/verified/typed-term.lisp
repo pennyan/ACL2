@@ -602,7 +602,7 @@
 ;; TODO: simplify the proof
 
 (defthm implies-of-good-typed-if
-  (implies (and (typed-term-p tterm) (type-options-p options)
+  (implies (and (type-options-p options)
                 (good-typed-if-p tterm options))
            (and (consp (cdr (typed-term->term tterm)))
                 (consp (cddr (typed-term->term tterm)))
@@ -656,7 +656,7 @@
            :expand (good-typed-if-p tterm options))))
 
 (defthm implies-of-good-typed-fncall
-  (implies (and (typed-term-p tterm) (type-options-p options)
+  (implies (and (type-options-p options)
                 (good-typed-fncall-p tterm options))
            (and (consp (typed-term->judgements tterm))
                 (consp (cdr (typed-term->judgements tterm)))
@@ -674,7 +674,7 @@
            :expand (good-typed-fncall-p tterm options))))
 
 (defthm implies-of-good-typed-lambda
-  (implies (and (typed-term-p tterm) (type-options-p options)
+  (implies (and (type-options-p options)
                 (good-typed-lambda-p tterm options))
            (and (consp (typed-term->judgements tterm))
                 (consp (cdr (typed-term->judgements tterm)))
@@ -1008,9 +1008,6 @@
 (defthm kind-of-make-typed-if
   (implies
      (and (typed-term-p tt-top)
-          (typed-term-p tt-cond)
-          (typed-term-p tt-then)
-          (typed-term-p tt-else)
           (good-typed-term-p tt-cond options)
           (good-typed-term-p tt-then options)
           (good-typed-term-p tt-else options))
@@ -1042,8 +1039,7 @@
   :guard (and (good-typed-term-p tt-cond options)
               (good-typed-term-p tt-then options)
               (good-typed-term-p tt-else options))
-  :returns (new-tt (and (typed-term-p new-tt)
-                        (good-typed-term-p new-tt options))
+  :returns (new-tt (good-typed-term-p new-tt options)
                    :hints (("Goal"
                             :in-theory (enable good-typed-if-p))))
   (b* (((unless (mbt (and (type-options-p options)
@@ -1095,8 +1091,6 @@
 (defthm kind-of-make-typed-lambda
   (implies
      (and (typed-term-p tt-top)
-          (typed-term-p tt-body)
-          (typed-term-list-p tt-actuals)
           (good-typed-term-p tt-body options)
           (good-typed-term-list-p tt-actuals options)
           (pseudo-lambdap (car (typed-term->term tt-top))))
@@ -1124,8 +1118,7 @@
                            (options type-options-p))
   :guard (and (good-typed-term-p tt-body options)
               (good-typed-term-list-p tt-actuals options))
-  :returns (new-tt (and (typed-term-p new-tt)
-                        (good-typed-term-p new-tt options))
+  :returns (new-tt (good-typed-term-p new-tt options)
                    :hints (("Goal"
                             :in-theory (enable good-typed-lambda-p))))
   (b* (((unless (mbt (and (type-options-p options)
@@ -1182,7 +1175,6 @@
 (defthm kind-of-make-typed-fncall
   (implies
      (and (typed-term-p tt-top)
-          (typed-term-list-p tt-actuals)
           (good-typed-term-list-p tt-actuals options)
           (consp (typed-term->term tt-top))
           (symbolp (car (typed-term->term tt-top)))
@@ -1207,8 +1199,7 @@
                            (tt-actuals typed-term-list-p)
                            (options type-options-p))
   :guard (good-typed-term-list-p tt-actuals options)
-  :returns (new-tt (and (typed-term-p new-tt)
-                        (good-typed-term-p new-tt options))
+  :returns (new-tt (good-typed-term-p new-tt options)
                    :hints (("Goal"
                             :in-theory (enable good-typed-fncall-p))))
   (b* (((unless (mbt (and (typed-term-p tt-top)
