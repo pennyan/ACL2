@@ -251,12 +251,18 @@
 (define good-typed-variable-p ((tterm typed-term-p)
                                (options type-options-p))
   :returns (ok booleanp)
-  (b* ((tterm (typed-term-fix tterm))
+  :guard (equal (typed-term->kind tterm) 'variablep)
+  (b* (((unless (typed-term-p tterm)) nil)
+       ((unless (mbt (equal (typed-term->kind tterm) 'variablep))))
        (options (type-options-fix options))
        ((typed-term tt) tterm)
        ((type-options to) options))
     ;; (if (is-conjunct-list? tt.judgements tt.term to.supertype) t nil)
-    t))
+    t)
+  ///
+  (defthm kind-of-good-typed-variable
+    (implies (good-typed-variable-p tterm options)
+             (equal (typed-term->kind tterm) 'variablep))))
 
 #|
 (good-typed-variable-p (typed-term 'x
@@ -271,12 +277,18 @@
 (define good-typed-quote-p ((tterm typed-term-p)
                             (options type-options-p))
   :returns (ok booleanp)
-  (b* ((tterm (typed-term-fix tterm))
+  :guard (equal (typed-term->kind tterm) 'quotep)
+  (b* (((unless (typed-term-p tterm)) nil)
+       ((unless (mbt (equal (typed-term->kind tterm) 'quotep))))
        (options (type-options-fix options))
        ((typed-term tt) tterm)
        ((type-options to) options))
     ;; (if (is-conjunct-list? tt.judgements tt.term to.supertype) t nil)
-    t))
+    t)
+  ///
+  (defthm kind-of-good-typed-quote
+    (implies (good-typed-quote-p tterm options)
+             (equal (typed-term->kind tterm) 'quotep))))
 
 #|
 (good-typed-quote-p (typed-term ''t
@@ -303,17 +315,15 @@
   (define good-typed-lambda-p ((tterm typed-term-p)
                                (options type-options-p))
     :returns (ok booleanp)
-    :guard (and (consp (typed-term->term tterm))
-                (pseudo-lambdap (car (typed-term->term tterm))))
+    :guard (equal (typed-term->kind tterm) 'lambdap)
     :measure (list (acl2-count (typed-term->term (typed-term-fix tterm)))
                    0)
     :ignore-ok t
-    (b* ((tterm (typed-term-fix tterm))
+    (b* (((unless (typed-term-p tterm)) nil)
          (options (type-options-fix options))
          ((typed-term tt) tterm)
          ((type-options to) options)
-         ((unless (mbt (and (consp tt.term)
-                            (pseudo-lambdap (car tt.term)))))
+         ((unless (mbt (equal (typed-term->kind tterm) 'lambdap)))
           nil)
          ((cons fn actuals) tt.term)
          (formals (lambda-formals fn))
@@ -349,17 +359,15 @@
   (define good-typed-if-p ((tterm typed-term-p)
                            (options type-options-p))
     :returns (ok booleanp)
-    :guard (and (consp (typed-term->term tterm))
-                (equal (car (typed-term->term tterm)) 'if))
+    :guard (equal (typed-term->kind tterm) 'ifp)
     :measure (list (acl2-count (typed-term->term (typed-term-fix tterm)))
                    0)
     :ignore-ok t
-    (b* ((tterm (typed-term-fix tterm))
+    (b* (((unless (typed-term-p tterm)) nil)
          (options (type-options-fix options))
          ((typed-term tt) tterm)
          ((type-options to) options)
-         ((unless (mbt (and (consp tt.term)
-                            (equal (car tt.term) 'if))))
+         ((unless (mbt (equal (typed-term->kind tterm) 'ifp)))
           nil)
          ((unless (equal (len (cdr tt.term)) 3))
           (er hard? 'typed-term=>good-typed-if-p
@@ -399,17 +407,15 @@
   (define good-typed-fncall-p ((tterm typed-term-p)
                                (options type-options-p))
     :returns (ok booleanp)
-    :guard (and (consp (typed-term->term tterm))
-                (not (equal (car (typed-term->term tterm)) 'quote))
-                (symbolp (car (typed-term->term tterm))))
+    :guard (equal (typed-term->kind tterm) 'fncallp)
     :measure (list (acl2-count (typed-term->term (typed-term-fix tterm)))
                    0)
     :ignore-ok t
-    (b* ((tterm (typed-term-fix tterm))
+    (b* (((unless (typed-term-p tterm)) nil)
          (options (type-options-fix options))
          ((typed-term tt) tterm)
          ((type-options to) options)
-         ((unless (mbt (consp tt.term))) nil)
+         ((unless (mbt (equal (typed-term->kind tterm) 'fncallp))) nil)
          ((cons & actuals) tt.term)
          ((unless (consp tt.judgements)) nil)
          (match?
@@ -427,7 +433,7 @@
     :returns (ok booleanp)
     :measure (list (acl2-count (typed-term->term (typed-term-fix tterm)))
                    1)
-    (b* ((tterm (typed-term-fix tterm))
+    (b* (((unless (typed-term-p tterm)) nil)
          ((typed-term tt) tterm)
          ((if (equal (typed-term->kind tt) 'variablep))
           (good-typed-variable-p tt options))
@@ -448,7 +454,7 @@
                    1)
     :hints (("Goal"
              :in-theory (enable typed-term-list->term-lst)))
-    (b* ((tterm-lst (typed-term-list-fix tterm-lst))
+    (b* (((unless (typed-term-list-p tterm-lst)) nil)
          ((unless (consp tterm-lst)) t)
          ((cons tterm-hd tterm-tl) tterm-lst))
       (and (good-typed-term-p tterm-hd options)
@@ -479,6 +485,15 @@
                    (equal (typed-term->kind tterm) 'fncallp))
               (iff (good-typed-term-p tterm options)
                    (good-typed-fncall-p tterm options))))
+   (defthm kind-of-good-typed-if
+     (implies (good-typed-if-p tterm options)
+              (equal (typed-term->kind tterm) 'ifp)))
+   (defthm kind-of-good-typed-lambda
+     (implies (good-typed-lambda-p tterm options)
+              (equal (typed-term->kind tterm) 'lambdap)))
+   (defthm kind-of-good-typed-fncall
+     (implies (good-typed-fncall-p tterm options)
+              (equal (typed-term->kind tterm) 'fncallp)))
    (defthm good-typed-term-list-of-nil
      (good-typed-term-list-p nil options)))
 
@@ -489,11 +504,25 @@
 
 (verify-guards good-typed-term-p)
 
+(defthm good-typed-term-implies-typed-term
+  (implies (and (type-options-p options)
+                (good-typed-term-p tterm options))
+           (typed-term-p tterm))
+  :hints (("Goal"
+           :in-theory (enable good-typed-term-p)))
+  :rule-classes :forward-chaining)
+
+(defthm good-typed-term-list-implies-typed-term-list
+  (implies (and (type-options-p options)
+                (good-typed-term-list-p tterm-lst options))
+           (typed-term-list-p tterm-lst))
+  :hints (("Goal"
+           :in-theory (enable good-typed-term-list-p)))
+  :rule-classes :forward-chaining)
+
 (defthm good-typed-term-list-of-cons
   (implies (and (type-options-p options)
-                (typed-term-p tterm)
                 (good-typed-term-p tterm options)
-                (typed-term-list-p tterm-lst)
                 (good-typed-term-list-p tterm-lst options))
            (good-typed-term-list-p (cons tterm tterm-lst) options))
   :hints (("Goal"
@@ -502,7 +531,6 @@
 
 (defthm good-typed-term-of-car
   (implies (and (type-options-p options)
-                (typed-term-list-p tterm-lst)
                 (good-typed-term-list-p tterm-lst options)
                 (consp tterm-lst))
            (good-typed-term-p (car tterm-lst) options))
@@ -512,7 +540,6 @@
 
 (defthm good-typed-term-list-of-cdr
   (implies (and (type-options-p options)
-                (typed-term-list-p tterm-lst)
                 (good-typed-term-list-p tterm-lst options)
                 (consp tterm-lst))
            (good-typed-term-list-p (cdr tterm-lst) options))
@@ -522,8 +549,7 @@
 
 (skip-proofs
 (defthm good-typed-term-list-of-make-typed-term-list
-  (implies (and (typed-term-list-p tterm-lst)
-                (type-options-p options)
+  (implies (and (type-options-p options)
                 (good-typed-term-list-p tterm-lst options))
            (good-typed-term-list-p
             (make-typed-term-list (typed-term-list->term-lst tterm-lst)
@@ -720,13 +746,15 @@
                      :judgements cond-judgements))
   ///
   (more-returns
-   (new-tt (implies
-            (and (typed-term-p tterm)
-                 (type-options-p options)
-                 (equal (typed-term->kind tterm) 'ifp)
-                 (good-typed-term-p tterm options))
-            (< (acl2-count (typed-term->term new-tt))
-               (acl2-count (typed-term->term tterm))))
+   (new-tt (implies (and (type-options-p options)
+                         (equal (typed-term->kind tterm) 'ifp)
+                         (good-typed-term-p tterm options))
+                    (< (acl2-count (typed-term->term new-tt))
+                       (acl2-count (typed-term->term tterm))))
+           ;; I don't know how to remove this hint
+           :hints (("Goal"
+                    :in-theory (disable good-typed-if-p-of-good-term)
+                    :use ((:instance good-typed-if-p-of-good-term))))
            :name acl2-count-of-typed-term-if->cond)))
 
 (define typed-term-if->then ((tterm typed-term-p)
@@ -757,20 +785,23 @@
                      :judgements then-judgements))
   ///
   (more-returns
-   (new-tt (implies
-            (and (typed-term-p tterm)
-                 (type-options-p options)
-                 (equal (typed-term->kind tterm) 'ifp)
-                 (good-typed-term-p tterm options))
-            (< (acl2-count (typed-term->term new-tt))
-               (acl2-count (typed-term->term tterm))))
+   (new-tt (implies (and (type-options-p options)
+                         (equal (typed-term->kind tterm) 'ifp)
+                         (good-typed-term-p tterm options))
+                    (< (acl2-count (typed-term->term new-tt))
+                       (acl2-count (typed-term->term tterm))))
+           ;; I don't know how to remove this hint
+           :hints (("Goal"
+                    :in-theory (disable good-typed-if-p-of-good-term)
+                    :use ((:instance good-typed-if-p-of-good-term))))
            :name acl2-count-of-typed-term-if->then)))
 
 (define typed-term-if->else ((tterm typed-term-p)
                              (options type-options-p))
   :guard (and (equal (typed-term->kind tterm) 'ifp)
               (good-typed-term-p tterm options))
-  :returns (new-tt (and (typed-term-p new-tt) (good-typed-term-p new-tt options)))
+  :returns (new-tt (and (typed-term-p new-tt)
+                        (good-typed-term-p new-tt options)))
   (b* (((unless (mbt (and (typed-term-p tterm)
                           (type-options-p options)
                           (equal (typed-term->kind tterm) 'ifp)
@@ -793,13 +824,15 @@
                      :judgements else-judgements))
   ///
   (more-returns
-   (new-tt (implies
-            (and (typed-term-p tterm)
-                 (type-options-p options)
-                 (equal (typed-term->kind tterm) 'ifp)
-                 (good-typed-term-p tterm options))
-            (< (acl2-count (typed-term->term new-tt))
-               (acl2-count (typed-term->term tterm))))
+   (new-tt (implies (and (type-options-p options)
+                         (equal (typed-term->kind tterm) 'ifp)
+                         (good-typed-term-p tterm options))
+                    (< (acl2-count (typed-term->term new-tt))
+                       (acl2-count (typed-term->term tterm))))
+           ;; I don't know how to remove this hint
+           :hints (("Goal"
+                    :in-theory (disable good-typed-if-p-of-good-term)
+                    :use ((:instance good-typed-if-p-of-good-term))))
            :name acl2-count-of-typed-term-if->else)))
 
 (define typed-term->top ((tterm typed-term-p)
@@ -834,10 +867,13 @@
    (new-tt (implies (and (equal (typed-term->kind tterm)
                                 'lambdap)
                          (good-typed-term-p tterm options)
-                         (typed-term-p tterm)
                          (type-options-p options))
                     (and (consp (typed-term->term new-tt))
                          (pseudo-lambdap (car (typed-term->term new-tt)))))
+           ;; I don't know how to remove this hint
+           :hints (("Goal"
+                    :in-theory (disable good-typed-lambda-p-of-good-term)
+                    :use ((:instance good-typed-lambda-p-of-good-term))))
            :name implies-of-typed-term->top)))
 
 ;; fncallp destructors
@@ -865,8 +901,7 @@
     (make-typed-term-list actuals tt.path-cond actuals-judgements))
   ///
   (more-returns
-   (new-ttl (implies (and (typed-term-p tterm)
-                          (type-options-p options)
+   (new-ttl (implies (and (type-options-p options)
                           (equal (typed-term->kind tterm) 'fncallp)
                           (good-typed-term-p tterm options))
                      (< (acl2-count
@@ -901,8 +936,7 @@
     (make-typed-term-list actuals tt.path-cond actuals-judgements))
   ///
   (more-returns
-   (new-ttl (implies (and (typed-term-p tterm)
-                          (equal (typed-term->kind tterm)
+   (new-ttl (implies (and (equal (typed-term->kind tterm)
                                  'lambdap)
                           (good-typed-term-p tterm options))
                      (< (acl2-count
@@ -956,13 +990,16 @@
                      :judgements body-judgements))
   ///
   (more-returns
-   (new-tt (implies (and (typed-term-p tterm)
-                         (type-options-p options)
+   (new-tt (implies (and (type-options-p options)
                          (equal (typed-term->kind tterm)
                                 'lambdap)
                          (good-typed-term-p tterm options))
                     (< (acl2-count (typed-term->term new-tt))
                        (acl2-count (typed-term->term tterm))))
+           ;; I don't know how to remove this hint
+           :hints (("Goal"
+                    :in-theory (disable good-typed-lambda-p-of-good-term)
+                    :use ((:instance good-typed-lambda-p-of-good-term))))
            :name acl2-count-of-typed-term-lambda->body)))
 
 ;; --------------------------------------------------------------------
