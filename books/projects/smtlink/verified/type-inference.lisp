@@ -24,6 +24,7 @@
                        (smtlink-hint t)
                        state)
   :returns (subgoal-lst pseudo-term-list-listp)
+  :guard-debug t
   (b* (((unless (pseudo-term-listp cl)) nil)
        ((unless (smtlink-hint-p smtlink-hint))
         (list cl))

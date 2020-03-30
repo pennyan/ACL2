@@ -188,9 +188,9 @@
    :hints (("Goal"
             :in-theory (enable pseudo-lambdap)))))
 
-(define typed-term->kind ((tterm typed-term-p))
+(define typed-term->kind ((tterm t))
   :returns (kind symbolp)
-  (b* ((tterm (typed-term-fix tterm))
+  (b* (((unless (typed-term-p tterm)) nil)
        ((typed-term tt) tterm)
        ((if (acl2::variablep tt.term)) 'variablep)
        ((if (acl2::quotep tt.term)) 'quotep)
@@ -200,7 +200,7 @@
     'fncallp)
   ///
   (more-returns
-   (kind (member-equal kind '(variablep quotep lambdap ifp fncallp))
+   (kind (member-equal kind '(variablep quotep lambdap ifp fncallp nil))
          :name range-of-typed-term->kind)
    (kind (implies (and (typed-term-p tterm)
                        (not (equal kind 'variablep))
@@ -228,12 +228,14 @@
                        (not (equal (car (typed-term->term tterm)) 'quote))
                        (symbolp (car (typed-term->term tterm)))))
          :name implies-of-fncall-kind)
-   (kind (implies (equal kind x)
+   (kind (implies (and (typed-term-p tterm)
+                       (equal kind x))
                   (equal (typed-term->kind
                           (typed-term (typed-term->term tterm) a b))
                          x))
          :name kind-preserved)
-   (kind (implies (not (equal kind x))
+   (kind (implies (and (typed-term-p tterm)
+                       (not (equal kind x)))
                   (not (equal (typed-term->kind
                                (typed-term (typed-term->term tterm) a b))
                               x)))
@@ -248,7 +250,7 @@
                      (typed-term `(,fn) path-cond `(if ,judges 't 'nil)))
                     'fncallp))))
 
-(define good-typed-variable-p ((tterm typed-term-p)
+(define good-typed-variable-p ((tterm t)
                                (options type-options-p))
   :returns (ok booleanp)
   :guard (equal (typed-term->kind tterm) 'variablep)
@@ -264,6 +266,14 @@
     (implies (good-typed-variable-p tterm options)
              (equal (typed-term->kind tterm) 'variablep))))
 
+(defthm good-typed-variable-implies-typed-term
+  (implies (good-typed-variable-p tterm options)
+           (typed-term-p tterm))
+  :hints (("Goal"
+           :in-theory (enable good-typed-variable-p)))
+  ;; :rule-classes :forward-chaining
+  )
+
 #|
 (good-typed-variable-p (typed-term 'x
                                    ''t
@@ -274,7 +284,7 @@
                                       'nil)))
 |#
 
-(define good-typed-quote-p ((tterm typed-term-p)
+(define good-typed-quote-p ((tterm t)
                             (options type-options-p))
   :returns (ok booleanp)
   :guard (equal (typed-term->kind tterm) 'quotep)
@@ -289,6 +299,14 @@
   (defthm kind-of-good-typed-quote
     (implies (good-typed-quote-p tterm options)
              (equal (typed-term->kind tterm) 'quotep))))
+
+(defthm good-typed-quote-implies-typed-term
+  (implies (good-typed-quote-p tterm options)
+           (typed-term-p tterm))
+  :hints (("Goal"
+           :in-theory (enable good-typed-quote-p)))
+  ;; :rule-classes :forward-chaining
+  )
 
 #|
 (good-typed-quote-p (typed-term ''t
@@ -312,7 +330,7 @@
                             symbol-listp
                             acl2::pseudo-termp-cadr-from-pseudo-term-listp))))
 
-  (define good-typed-lambda-p ((tterm typed-term-p)
+  (define good-typed-lambda-p ((tterm t)
                                (options type-options-p))
     :returns (ok booleanp)
     :guard (equal (typed-term->kind tterm) 'lambdap)
@@ -356,7 +374,7 @@
             (& nil))))
       (if match? t nil)))
 
-  (define good-typed-if-p ((tterm typed-term-p)
+  (define good-typed-if-p ((tterm t)
                            (options type-options-p))
     :returns (ok booleanp)
     :guard (equal (typed-term->kind tterm) 'ifp)
@@ -404,7 +422,7 @@
             (& nil))))
       (if match? t nil)))
 
-  (define good-typed-fncall-p ((tterm typed-term-p)
+  (define good-typed-fncall-p ((tterm t)
                                (options type-options-p))
     :returns (ok booleanp)
     :guard (equal (typed-term->kind tterm) 'fncallp)
@@ -428,7 +446,7 @@
             (& nil))))
       (if match? t nil)))
 
-  (define good-typed-term-p ((tterm typed-term-p)
+  (define good-typed-term-p ((tterm t)
                              (options type-options-p))
     :returns (ok booleanp)
     :measure (list (acl2-count (typed-term->term (typed-term-fix tterm)))
@@ -461,28 +479,23 @@
            (good-typed-term-list-p tterm-tl options))))
   ///
    (defthm good-typed-variable-p-of-good-term
-     (implies (and (typed-term-p tterm)
-                   (equal (typed-term->kind tterm) 'variablep))
+     (implies (equal (typed-term->kind tterm) 'variablep)
               (iff (good-typed-term-p tterm options)
                    (good-typed-variable-p tterm options))))
    (defthm good-typed-quote-p-of-good-term
-     (implies (and (typed-term-p tterm)
-                   (equal (typed-term->kind tterm) 'quotep))
+     (implies (equal (typed-term->kind tterm) 'quotep)
               (iff (good-typed-term-p tterm options)
                    (good-typed-quote-p tterm options))))
    (defthm good-typed-lambda-p-of-good-term
-     (implies (and (typed-term-p tterm)
-                   (equal (typed-term->kind tterm) 'lambdap))
+     (implies (equal (typed-term->kind tterm) 'lambdap)
               (iff (good-typed-term-p tterm options)
                    (good-typed-lambda-p tterm options))))
    (defthm good-typed-if-p-of-good-term
-     (implies (and (typed-term-p tterm)
-                   (equal (typed-term->kind tterm) 'ifp))
+     (implies (equal (typed-term->kind tterm) 'ifp)
               (iff (good-typed-term-p tterm options)
                    (good-typed-if-p tterm options))))
    (defthm good-typed-fncall-p-of-good-term
-     (implies (and (typed-term-p tterm)
-                   (equal (typed-term->kind tterm) 'fncallp))
+     (implies (equal (typed-term->kind tterm) 'fncallp)
               (iff (good-typed-term-p tterm options)
                    (good-typed-fncall-p tterm options))))
    (defthm kind-of-good-typed-if
@@ -494,6 +507,16 @@
    (defthm kind-of-good-typed-fncall
      (implies (good-typed-fncall-p tterm options)
               (equal (typed-term->kind tterm) 'fncallp)))
+   (defthm good-typed-fncall-p-of-exclusion
+     (implies (and (good-typed-term-p tterm options)
+                   (not (equal (typed-term->kind tterm)
+                               'variablep))
+                   (not (equal (typed-term->kind tterm)
+                               'quotep))
+                   (not (equal (typed-term->kind tterm)
+                               'lambdap))
+                   (not (equal (typed-term->kind tterm) 'ifp)))
+              (good-typed-fncall-p tterm options)))
    (defthm good-typed-term-list-of-nil
      (good-typed-term-list-p nil options)))
 
@@ -505,20 +528,20 @@
 (verify-guards good-typed-term-p)
 
 (defthm good-typed-term-implies-typed-term
-  (implies (and (type-options-p options)
-                (good-typed-term-p tterm options))
+  (implies (good-typed-term-p tterm options)
            (typed-term-p tterm))
   :hints (("Goal"
            :in-theory (enable good-typed-term-p)))
-  :rule-classes :forward-chaining)
+  ;; :rule-classes :forward-chaining
+  )
 
 (defthm good-typed-term-list-implies-typed-term-list
-  (implies (and (type-options-p options)
-                (good-typed-term-list-p tterm-lst options))
+  (implies (good-typed-term-list-p tterm-lst options)
            (typed-term-list-p tterm-lst))
   :hints (("Goal"
            :in-theory (enable good-typed-term-list-p)))
-  :rule-classes :forward-chaining)
+  ;; :rule-classes :forward-chaining
+  )
 
 (defthm good-typed-term-list-of-cons
   (implies (and (type-options-p options)
@@ -723,8 +746,7 @@
                              (options type-options-p))
   :guard (and (equal (typed-term->kind tterm) 'ifp)
               (good-typed-term-p tterm options))
-  :returns (new-tt (and (typed-term-p new-tt)
-                        (good-typed-term-p new-tt options)))
+  :returns (new-tt (good-typed-term-p new-tt options))
   (b* (((unless (mbt (and (typed-term-p tterm)
                           (type-options-p options)
                           (equal (typed-term->kind tterm) 'ifp)
@@ -746,6 +768,8 @@
                      :judgements cond-judgements))
   ///
   (more-returns
+   (new-tt (typed-term-p new-tt)
+           :name typed-term-of-typed-term-if->cond)
    (new-tt (implies (and (type-options-p options)
                          (equal (typed-term->kind tterm) 'ifp)
                          (good-typed-term-p tterm options))
@@ -761,8 +785,7 @@
                              (options type-options-p))
   :guard (and (equal (typed-term->kind tterm) 'ifp)
               (good-typed-term-p tterm options))
-  :returns (new-tt (and (typed-term-p new-tt)
-                        (good-typed-term-p new-tt options)))
+  :returns (new-tt (good-typed-term-p new-tt options))
   (b* (((unless (mbt (and (typed-term-p tterm)
                           (type-options-p options)
                           (equal (typed-term->kind tterm) 'ifp)
@@ -785,6 +808,8 @@
                      :judgements then-judgements))
   ///
   (more-returns
+   (new-tt (typed-term-p new-tt)
+           :name typed-term-of-typed-term-if->then)
    (new-tt (implies (and (type-options-p options)
                          (equal (typed-term->kind tterm) 'ifp)
                          (good-typed-term-p tterm options))
@@ -800,8 +825,7 @@
                              (options type-options-p))
   :guard (and (equal (typed-term->kind tterm) 'ifp)
               (good-typed-term-p tterm options))
-  :returns (new-tt (and (typed-term-p new-tt)
-                        (good-typed-term-p new-tt options)))
+  :returns (new-tt (good-typed-term-p new-tt options))
   (b* (((unless (mbt (and (typed-term-p tterm)
                           (type-options-p options)
                           (equal (typed-term->kind tterm) 'ifp)
@@ -824,6 +848,8 @@
                      :judgements else-judgements))
   ///
   (more-returns
+   (new-tt (typed-term-p new-tt)
+           :name typed-term-of-typed-term-if->else)
    (new-tt (implies (and (type-options-p options)
                          (equal (typed-term->kind tterm) 'ifp)
                          (good-typed-term-p tterm options))
@@ -881,8 +907,7 @@
                                     (options type-options-p))
   :guard (and (equal (typed-term->kind tterm) 'fncallp)
               (good-typed-term-p tterm options))
-  :returns (new-ttl (and (typed-term-list-p new-ttl)
-                         (good-typed-term-list-p new-ttl options)))
+  :returns (new-ttl (good-typed-term-list-p new-ttl options))
   (b* (((unless (mbt (and (typed-term-p tterm)
                           (type-options-p options)
                           (equal (typed-term->kind tterm) 'fncallp)
@@ -901,6 +926,8 @@
     (make-typed-term-list actuals tt.path-cond actuals-judgements))
   ///
   (more-returns
+   (new-ttl (typed-term-list-p new-ttl)
+            :name typed-term-list-of-typed-term-fncall->actuals)
    (new-ttl (implies (and (type-options-p options)
                           (equal (typed-term->kind tterm) 'fncallp)
                           (good-typed-term-p tterm options))
@@ -916,8 +943,7 @@
               (good-typed-term-p tterm options))
   :guard-hints (("Goal"
                  :expand (good-typed-lambda-p tterm options)))
-  :returns (new-ttl (and (typed-term-list-p new-ttl)
-                         (good-typed-term-list-p new-ttl options)))
+  :returns (new-ttl (good-typed-term-list-p new-ttl options))
   (b* (((unless (mbt (and (typed-term-p tterm)
                           (type-options-p options)
                           (equal (typed-term->kind tterm) 'lambdap)
@@ -936,6 +962,8 @@
     (make-typed-term-list actuals tt.path-cond actuals-judgements))
   ///
   (more-returns
+   (new-ttl (typed-term-list-p new-ttl)
+            :name typed-term-list-of-typed-term-lambda->actuals)
    (new-ttl (implies (and (equal (typed-term->kind tterm)
                                  'lambdap)
                           (good-typed-term-p tterm options))
@@ -962,8 +990,7 @@
               (good-typed-term-p tterm options))
   :guard-hints (("Goal"
                  :expand (good-typed-lambda-p tterm options)))
-  :returns (new-tt (and (typed-term-p new-tt)
-                        (good-typed-term-p new-tt options)))
+  :returns (new-tt (good-typed-term-p new-tt options))
   (b* (((unless (mbt (and (typed-term-p tterm)
                           (type-options-p options)
                           (equal (typed-term->kind tterm) 'lambdap)
@@ -990,6 +1017,8 @@
                      :judgements body-judgements))
   ///
   (more-returns
+   (new-tt (typed-term-p new-tt)
+           :name typed-term-of-typed-term-lambda->body)
    (new-tt (implies (and (type-options-p options)
                          (equal (typed-term->kind tterm)
                                 'lambdap)

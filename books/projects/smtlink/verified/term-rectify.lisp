@@ -103,8 +103,7 @@
                      (nil-alst symbol-symbol-alistp)
                      (options type-options-p)
                      state)
-  :returns (new-tt (and (typed-term-p new-tt)
-                        (good-typed-term-p new-tt options)))
+  :returns (new-tt (good-typed-term-p new-tt options))
   :guard (and (good-typed-term-p tterm options)
               (equal (typed-term->term tterm) ''nil))
   (b* (((unless (mbt (and (typed-term-p tterm)
@@ -142,15 +141,20 @@
     (make-typed-term
      :term new-term
      :path-cond path-cond
-     :judgements new-judge)))
+     :judgements new-judge))
+  ///
+  (more-returns
+   (new-tt (typed-term-p new-tt)
+           :name typed-term-of-find-nil-fn)))
 
 ;; Dispatching nil
 (define quote-rectify ((tterm typed-term-p)
                        (path-cond pseudo-termp)
                        (options type-options-p)
                        state)
-  :returns (new-tt (and (typed-term-p new-tt)
-                        (good-typed-term-p new-tt options)))
+  :returns (new-tt (good-typed-term-p new-tt options)
+                   :hints (("Goal"
+                            :in-theory (enable good-typed-quote-p))))
   :guard (and (good-typed-term-p tterm options)
               (equal (typed-term->kind tterm) 'quotep))
   (b* (((unless (mbt (and (typed-term-p tterm)
@@ -163,7 +167,11 @@
        ((type-options to) options)
        ((unless (equal tt.term ''nil))
         (change-typed-term tterm :path-cond path-cond)))
-    (find-nil-fn tt path-cond to.nil-alst options state)))
+    (find-nil-fn tt path-cond to.nil-alst options state))
+  ///
+  (more-returns
+   (new-tt (typed-term-p new-tt)
+           :name typed-term-of-quote-rectify)))
 
 (defines term-rectify
   :well-founded-relation l<
@@ -171,6 +179,8 @@
   :hints (("Goal"
            :in-theory (e/d ()
                            (acl2-count implies-of-fncall-kind))))
+  :returns-hints (("Goal"
+                   :in-theory (enable good-typed-variable-p)))
 
   (define lambda-rectify ((tterm typed-term-p)
                           (path-cond pseudo-termp)
@@ -178,8 +188,7 @@
                           state)
     :guard (and (good-typed-term-p tterm options)
                 (equal (typed-term->kind tterm) 'lambdap))
-    :returns (new-tt (and (typed-term-p new-tt)
-                          (good-typed-term-p new-tt options)))
+    :returns (new-tt (good-typed-term-p new-tt options))
     :measure (list (acl2-count (typed-term->term tterm))
                    0)
     (b* (((unless (mbt (and (typed-term-p tterm)
@@ -226,8 +235,7 @@
                       state)
     :guard (and (good-typed-term-p tterm options)
                 (equal (typed-term->kind tterm) 'ifp))
-    :returns (new-tt (and (typed-term-p new-tt)
-                          (good-typed-term-p new-tt options)))
+    :returns (new-tt (good-typed-term-p new-tt options))
     :measure (list (acl2-count (typed-term->term tterm))
                    0)
     (b* (((unless (mbt (and (typed-term-p tterm)
@@ -265,8 +273,7 @@
                           state)
     :guard (and (good-typed-term-p tterm options)
                 (equal (typed-term->kind tterm) 'fncallp))
-    :returns (new-tt (and (typed-term-p new-tt)
-                          (good-typed-term-p new-tt options)))
+    :returns (new-tt (good-typed-term-p new-tt options))
     :measure (list (acl2-count (typed-term->term tterm))
                    0)
     (b* (((unless (mbt (and (typed-term-p tterm)
@@ -311,8 +318,7 @@
                         (options type-options-p)
                         state)
   :guard (good-typed-term-p tterm options)
-  :returns (new-tt (and (typed-term-p new-tt)
-                        (good-typed-term-p new-tt options)))
+  :returns (new-tt (good-typed-term-p new-tt options))
   :measure (list (acl2-count (typed-term->term tterm)) 1)
   (b* (((unless (mbt (and (typed-term-p tterm)
                           (pseudo-termp path-cond)
@@ -334,8 +340,7 @@
                            (options type-options-p)
                            state)
   :guard (good-typed-term-list-p tterm-lst options)
-  :returns (new-ttl (and (typed-term-list-p new-ttl)
-                         (good-typed-term-list-p new-ttl options)))
+  :returns (new-ttl (good-typed-term-list-p new-ttl options))
   :measure (list (acl2-count (typed-term-list->term-lst tterm-lst)) 1)
   (b* (((unless (mbt (and (typed-term-list-p tterm-lst)
                           (pseudo-termp path-cond)
@@ -348,6 +353,47 @@
        (tt-cdr (term-list-rectify tterm-tl path-cond options state)))
     (cons tt-car tt-cdr)))
 ///
+(defthm typed-term-of-fncall-rectify
+  (typed-term-p (fncall-rectify tterm path-cond options state))
+  :hints (("Goal"
+           :in-theory (disable good-typed-term-implies-typed-term)
+           :use ((:instance good-typed-term-implies-typed-term
+                            (tterm
+                             (fncall-rectify tterm path-cond options state))
+                            (options options))))))
+(defthm typed-term-of-lambda-rectify
+  (typed-term-p (lambda-rectify tterm path-cond options state))
+  :hints (("Goal"
+           :in-theory (disable good-typed-term-implies-typed-term)
+           :use ((:instance good-typed-term-implies-typed-term
+                            (tterm
+                             (lambda-rectify tterm path-cond options state))
+                            (options options))))))
+(defthm typed-term-of-if-rectify
+  (typed-term-p (if-rectify tterm path-cond options state))
+  :hints (("Goal"
+           :in-theory (disable good-typed-term-implies-typed-term)
+           :use ((:instance good-typed-term-implies-typed-term
+                            (tterm
+                             (if-rectify tterm path-cond options state))
+                            (options options))))))
+(defthm typed-term-of-term-rectify
+  (typed-term-p (term-rectify tterm path-cond options state))
+  :hints (("Goal"
+           :in-theory (disable good-typed-term-implies-typed-term)
+           :use ((:instance good-typed-term-implies-typed-term
+                            (tterm
+                             (term-rectify tterm path-cond options state))
+                            (options options))))))
+(defthm typed-term-list-of-term-list-rectify
+  (typed-term-list-p (term-list-rectify tterm-lst path-cond options state))
+  :hints (("Goal"
+           :in-theory (disable good-typed-term-list-implies-typed-term-list)
+           :use ((:instance good-typed-term-list-implies-typed-term-list
+                            (tterm-lst
+                             (term-list-rectify tterm-lst path-cond options state))
+                            (options options))))))
+
 ;; (defthm term-list-rectify-maintains-len-nil
 ;;   (implies (and (typed-term-list-p tterm-lst)
 ;;                 (type-options-p options)

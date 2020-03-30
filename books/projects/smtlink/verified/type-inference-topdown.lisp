@@ -323,17 +323,16 @@
 
 ;;----------------------------------------------------------------
 
-(define unify-variable ((tterm typed-term-p)
+(define unify-variable ((tterm t)
                         (expected pseudo-termp)
                         (options type-options-p))
   :guard (and (good-typed-term-p tterm options)
               (equal (typed-term->kind tterm) 'variablep))
-  :returns (new-tt (and (typed-term-p new-tt)
-                        (good-typed-term-p new-tt options))
+  :guard-debug t
+  :returns (new-tt (good-typed-term-p new-tt options)
                    :hints (("Goal"
                             :in-theory (enable good-typed-variable-p))))
-  (b* (((unless (mbt (and (typed-term-p tterm)
-                          (pseudo-termp expected)
+  (b* (((unless (mbt (and (pseudo-termp expected)
                           (equal (typed-term->kind tterm) 'variablep)
                           (good-typed-term-p tterm options))))
         (make-typed-term))
@@ -354,8 +353,8 @@
                                                to.supertype)))
   ///
   (more-returns
-   (new-tt (implies (and (typed-term-p tterm)
-                         (pseudo-termp expected)
+   (new-tt (implies (and (pseudo-termp expected)
+                         (type-options-p options)
                          (equal (typed-term->kind tterm) 'variablep)
                          (good-typed-term-p tterm options))
                     (equal (typed-term->path-cond new-tt)
@@ -367,8 +366,7 @@
                      (options type-options-p))
   :guard (and (good-typed-term-p tterm options)
               (equal (typed-term->kind tterm) 'quotep))
-  :returns (new-tt (and (typed-term-p new-tt)
-                        (good-typed-term-p new-tt options))
+  :returns (new-tt (good-typed-term-p new-tt options)
                    :hints (("Goal"
                             :in-theory (enable good-typed-quote-p))))
   (b* (((unless (mbt (and (typed-term-p tterm)
@@ -393,8 +391,7 @@
                                                to.supertype)))
   ///
   (more-returns
-   (new-tt (implies (and (typed-term-p tterm)
-                         (pseudo-termp expected)
+   (new-tt (implies (and (pseudo-termp expected)
                          (equal (typed-term->kind tterm) 'quotep)
                          (good-typed-term-p tterm options))
                     (equal (typed-term->path-cond new-tt)
@@ -413,8 +410,7 @@
                         state)
     :guard (and (good-typed-term-p tterm options)
                 (equal (typed-term->kind tterm) 'fncallp))
-    :returns (new-tt (and (typed-term-p new-tt)
-                          (good-typed-term-p new-tt options)))
+    :returns (new-tt (good-typed-term-p new-tt options))
     :measure (list (acl2-count (typed-term->term tterm)) 0)
     (b* (((unless (mbt (and (typed-term-p tterm)
                             (type-options-p options)
@@ -466,8 +462,7 @@
                         state)
     :guard (and (good-typed-term-p tterm options)
                 (equal (typed-term->kind tterm) 'lambdap))
-    :returns (new-tt (and (typed-term-p new-tt)
-                          (good-typed-term-p new-tt options)))
+    :returns (new-tt (good-typed-term-p new-tt options))
     :measure (list (acl2-count (typed-term->term tterm)) 0)
     (b* (((unless (mbt (and (typed-term-p tterm)
                             (type-options-p options)
@@ -505,8 +500,7 @@
                     state)
     :guard (and (good-typed-term-p tterm options)
                 (equal (typed-term->kind tterm) 'ifp))
-    :returns (new-tt (and (typed-term-p new-tt)
-                          (good-typed-term-p new-tt options)))
+    :returns (new-tt (good-typed-term-p new-tt options))
     :measure (list (acl2-count (typed-term->term tterm)) 0)
     (b* (((unless (mbt (and (typed-term-p tterm)
                             (pseudo-termp expected)
@@ -539,8 +533,7 @@
                       (options type-options-p)
                       state)
     :guard (good-typed-term-p tterm options)
-    :returns (new-tt (and (typed-term-p new-tt)
-                          (good-typed-term-p new-tt options)))
+    :returns (new-tt (good-typed-term-p new-tt options))
     :measure (list (acl2-count (typed-term->term tterm)) 1)
     (b* (((unless (mbt (and (typed-term-p tterm)
                             (type-options-p options)
@@ -561,8 +554,7 @@
                            (expected-lst pseudo-term-listp)
                            (options type-options-p)
                            state)
-    :returns (new-ttl (and (typed-term-list-p new-ttl)
-                           (good-typed-term-list-p new-ttl options)))
+    :returns (new-ttl (good-typed-term-list-p new-ttl options))
     :guard (good-typed-term-list-p tterm-lst options)
     :measure (list (acl2-count (typed-term-list->term-lst tterm-lst))
                    1)
@@ -583,6 +575,48 @@
          (tt-car (unify-type tterm-hd expected-hd options state))
          (tt-cdr (unify-type-list tterm-tl expected-tl options state)))
       (cons tt-car tt-cdr)))
+  ///
+  (defthm typed-term-of-unify-fncall
+    (typed-term-p (unify-fncall tterm expected options state))
+    :hints (("Goal"
+             :in-theory (disable good-typed-term-implies-typed-term)
+             :use ((:instance good-typed-term-implies-typed-term
+                              (tterm
+                               (unify-fncall tterm expected options state))
+                              (options options))))))
+  (defthm typed-term-of-unify-lambda
+    (typed-term-p (unify-lambda tterm expected options state))
+    :hints (("Goal"
+             :in-theory (disable good-typed-term-implies-typed-term)
+             :use ((:instance good-typed-term-implies-typed-term
+                              (tterm
+                               (unify-lambda tterm expected options state))
+                              (options options))))))
+  (defthm typed-term-of-unify-if
+    (typed-term-p (unify-if tterm expected options state))
+    :hints (("Goal"
+             :in-theory (disable good-typed-term-implies-typed-term)
+             :use ((:instance good-typed-term-implies-typed-term
+                              (tterm
+                               (unify-if tterm expected options state))
+                              (options options))))))
+  (defthm typed-term-of-unify-type
+    (typed-term-p (unify-type tterm expected options state))
+    :hints (("Goal"
+             :in-theory (disable good-typed-term-implies-typed-term)
+             :use ((:instance good-typed-term-implies-typed-term
+                              (tterm
+                               (unify-type tterm expected options state))
+                              (options options))))))
+  (defthm typed-term-list-of-unify-type-list
+    (typed-term-list-p (unify-type-list tterm-lst expected-lst options state))
+    :hints (("Goal"
+             :in-theory (disable good-typed-term-list-implies-typed-term-list)
+             :use ((:instance good-typed-term-list-implies-typed-term-list
+                              (tterm-lst
+                               (unify-type-list tterm-lst expected-lst
+                                                options state))
+                              (options options))))))
   )
 
 (verify-guards unify-type)
