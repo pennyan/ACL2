@@ -170,8 +170,9 @@
                                       (concl pseudo-termp)
                                       (options type-options-p)
                                       state)
-    :returns (mv (new-tt (and (typed-term-p new-tt)
-                              (good-typed-term-p new-tt options)))
+    :returns (mv (new-tt (good-typed-term-p new-tt options)
+                         :hints (("Goal"
+                                  :in-theory (enable good-typed-quote-p))))
                  (new-proj pseudo-termp))
     :guard (and (not (equal fn 'quote))
                 (good-typed-term-list-p tta options)
@@ -301,8 +302,9 @@
                                 (actuals-proj pseudo-termp)
                                 (options type-options-p)
                                 state)
-    :returns (mv (new-tt (and (typed-term-p new-tt)
-                              (good-typed-term-p new-tt options)))
+    :returns (mv (new-tt (good-typed-term-p new-tt options)
+                         :hints (("Goal"
+                                  :in-theory (enable good-typed-quote-p))))
                  (new-proj pseudo-termp))
     :guard (and (not (equal fn 'quote))
                 (good-typed-term-list-p actuals-tterm options)
@@ -427,8 +429,10 @@
                              (projection pseudo-termp)
                              (names symbol-listp)
                              (options type-options-p))
-  :returns (mv (new-tt (and (typed-term-p new-tt)
-                            (good-typed-term-p new-tt options)))
+  :returns (mv (new-tt (good-typed-term-p new-tt options)
+                       :hints (("Goal"
+                                :in-theory (enable good-typed-quote-p
+                                                   good-typed-variable-p))))
                (new-proj pseudo-termp)
                (new-names symbol-listp))
   :guard (and (good-typed-term-p tterm options)
@@ -469,8 +473,9 @@
                           (path-cond pseudo-termp)
                           (names symbol-listp)
                           (options type-options-p))
-  :returns (mv (new-tt (and (typed-term-p new-tt)
-                            (good-typed-term-p new-tt options)))
+  :returns (mv (new-tt (good-typed-term-p new-tt options)
+                       :hints (("Goal"
+                                :in-theory (enable good-typed-quote-p))))
                (new-proj pseudo-termp)
                (new-names symbol-listp))
   :guard (and (good-typed-term-p tterm options)
@@ -521,8 +526,7 @@
                              (names symbol-listp)
                              (options type-options-p)
                              state)
-    :returns (mv (new-tt (and (typed-term-p new-tt)
-                              (good-typed-term-p new-tt options)))
+    :returns (mv (new-tt (good-typed-term-p new-tt options))
                  (new-proj pseudo-termp)
                  (new-names symbol-listp))
     :guard (and (good-typed-term-p tterm options)
@@ -592,8 +596,7 @@
                          (names symbol-listp)
                          (options type-options-p)
                          state)
-    :returns (mv (new-tt (and (typed-term-p new-tt)
-                              (good-typed-term-p new-tt options)))
+    :returns (mv (new-tt (good-typed-term-p new-tt options))
                  (new-proj pseudo-termp)
                  (new-names symbol-listp))
     :guard (and (good-typed-term-p tterm options)
@@ -645,8 +648,7 @@
                              (names symbol-listp)
                              (options type-options-p)
                              state)
-    :returns (mv (new-tt (and (typed-term-p new-tt)
-                              (good-typed-term-p new-tt options)))
+    :returns (mv (new-tt (good-typed-term-p new-tt options))
                  (new-proj pseudo-termp)
                  (new-names symbol-listp))
     :guard (and (good-typed-term-p tterm options)
@@ -695,8 +697,7 @@
                            (options type-options-p)
                            state)
     :guard (good-typed-term-p tterm options)
-    :returns (mv (new-tt (and (typed-term-p new-tt)
-                              (good-typed-term-p new-tt options)))
+    :returns (mv (new-tt (good-typed-term-p new-tt options))
                  (new-proj pseudo-termp)
                  (new-names symbol-listp))
     :measure (list (acl2-count (typed-term->term tterm)) 1)
@@ -724,8 +725,7 @@
                                 (options type-options-p)
                                 state)
     :guard (good-typed-term-list-p tterm-lst options)
-    :returns (mv (new-ttl (and (typed-term-list-p new-ttl)
-                               (good-typed-term-list-p new-ttl options)))
+    :returns (mv (new-ttl (good-typed-term-list-p new-ttl options))
                  (new-proj pseudo-termp)
                  (new-names symbol-listp))
     :measure (list (acl2-count (typed-term-list->term-lst tterm-lst))
@@ -751,6 +751,69 @@
           `(if ,proj-car ,proj-cdr 'nil)
           names-cdr)))
   ///
+  (defthm typed-term-of-lambda-projection
+    (typed-term-p
+     (mv-nth 0 (lambda-projection tterm path-cond projection
+                                  names options state)))
+    :hints (("Goal"
+             :in-theory (disable good-typed-term-implies-typed-term)
+             :use ((:instance good-typed-term-implies-typed-term
+                              (tterm
+                               (mv-nth 0 (lambda-projection tterm path-cond
+                                                            projection
+                                                            names options
+                                                            state)))
+                              (options options))))))
+  (defthm typed-term-of-fncall-projection
+    (typed-term-p
+     (mv-nth 0 (fncall-projection tterm path-cond projection
+                                  names options state)))
+    :hints (("Goal"
+             :in-theory (disable good-typed-term-implies-typed-term)
+             :use ((:instance good-typed-term-implies-typed-term
+                              (tterm
+                               (mv-nth 0 (fncall-projection tterm path-cond
+                                                            projection
+                                                            names options
+                                                            state)))
+                              (options options))))))
+  (defthm typed-term-of-if-projection
+    (typed-term-p
+     (mv-nth 0 (if-projection tterm path-cond projection names options state)))
+    :hints (("Goal"
+             :in-theory (disable good-typed-term-implies-typed-term)
+             :use ((:instance good-typed-term-implies-typed-term
+                              (tterm
+                               (mv-nth 0 (if-projection tterm path-cond
+                                                        projection names
+                                                        options state)))
+                              (options options))))))
+  (defthm typed-term-of-term-projection
+    (typed-term-p
+     (mv-nth 0 (term-projection tterm path-cond projection names
+                                options state)))
+    :hints (("Goal"
+             :in-theory (disable good-typed-term-implies-typed-term)
+             :use ((:instance good-typed-term-implies-typed-term
+                              (tterm
+                               (mv-nth 0 (term-projection tterm path-cond
+                                                          projection names
+                                                          options state)))
+                              (options options))))))
+  (defthm typed-term-list-of-term-list-projection
+    (typed-term-list-p
+     (mv-nth 0 (term-list-projection tterm path-cond projection
+                                     names options state)))
+    :hints (("Goal"
+             :in-theory (disable good-typed-term-list-implies-typed-term-list)
+             :use ((:instance good-typed-term-list-implies-typed-term-list
+                              (tterm-lst
+                               (mv-nth 0 (term-list-projection tterm path-cond
+                                                               projection
+                                                               names options
+                                                               state)))
+                              (options options))))))
+
   (defthm term-list-projection-maintains-length-nil
     (implies (and (pseudo-termp path-cond)
                   (pseudo-termp projection)

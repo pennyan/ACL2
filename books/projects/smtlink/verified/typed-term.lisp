@@ -1103,7 +1103,11 @@
           (if ,ttc.judgements
               (if ,ttc.term ,ttt.judgements ,tte.judgements)
             'nil)
-        'nil))))
+        'nil)))
+  ///
+  (more-returns
+   (new-tt (typed-term-p new-tt)
+           :name typed-term-of-make-typed-if)))
 
 (local
  (defthm pseudo-termp-of-lambda
@@ -1199,7 +1203,11 @@
                            ,@actuals)
                           ,tta.judgements
                         'nil)
-                    'nil))))
+                    'nil)))
+  ///
+  (more-returns
+   (new-tt (typed-term-p new-tt)
+           :name typed-term-of-make-typed-lambda)))
 
 (defthm kind-of-make-typed-fncall
   (implies
@@ -1252,4 +1260,8 @@
     (make-typed-term
      :term ttt.term
      :path-cond ttt.path-cond
-     :judgements `(if ,ttt.judgements ,tta.judgements 'nil))))
+     :judgements `(if ,ttt.judgements ,tta.judgements 'nil)))
+  ///
+  (more-returns
+   (new-tt (typed-term-p new-tt)
+           :name typed-term-of-make-typed-fncall)))
