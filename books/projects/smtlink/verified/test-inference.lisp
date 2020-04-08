@@ -2,6 +2,7 @@
 (include-book "type-inference-bottomup")
 (include-book "type-inference-topdown")
 (include-book "term-rectify")
+(include-book "term-projection")
 (set-state-ok t)
 
 (defalist rational-integer-alist
@@ -356,13 +357,46 @@
     (maybe-rational-integer-consp . maybe-rational-integer-cons-nil)
     (rational-list-p . rational-list-nil)))
 
+(defthm alist-to-array-equiv-of-rational-integer-alist
+  (implies (and (rational-integer-alistp a)
+                (equal b (rational-integer-alist-to-array a)))
+           (alist-array-equiv a b)))
+
+(defun alist ()
+  `((rational-integer-alistp
+     . ,(make-a2a-info :a2a-fn 'rational-integer-alist-to-array
+                       :formals '(a b)
+                       :thm 'alist-to-array-equiv-of-rational-integer-alist))))
+
+(defthm assoc-equal-of-rational-integer-alist
+  (implies (and (rational-integer-alistp al)
+                (rational-integer-arrayp ar)
+                (alist-array-equiv al ar)
+                (rationalp k))
+           (and (alist-array-equiv (assoc-equal k al)
+                                   (rational-integer-assoc-equal k ))
+                ())))
+
+(defthm rational-integer-alistp-of-rational-integer-alist
+  ())
+
+(defun aa-map ()
+  `((assoc-equal
+     . ,(make-equiv :formal-map '((al . al) (ar . ar) (k . k))
+                    :thm assoc-equal-of-rational-integer-alist))
+    (rational-integer-alistp
+     . ,(make-equiv :formal-map '((al . al) (ar . ar))
+                    :thm rational-integer-alistp-of-rational-integer-alist))))
+
 (defun options ()
   (b* ((supertype (supertype))
        (supertype-thm (supertype-thm))
        (subtype (subtype))
        (subtype-thm (subtype-thm))
        (functions (functions))
-       (nil-alst (nil-alst)))
+       (nil-alst (nil-alst))
+       (alist (alist))
+       (aa-map (aa-map)))
     (make-type-options
      :supertype supertype
      :supertype-thm supertype-thm
@@ -609,3 +643,28 @@
             ''t
             (options)
             state)
+
+;; --------------------------------------------------
+;; test term projection
+
+
+(term-projection
+ (unify-type (make-typed-term :term (term)
+                              :path-cond ''t
+                              :judgements (type-judgement (term) ''t (options)
+                                                          state))
+             ''t
+             (options)
+             state)
+ ''t
+ ''t
+ (all-vars (typed-term->term
+            (unify-type (make-typed-term :term (term)
+                                         :path-cond ''t
+                                         :judgements (type-judgement (term) ''t (options)
+                                                                     state))
+                        ''t
+                        (options)
+                       state)))
+ (options)
+ state)

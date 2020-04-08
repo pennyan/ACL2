@@ -15,7 +15,7 @@
 (include-book "clause-processors/meta-extract-user" :dir :system)
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 
-(include-book "typed-term")
+(include-book "typed-term-fns")
 (include-book "judgement-fns")
 
 (set-state-ok t)

@@ -134,6 +134,10 @@
                      (pseudo-termp (cadr term))
                      (pseudo-termp (caddr term))))
        :name implies-of-is-conjunct?)
+   (ok (implies ok (not (consp (cddddr term))))
+       :hints (("Goal"
+                :in-theory (enable pseudo-term-fix)))
+       :name cddddr-when-is-conjunct?)
    (ok (implies (and ok (pseudo-termp term) (not (equal term ''t)))
                 (< (acl2-count (caddr term))
                    (acl2-count term)))

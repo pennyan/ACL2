@@ -17,7 +17,7 @@
 
 (include-book "basics")
 (include-book "hint-please")
-(include-book "typed-term")
+(include-book "typed-term-fns")
 (include-book "judgement-fns")
 (include-book "returns-judgement")
 

@@ -116,6 +116,21 @@
            (and (true-listp (cdr term))
                 (pseudo-term-listp (cdr term)))))
 
+(defthm consp-of-pseudo-term-list-fix
+  (implies (consp x)
+           (consp (pseudo-term-list-fix x)))
+  :hints(("Goal" :expand (pseudo-term-list-fix x))))
+
+(defthm null-of-pseudo-term-list-fix
+  (implies (not (consp x))
+           (equal (pseudo-term-list-fix x) nil))
+  :hints(("Goal" :expand (pseudo-term-list-fix x))))
+
+(defthm len-of-pseudo-term-list-fix
+  (equal (len (pseudo-term-list-fix x))
+         (len x))
+  :hints(("Goal" :in-theory (enable pseudo-term-list-fix))))
+
 (define pseudo-term-list-list-fix ((x pseudo-term-list-listp))
   :returns (fixed pseudo-term-list-listp)
   (mbe :logic (if (consp x)
@@ -203,3 +218,4 @@
                 (consp term-lst))
            (< (acl2-count (pseudo-term-fix (car term-lst)))
               (acl2-count term-lst))))
+

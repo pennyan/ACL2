@@ -19,9 +19,13 @@
 (include-book "basics")
 ;; (include-book "alist")
 (include-book "hint-please")
-(include-book "typed-term")
+(include-book "typed-term-fns")
 (include-book "judgement-fns")
 (include-book "type-options")
+
+;; This clause-processor projections a term that uses alists into a term that
+;; uses arrays. Supposedly other isomorphic projectionations can also be made in
+;; a similar way.
 
 (set-state-ok t)
 
@@ -29,10 +33,6 @@
   (implies (and (symbol-listp x)
                 (symbol-listp y))
            (symbol-listp (append x y))))
-
-;; This clause-processor projections a term that uses alists into a term that
-;; uses arrays. Supposedly other isomorphic projectionations can also be made in
-;; a similar way.
 
 (define new-fresh-vars ((n natp)
                         (current symbol-listp))
