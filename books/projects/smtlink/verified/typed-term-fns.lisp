@@ -83,7 +83,8 @@
                        (symbolp (car (typed-term->term tterm)))))
          :name implies-of-fncall-kind)
    (kind (implies (equal kind 'fncallp)
-                  (not (equal (car (typed-term->term tterm)) 'if)))
+                  (and (not (equal (car (typed-term->term tterm)) 'quote))
+                       (not (equal (car (typed-term->term tterm)) 'if))))
          :name fncall-is-not-if)
    (kind (implies (and (typed-term-p tterm)
                        (equal kind x))
@@ -782,17 +783,15 @@
                      :judgements top-judge))
   ///
   (more-returns
-   (new-tt (implies (and (equal (typed-term->kind tterm)
-                                'lambdap)
+   (new-tt (implies (and (equal (typed-term->kind tterm) 'lambdap)
                          (good-typed-term-p tterm options)
                          (type-options-p options))
                     (and (consp (typed-term->term new-tt))
                          (pseudo-lambdap (car (typed-term->term new-tt)))))
-           ;; I don't know how to remove this hint
            :hints (("Goal"
                     :in-theory (disable good-typed-lambda-p-of-good-term)
                     :use ((:instance good-typed-lambda-p-of-good-term))))
-           :name implies-of-typed-term->top)))
+           :name implies-of-typed-term->top-lambda)))
 
 ;; fncallp destructors
 (define typed-term-fncall->actuals ((tterm typed-term-p)

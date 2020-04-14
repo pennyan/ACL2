@@ -310,7 +310,11 @@
           (term-substitution ttt.judgements `((,ttt.term . ,new-term)) t))
          (new-top (make-typed-term :term new-term
                                    :path-cond path-cond
-                                   :judgements new-judge)))
+                                   :judgements new-judge))
+         ;; in order to satisfy the guards of make-typed-fncall
+         ((unless (and (not (equal new-fn 'if))
+                       (equal path-cond rtta.path-cond)))
+          tt))
       (make-typed-fncall new-top rtta to)))
 
   (define term-rectify ((tterm typed-term-p)
@@ -350,7 +354,10 @@
        ((unless (consp tterm-lst)) nil)
        ((cons tterm-hd tterm-tl) tterm-lst)
        (tt-car (term-rectify tterm-hd path-cond options state))
-       (tt-cdr (term-list-rectify tterm-tl path-cond options state)))
+       (tt-cdr (term-list-rectify tterm-tl path-cond options state))
+       ((unless (equal (typed-term->path-cond tt-car)
+                       (typed-term-list->path-cond tt-cdr)))
+        tterm-lst))
     (cons tt-car tt-cdr)))
 ///
 (defthm typed-term-of-fncall-rectify
@@ -421,7 +428,9 @@
 ;;            :expand (term-list-rectify tterm-lst path-cond options state))))
 )
 
-(verify-guards term-rectify)
+(verify-guards term-rectify
+  :hints (("Goal"
+           :in-theory (enable make-typed-fncall-guard))))
 
 (define term-rectify-fn ((cl pseudo-term-listp)
                          (smtlink-hint t)

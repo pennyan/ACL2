@@ -425,6 +425,10 @@
          (tta.path-cond (typed-term-list->path-cond tt-actuals))
          (tta.judgements (typed-term-list->judgements tt-actuals))
          ((typed-term ttt) (typed-term->top tt to))
+         ;; for guard of make-typed-fncall
+         ((unless (and (consp ttt.term)
+                       (not (equal (car ttt.term) 'quote))))
+          tt)
          (judge-top (if (equal expected ''t)
                         (choose-judge ttt.judgements ttt.term to.supertype)
                       expected))
@@ -453,7 +457,17 @@
                        covered. ~%")
                   tterm))
          (expected-actuals (get-actuals-judges actuals actuals-alst))
-         (new-actuals (unify-type-list tt-actuals expected-actuals to state)))
+         (new-actuals (unify-type-list tt-actuals expected-actuals to state))
+         ;; in order to satisfy the guards of make-typed-fncall
+         ((unless (and (consp ttt.term)
+                       (symbolp (car ttt.term))
+                       (not (equal (car ttt.term) 'quote))
+                       (not (equal (car ttt.term) 'if))
+                       (equal (cdr ttt.term)
+                              (typed-term-list->term-lst new-actuals))
+                       (equal ttt.path-cond
+                              (typed-term-list->path-cond new-actuals))))
+          tt))
       (make-typed-fncall new-top new-actuals options)))
 
   (define unify-lambda ((tterm typed-term-p)
@@ -573,7 +587,10 @@
            tterm-lst))
          ((cons expected-hd expected-tl) expected-lst)
          (tt-car (unify-type tterm-hd expected-hd options state))
-         (tt-cdr (unify-type-list tterm-tl expected-tl options state)))
+         (tt-cdr (unify-type-list tterm-tl expected-tl options state))
+         ((unless (equal (typed-term->path-cond tt-car)
+                         (typed-term-list->path-cond tt-cdr)))
+          tterm-lst))
       (cons tt-car tt-cdr)))
   ///
   (defthm typed-term-of-unify-fncall
@@ -619,4 +636,6 @@
                               (options options))))))
   )
 
-(verify-guards unify-type)
+(verify-guards unify-type
+  :hints (("Goal"
+           :in-theory (enable make-typed-fncall-guard))))
