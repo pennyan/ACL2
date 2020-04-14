@@ -118,6 +118,18 @@
                    '((integerp . rationalp)))
 |#
 
+(encapsulate ()
+(local (defthm lemma
+         (implies (equal (len term) 4)
+                  (not (consp (cddddr term))))
+         :hints(("Goal"
+                 :in-theory (disable len)
+                 :expand ((len term)
+                          (len (cdr term))
+                          (len (cdr (cdr term)))
+                          (len (cdr (cdr (cdr term))))
+                          (len (cdr (cdr (cdr (cdr term))))))))))
+
 (define is-conjunct? ((term pseudo-termp))
   :returns (ok booleanp)
   (b* ((term (pseudo-term-fix term)))
@@ -136,7 +148,7 @@
        :name implies-of-is-conjunct?)
    (ok (implies ok (not (consp (cddddr term))))
        :hints (("Goal"
-                :in-theory (enable pseudo-term-fix)))
+                :in-theory (e/d (pseudo-term-fix))))
        :name cddddr-when-is-conjunct?)
    (ok (implies (and ok (pseudo-termp term) (not (equal term ''t)))
                 (< (acl2-count (caddr term))
@@ -146,6 +158,7 @@
                 :in-theory (disable implies-of-is-conjunct?
                                     symbol-listp)))
        :rule-classes :linear)))
+)
 
 (defthm consp-of-is-conjunct?
   (implies (and (pseudo-termp actuals-judgements)

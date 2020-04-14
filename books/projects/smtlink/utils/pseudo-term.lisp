@@ -126,11 +126,6 @@
            (equal (pseudo-term-list-fix x) nil))
   :hints(("Goal" :expand (pseudo-term-list-fix x))))
 
-(defthm len-of-pseudo-term-list-fix
-  (equal (len (pseudo-term-list-fix x))
-         (len x))
-  :hints(("Goal" :in-theory (enable pseudo-term-list-fix))))
-
 (define pseudo-term-list-list-fix ((x pseudo-term-list-listp))
   :returns (fixed pseudo-term-list-listp)
   (mbe :logic (if (consp x)

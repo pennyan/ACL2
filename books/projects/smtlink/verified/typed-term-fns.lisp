@@ -82,6 +82,9 @@
                        (not (equal (car (typed-term->term tterm)) 'quote))
                        (symbolp (car (typed-term->term tterm)))))
          :name implies-of-fncall-kind)
+   (kind (implies (equal kind 'fncallp)
+                  (not (equal (car (typed-term->term tterm)) 'if)))
+         :name fncall-is-not-if)
    (kind (implies (and (typed-term-p tterm)
                        (equal kind x))
                   (equal (typed-term->kind
@@ -124,9 +127,7 @@
   (implies (good-typed-variable-p tterm options)
            (typed-term-p tterm))
   :hints (("Goal"
-           :in-theory (enable good-typed-variable-p)))
-  ;; :rule-classes :forward-chaining
-  )
+           :in-theory (enable good-typed-variable-p))))
 
 #|
 (good-typed-variable-p (typed-term 'x
@@ -172,6 +173,11 @@
                                    'nil)))
 |#
 
+;; mrg: I added the test
+;;   (make-typed-term-list-guard actuals tt.path-cond actuals-judge)
+;; to good-typed-lambda-p and good-typed-fncall-p.
+;; This probably creates a verification obligation for the code that
+;; creates judgements for lambdas and function calls.
 (defines good-typed-term
   :well-founded-relation l<
   :flag-local nil
@@ -209,6 +215,7 @@
                    ''nil)
                ''nil)
              (and ;; (is-conjunct-list? return-judge tt.term to.supertype)
+              (make-typed-term-list-guard actuals tt.path-cond actuals-judge) ;; added by mrg
                   (good-typed-term-list-p
                    (make-typed-term-list actuals tt.path-cond actuals-judge)
                    to)
@@ -294,9 +301,10 @@
           (case-match tt.judgements
             (('if return-judge actuals-judge ''nil)
              (and ;; (is-conjunct-list? return-judge tt.term to.supertype)
-                  (good-typed-term-list-p
-                   (make-typed-term-list actuals tt.path-cond actuals-judge)
-                   options)))
+              (make-typed-term-list-guard actuals tt.path-cond actuals-judge) ;; added by mrg
+              (good-typed-term-list-p
+               (make-typed-term-list actuals tt.path-cond actuals-judge)
+               options)))
             (& nil))))
       (if match? t nil)))
 
@@ -330,7 +338,11 @@
          ((unless (consp tterm-lst)) t)
          ((cons tterm-hd tterm-tl) tterm-lst))
       (and (good-typed-term-p tterm-hd options)
-           (good-typed-term-list-p tterm-tl options))))
+           (good-typed-term-list-p tterm-tl options)
+           (if tterm-tl ;; added by mrg -- ensures good-typed-term-list-p => uniform-path-cond?
+               (equal (typed-term->path-cond tterm-hd)
+                      (typed-term-list->path-cond tterm-tl))
+             t))))
   ///
    (defthm good-typed-variable-p-of-good-term
      (implies (equal (typed-term->kind tterm) 'variablep)
@@ -385,22 +397,52 @@
   (implies (good-typed-term-p tterm options)
            (typed-term-p tterm))
   :hints (("Goal"
-           :in-theory (enable good-typed-term-p)))
-  ;; :rule-classes :forward-chaining
-  )
+           :in-theory (enable good-typed-term-p))))
 
 (defthm good-typed-term-list-implies-typed-term-list
   (implies (good-typed-term-list-p tterm-lst options)
            (typed-term-list-p tterm-lst))
   :hints (("Goal"
-           :in-theory (enable good-typed-term-list-p)))
-  ;; :rule-classes :forward-chaining
-  )
+           :in-theory (enable good-typed-term-list-p))))
 
+;; mrg: I added uniform-path-help-when-good-typed-term-list-p and
+;;   uniform-path-cond?-when-good-typed-term-list-p.  These are really
+;;   more-returns theorems of good-typed-term-listp, but when I try to
+;;   state them as such, the proofs take much longer and then fail.
+;;   I'm guessing that ACL2 gets lost when pseudo-termp is enabled.
+;;   Rather figuring out the various theory hints that would make it
+;;   work, I'm just stating the theorems here.
+;;     Note that uniform-path-help-when-good-typed-term-list-p conjures up
+;;   path-cond as a free variable that just happens to be equal to
+;;     (typed-term-list->path-cond tterm-lst).  I suspect this will make it
+;;   hard to apply the rule automatically, but it still may be useful in
+;;   subsequent arguments about good-typed-term-list-p and
+;;   uniform-path-cond?.  Thus, I'm admitting it as a disabled theorem.
+(defthmd uniform-path-help-when-good-typed-term-list-p
+  (implies (and (good-typed-term-list-p tterm-lst options)
+                (equal (typed-term-list->path-cond tterm-lst) path-cond))
+           (uniform-path-help tterm-lst path-cond))
+  :hints(("Goal"
+          :in-theory (enable good-typed-term-list-p uniform-path-help typed-term-list->path-cond))))
+
+(defthm uniform-path-cond?-when-good-typed-term-list-p
+  (implies (good-typed-term-list-p tterm-lst options)
+           (uniform-path-cond? tterm-lst))
+  :hints(("Goal"
+          :in-theory (enable uniform-path-cond?)
+          :use((:instance uniform-path-help-when-good-typed-term-list-p
+                          (path-cond (typed-term-list->path-cond tterm-lst)))))))
+
+;; mrg:  I added the hypothesis
+;;         (equal (typed-term->path-cond tterm)
+;;                (typed-term-list->path-cond tterm-lst))
+;;  which is required to ensure uniform-path-cond?
 (defthm good-typed-term-list-of-cons
   (implies (and (type-options-p options)
                 (good-typed-term-p tterm options)
-                (good-typed-term-list-p tterm-lst options))
+                (good-typed-term-list-p tterm-lst options)
+                (equal (typed-term->path-cond tterm)
+                       (typed-term-list->path-cond tterm-lst)))
            (good-typed-term-list-p (cons tterm tterm-lst) options))
   :hints (("Goal"
            :in-theory (enable good-typed-term-list-p)
@@ -424,7 +466,6 @@
            :in-theory (enable good-typed-term-list-p)
            :expand (good-typed-term-list-p tterm-lst options))))
 
-(skip-proofs
 (defthm good-typed-term-list-of-make-typed-term-list
   (implies (and (type-options-p options)
                 (good-typed-term-list-p tterm-lst options))
@@ -432,10 +473,7 @@
             (make-typed-term-list (typed-term-list->term-lst tterm-lst)
                                   (typed-term-list->path-cond tterm-lst)
                                   (typed-term-list->judgements tterm-lst))
-            options))
-  :hints (("Goal"
-           :in-theory (enable typed-term-list->path-cond))))
-)
+            options)))
 
 (defthm good-typed-term-of-make-typed-term
   (good-typed-term-p (make-typed-term) options)
@@ -761,6 +799,8 @@
                                     (options type-options-p))
   :guard (and (equal (typed-term->kind tterm) 'fncallp)
               (good-typed-term-p tterm options))
+  :guard-hints (("Goal"
+                 :expand (good-typed-fncall-p tterm options)))
   :returns (new-ttl (good-typed-term-list-p new-ttl options))
   (b* (((unless (mbt (and (typed-term-p tterm)
                           (type-options-p options)
@@ -1070,11 +1110,7 @@
           (consp (typed-term->term tt-top))
           (symbolp (car (typed-term->term tt-top)))
           (not (equal (car (typed-term->term tt-top)) 'quote))
-          (not (equal (car (typed-term->term tt-top)) 'if))
-          (equal (cdr (typed-term->term tt-top))
-                 (typed-term-list->term-lst tt-actuals))
-          (equal (typed-term->path-cond tt-top)
-                 (typed-term-list->path-cond tt-actuals)))
+          (not (equal (car (typed-term->term tt-top)) 'if)))
      (equal (typed-term->kind
              (typed-term (typed-term->term tt-top)
                          (typed-term->path-cond tt-top)
@@ -1086,31 +1122,37 @@
   :hints (("Goal"
            :in-theory (enable typed-term->kind))))
 
+(define make-typed-fncall-guard ((tt-top typed-term-p)
+                                 (tt-actuals typed-term-list-p)
+                                 (options type-options-p))
+  :returns (ok booleanp)
+  (b* (((unless (mbt (and (typed-term-p tt-top)
+                          (typed-term-list-p tt-actuals)
+                          (type-options-p options))))
+        nil)
+       ((typed-term ttt) tt-top)
+       (tta.term-lst (typed-term-list->term-lst tt-actuals))
+       (tta.path-cond (typed-term-list->path-cond tt-actuals)))
+    (and (good-typed-term-list-p tt-actuals options)
+         (consp ttt.term)
+         (symbolp (car ttt.term))
+         (not (equal (car ttt.term) 'quote))
+         (not (equal (car ttt.term) 'if))
+         (equal (cdr ttt.term) tta.term-lst)
+         (equal ttt.path-cond tta.path-cond))))
+
 (define make-typed-fncall ((tt-top typed-term-p)
                            (tt-actuals typed-term-list-p)
                            (options type-options-p))
-  :guard (good-typed-term-list-p tt-actuals options)
+  :guard (make-typed-fncall-guard tt-top tt-actuals options)
   :returns (new-tt (good-typed-term-p new-tt options)
                    :hints (("Goal"
-                            :in-theory (enable good-typed-fncall-p))))
-  (b* (((unless (mbt (and (typed-term-p tt-top)
-                          (typed-term-list-p tt-actuals)
-                          (type-options-p options)
-                          (good-typed-term-list-p tt-actuals options))))
+                            :in-theory (enable good-typed-fncall-p
+                                               make-typed-fncall-guard))))
+  (b* (((unless (mbt (make-typed-fncall-guard tt-top tt-actuals options)))
         (make-typed-term))
        ((typed-term ttt) tt-top)
-       (tta.term-lst (typed-term-list->term-lst tt-actuals))
-       (tta.path-cond (typed-term-list->path-cond tt-actuals))
-       (tta.judgements (typed-term-list->judgements tt-actuals))
-       ((unless (and (consp ttt.term)
-                     (symbolp (car ttt.term))
-                     (equal (cdr ttt.term) tta.term-lst)
-                     (equal ttt.path-cond tta.path-cond)
-                     (not (equal (car ttt.term) 'quote))
-                     (not (equal (car ttt.term) 'if))))
-        (prog2$ (er hard? 'typed-term=>make-typed-fncall
-                    "Inconsistent inputs.~%")
-                (make-typed-term))))
+       (tta.judgements (typed-term-list->judgements tt-actuals)))
     (make-typed-term
      :term ttt.term
      :path-cond ttt.path-cond
@@ -1118,4 +1160,12 @@
   ///
   (more-returns
    (new-tt (typed-term-p new-tt)
-           :name typed-term-of-make-typed-fncall)))
+           :name typed-term-of-make-typed-fncall)
+   (new-tt (implies (make-typed-fncall-guard tt-top tt-actuals options)
+                    (equal (typed-term->term new-tt)
+                           (typed-term->term tt-top)))
+           :name make-typed-fncall-maintains-term)
+   (new-tt (implies (make-typed-fncall-guard tt-top tt-actuals options)
+                    (equal (typed-term->path-cond new-tt)
+                           (typed-term->path-cond tt-top)))
+           :name make-typed-fncall-maintains-path-cond)))

@@ -175,11 +175,13 @@
                                   :in-theory (enable good-typed-quote-p))))
                  (new-proj pseudo-termp))
     :guard (and (not (equal fn 'quote))
+                (not (equal fn 'if))
                 (good-typed-term-list-p tta options)
                 (good-typed-term-list-p ntta options))
     :verify-guards nil
     (b* (((unless (mbt (and (symbolp fn)
                             (not (equal fn 'quote))
+                            (not (equal fn 'if))
                             (typed-term-list-p tta)
                             (good-typed-term-list-p tta options)
                             (typed-term-list-p ntta)
@@ -215,7 +217,9 @@
                 (b* (((unless (and (symbolp store-fn)
                                    (symbolp cons-fn)
                                    (not (equal store-fn 'quote))
+                                   (not (equal store-fn 'if))
                                    (not (equal cons-fn 'quote))
+                                   (not (equal cons-fn 'if))
                                    (equal (len ntta) 3)))
                       (mv nil (make-typed-term)))
                      (cons-term `(,cons-fn ,k ,v))
@@ -224,6 +228,10 @@
                      (cons-top (make-typed-term :term cons-term
                                                 :path-cond ntta.path-cond
                                                 :judgements judge-cons-fn))
+                     ((unless (and (equal k (typed-term->term (car ntta)))
+                                   (equal v (typed-term->term (cadr ntta)))
+                                   (equal ar (typed-term->term (caddr ntta)))))
+                      (mv nil nil))
                      (cons-actuals (list (car ntta) (cadr ntta)))
                      (cons-tterm
                       (make-typed-fncall cons-top cons-actuals options))
@@ -234,6 +242,10 @@
                       (make-typed-term :term store-term
                                        :path-cond ntta.path-cond
                                        :judgements judge-store-fn))
+                     ;; should be able to prove this
+                     ((unless (equal (typed-term->term cons-tterm)
+                                     `(,cons-fn ,k ,v)))
+                      (mv nil nil))
                      (store-actuals
                       (list (car ntta) cons-tterm (caddr ntta)))
                      (store-tterm
@@ -241,7 +253,8 @@
                   (mv t store-tterm)))
                ((new-fn . !ntta.term-lst) ;; assumes the same order of actuals
                 (b* (((unless (and (symbolp new-fn)
-                                   (not (equal new-fn 'quote))))
+                                   (not (equal new-fn 'quote))
+                                   (not (equal new-fn 'if))))
                       (mv nil (make-typed-term)))
                      (judge-new-term
                       (look-up-path-cond new-term concl to.supertype))
@@ -250,7 +263,7 @@
                                               :judgements judge-new-term))
                      (new-tt (make-typed-fncall top-tt ntta options)))
                   (mv t new-tt)))
-               ;; other cases need to be implemented
+               ;; are there other cases?
                (& (mv nil nil))))
             (& (mv nil (make-typed-term)))))
          ((unless ok)
@@ -262,15 +275,76 @@
       (mv new-tterm new-proj)))
   )
 
+(encapsulate ()
+(local
+ (defthm good-typed-term-list-of-two
+   (implies (and (type-options-p options)
+                 (good-typed-term-list-p ntta options)
+                 (consp ntta)
+                 (consp (cdr ntta)))
+            (good-typed-term-list-p (list (car ntta) (cadr ntta))
+                                    options))
+   :hints (("Goal"
+            :in-theory (enable good-typed-term-list-p
+                               typed-term-list->path-cond)))))
+
+(local
+ (defthm good-typed-term-list-of-three
+   (implies (and (type-options-p options)
+                 (good-typed-term-list-p ntta options)
+                 (consp ntta)
+                 (consp (cdr ntta))
+                 (equal (+ 2 (len (cddr ntta))) 3)
+                 (good-typed-term-p x options)
+                 (equal (typed-term->path-cond (car ntta))
+                        (typed-term->path-cond x)))
+            (good-typed-term-list-p (list (car ntta) x (caddr ntta))
+                                    options))
+   :hints (("Goal"
+            :in-theory (enable good-typed-term-list-p
+                               typed-term-list->path-cond)))))
+
 (verify-guards generate-fncall-proj-cases
   :hints (("Goal"
-           :in-theory (disable consp-of-is-conjunct? pseudo-term-listp
-                               symbol-listp acl2::pseudo-termp-opener
-                               pseudo-term-listp-of-symbol-listp
-                               member-equal true-list-listp
-                               acl2::symbolp-of-car-when-symbol-listp
-                               acl2::true-listp-of-car-when-true-list-listp
-                               pseudo-term-listp-of-cdr-of-pseudo-termp))))
+           :in-theory (e/d (make-typed-fncall-guard
+                            typed-term-list->path-cond
+                            typed-term-list->term-lst)
+                           (consp-of-is-conjunct? pseudo-termp
+                            symbol-listp acl2::pseudo-termp-opener
+                            pseudo-term-listp-of-symbol-listp
+                            pseudo-lambdap-of-fn-call-of-pseudo-termp
+                            acl2::true-listp-of-car-when-true-list-listp
+                            true-list-listp pseudo-term-listp
+                            consp-of-cdr-of-pseudo-lambdap
+                            good-typed-term-list-of-three))
+           :use ((:instance good-typed-term-list-of-three
+                            (x (make-typed-fncall
+                                (typed-term
+                                 (list
+                                  (car
+                                   (caddr
+                                    (caddr
+                                     (find-projection
+                                      (cons fn (typed-term-list->term-lst tta))
+                                      concl))))
+                                  (typed-term->term (car ntta))
+                                  (typed-term->term (cadr ntta)))
+                                 (typed-term->path-cond (car ntta))
+                                 (look-up-path-cond
+                                  (list
+                                   (car
+                                    (caddr
+                                     (caddr
+                                      (find-projection
+                                       (cons fn (typed-term-list->term-lst tta))
+                                       concl))))
+                                   (typed-term->term (car ntta))
+                                   (typed-term->term (cadr ntta)))
+                                  concl
+                                  (type-options->supertype options)))
+                                (list (car ntta) (cadr ntta))
+                                options)))))))
+)
 
 (encapsulate ()
   (local (in-theory (disable pseudo-termp assoc-equal
@@ -307,10 +381,13 @@
                                   :in-theory (enable good-typed-quote-p))))
                  (new-proj pseudo-termp))
     :guard (and (not (equal fn 'quote))
+                (not (equal fn 'if))
                 (good-typed-term-list-p actuals-tterm options)
                 (good-typed-term-list-p new-actuals-tterm options))
+    :verify-guards nil
     (b* (((unless (mbt (and (symbolp fn)
                             (not (equal fn 'quote))
+                            (not (equal fn 'if))
                             (typed-term-list-p actuals-tterm)
                             (good-typed-term-list-p actuals-tterm options)
                             (typed-term-list-p new-actuals-tterm)
@@ -355,6 +432,8 @@
                   (mv (make-typed-term) nil))))
       (mv new-tt new-proj)))
   )
+
+(verify-guards generate-fncall-proj)
 
 (encapsulate ()
   (local (in-theory (disable symbol-listp
@@ -746,7 +825,10 @@
                            state))
          ((mv ttl-cdr proj-cdr names-cdr)
           (term-list-projection (cdr tterm-lst) path-cond projection names-car
-                                options state)))
+                                options state))
+         ((unless (equal (typed-term->path-cond tt-car)
+                         (typed-term-list->path-cond ttl-cdr)))
+          (mv tterm-lst projection names)))
       (mv (cons tt-car ttl-cdr)
           `(if ,proj-car ,proj-cdr 'nil)
           names-cdr)))
@@ -866,10 +948,4 @@
 
 (verify-guards term-projection
   :hints (("Goal"
-           :in-theory (disable pseudo-termp symbol-listp))
-          ("Subgoal 3.2"
-           :in-theory (disable pseudo-termp
-                               term-list-projection-maintains-length)
-           :use ((:instance term-list-projection-maintains-length
-                            (tterm-lst
-                             (typed-term-lambda->actuals tterm options)))))))
+           :in-theory (disable pseudo-termp symbol-listp))))
