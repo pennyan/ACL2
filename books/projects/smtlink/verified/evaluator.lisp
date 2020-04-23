@@ -24,7 +24,11 @@
                           (implies a b)
                           (hint-please hint)
                           (return-last x y z)
-                          (binary-+ x y))
+                          (binary-+ x y)
+                          (integerp x)
+                          (rationalp x)
+                          (symbolp x)
+                          (booleanp x))
                          :namedp t)
 
 (acl2::def-ev-theoremp ev-smtcp)

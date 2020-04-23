@@ -16,13 +16,14 @@
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 
 (include-book "path-cond")
+(include-book "evaluator")
 
 ;;-------------------------------------------------------
 ;;  Intersect judgements
 (define intersect-judgements-acc ((judge1 pseudo-termp)
-                              (judge2 pseudo-termp)
-                              (acc pseudo-termp)
-                              state)
+                                  (judge2 pseudo-termp)
+                                  (acc pseudo-termp)
+                                  state)
   :returns (intersect pseudo-termp)
   :verify-guards nil
   :measure (acl2-count (pseudo-term-fix judge2))
@@ -41,20 +42,36 @@
 (verify-guards intersect-judgements-acc)
 
 (define intersect-judgements ((judge1 pseudo-termp)
-                          (judge2 pseudo-termp)
-                          state)
+                              (judge2 pseudo-termp)
+                              state)
   :returns (intersect pseudo-termp)
   (intersect-judgements-acc judge1 judge2 ''t state))
+
+(skip-proofs
+ (defthm correctness-of-intersect-judgements-judge1
+   (implies (and (ev-smtcp-meta-extract-global-facts)
+                 (pseudo-termp term)
+                 (alistp a)
+                 (ev-smtcp judge1 a))
+            (ev-smtcp (intersect-judgements judge1 judge2 state) a))))
+
+(skip-proofs
+ (defthm correctness-of-intersect-judgements-judge2
+   (implies (and (ev-smtcp-meta-extract-global-facts)
+                 (pseudo-termp term)
+                 (alistp a)
+                 (ev-smtcp judge2 a))
+            (ev-smtcp (intersect-judgements judge1 judge2 state) a))))
 
 #|
 (defthm test (implies (integerp x) (rationalp x)))
 (intersect-judgements '(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
-                  '(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
-                  state)
+'(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
+state)
 
 (intersect-judgements '(if (rationalp x) 't 'nil)
-                  '(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
-                  state)
+'(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
+state)
 |#
 
 ;;------------------------------------------------------
@@ -90,15 +107,15 @@
 #|
 (defthm test (implies (integerp x) (rationalp x)))
 (union-judgements '(if (integerp x) 't 'nil)
-                  '(if (rationalp x) (< x '0) 'nil)
-                  state)
+'(if (rationalp x) (< x '0) 'nil)
+state)
 (union-judgements ''t
-                  '(if (integerp x) (if (rationalp x) (< x '0) 'nil)
-                     'nil)
-                  state)
+'(if (integerp x) (if (rationalp x) (< x '0) 'nil)
+'nil)
+state)
 (union-judgements '(if (rationalp x) 't 'nil)
-                  '(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
-                  state)
+'(if (rationalp x) (if (integerp x) 't 'nil) 'nil)
+state)
 |#
 
 ;;-------------------------------------------------------
@@ -150,16 +167,16 @@
 
 #|
 (super/subtype 'integerp '((integerp . (rationalp maybe-integerp))
-                           (maybe-integerp . (maybe-rationalp))
-                           (rationalp . (maybe-rationalp))
-                           (maybe-rationalp . nil))
-               nil 4)
+(maybe-integerp . (maybe-rationalp))
+(rationalp . (maybe-rationalp))
+(maybe-rationalp . nil))
+nil 4)
 
 (super/subtype 'rationalp '((integerp . (rationalp maybe-integerp))
-                           (maybe-integerp . (maybe-rationalp))
-                           (rationalp . (maybe-rationalp))
-                           (maybe-rationalp . nil))
-               nil 4)
+(maybe-integerp . (maybe-rationalp))
+(rationalp . (maybe-rationalp))
+(maybe-rationalp . nil))
+nil 4)
 |#
 
 (local
@@ -219,35 +236,35 @@
               (and (consp (assoc-equal y x))
                    (symbolp (cdr (assoc-equal y x)))))))
 
-(define super/subtype-to-judgements ((root-type symbolp)
-                                     (types symbol-listp)
-                                     (term pseudo-termp)
-                                     (thms type-tuple-to-thm-alist-p)
-                                     (path-cond pseudo-termp)
-                                     (acc pseudo-termp)
-                                     state)
-  :returns (judgements pseudo-termp)
-  :measure (len types)
-  (b* ((root-type (symbol-fix root-type))
-       (types (symbol-list-fix types))
-       (term (pseudo-term-fix term))
-       (thms (type-tuple-to-thm-alist-fix thms))
-       (acc (pseudo-term-fix acc))
-       ((unless (consp types)) acc)
-       ((cons types-hd types-tl) types)
-       ((if (equal root-type types-hd))
-        (super/subtype-to-judgements root-type types-tl term thms path-cond acc
-                                     state))
-       ((unless (look-up-type-tuple-to-thm-alist root-type types-hd thms
-                                                 term path-cond state))
-        acc)
-       (type-term `(,types-hd ,term))
-       ((if (path-test acc type-term state))
-        (super/subtype-to-judgements root-type types-tl term thms path-cond acc
-                                     state)))
-    (super/subtype-to-judgements root-type types-tl term thms path-cond
-                                 `(if ,type-term ,acc 'nil) state)))
-)
+  (define super/subtype-to-judgements ((root-type symbolp)
+                                       (types symbol-listp)
+                                       (term pseudo-termp)
+                                       (thms type-tuple-to-thm-alist-p)
+                                       (path-cond pseudo-termp)
+                                       (acc pseudo-termp)
+                                       state)
+    :returns (judgements pseudo-termp)
+    :measure (len types)
+    (b* ((root-type (symbol-fix root-type))
+         (types (symbol-list-fix types))
+         (term (pseudo-term-fix term))
+         (thms (type-tuple-to-thm-alist-fix thms))
+         (acc (pseudo-term-fix acc))
+         ((unless (consp types)) acc)
+         ((cons types-hd types-tl) types)
+         ((if (equal root-type types-hd))
+          (super/subtype-to-judgements root-type types-tl term thms path-cond acc
+                                       state))
+         ((unless (look-up-type-tuple-to-thm-alist root-type types-hd thms
+                                                   term path-cond state))
+          acc)
+         (type-term `(,types-hd ,term))
+         ((if (path-test acc type-term state))
+          (super/subtype-to-judgements root-type types-tl term thms path-cond acc
+                                       state)))
+      (super/subtype-to-judgements root-type types-tl term thms path-cond
+                                   `(if ,type-term ,acc 'nil) state)))
+  )
 
 (define super/subtype-judgement-single ((type-judgement pseudo-termp)
                                         (path-cond pseudo-termp)
@@ -304,14 +321,14 @@
 (defoption maybe-integerp integerp :pred maybe-integerp)
 (defthm test1 (implies (integerp x) (maybe-integerp x)))
 (super/subtype-judgements-fn '(if (integerp x) 't 'nil) ''t
-                             '((integerp . (rationalp maybe-integerp))
-                               (rationalp . nil)
-                               (maybe-integerp . nil))
-                             '((((type . integerp) (neighbour-type . rationalp)) .
-                                test)
-                               (((type . integerp) (neighbour-type . maybe-integerp)) .
-                                test1))
-                             state)
+'((integerp . (rationalp maybe-integerp))
+(rationalp . nil)
+(maybe-integerp . nil))
+'((((type . integerp) (neighbour-type . rationalp)) .
+test)
+(((type . integerp) (neighbour-type . maybe-integerp)) .
+test1))
+state)
 |#
 
 (defmacro super/subtype-judgements (judgements path-cond options state
@@ -329,24 +346,24 @@
 #|
 (defthm test (implies (integerp x) (rationalp x)))
 (super/subtype-judgements '(if (integerp x) 't 'nil) ''t
-                          '((supertype (integerp rationalp)
-                                       (rationalp))
-                            (supertype-thm (((type . integerp)
-                                             (neighbour-type . rationalp))
-                                            . test))
-                            (subtype)
-                            (subtype-thm)
-                            (functions)
-                            (consp)
-                            (basic)
-                            (list)
-                            (alist)
-                            (prod)
-                            (option)
-                            (sum)
-                            (abstract))
-                          state
-                          :which :super)
+'((supertype (integerp rationalp)
+(rationalp))
+(supertype-thm (((type . integerp)
+(neighbour-type . rationalp))
+. test))
+(subtype)
+(subtype-thm)
+(functions)
+(consp)
+(basic)
+(list)
+(alist)
+(prod)
+(option)
+(sum)
+(abstract))
+state
+:which :super)
 |#
 
 ;; extend-judgements first calcualte the subtypes then it calculate the
@@ -359,3 +376,12 @@
   (super/subtype-judgements
    (super/subtype-judgements judgements path-cond options state :which :sub)
    path-cond options state :which :super))
+
+(skip-proofs
+ (defthm correctness-of-extend-judgements
+   (implies (and (ev-smtcp-meta-extract-global-facts)
+                 (pseudo-termp term)
+                 (alistp a)
+                 (ev-smtcp judgements a)
+                 (ev-smtcp path-cond a))
+            (ev-smtcp (extend-judgements judgements path-cond options state) a))))

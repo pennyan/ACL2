@@ -30,6 +30,14 @@
           (& term))))
     new-term))
 
+(skip-proofs
+ (defthm correctness-of-simple-transformer
+   (implies (and (ev-smtcp-meta-extract-global-facts)
+                 (pseudo-termp term)
+                 (alistp a))
+            (equal (ev-smtcp (simple-transformer term) a)
+                   (ev-smtcp term a)))))
+
 ;; ---------------------------------------------
 ;;       Recognizers
 

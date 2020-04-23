@@ -230,3 +230,26 @@
 (verify-guards returns-judgement
   :hints (("Goal"
            :in-theory (disable pseudo-termp))))
+
+(skip-proofs
+ (defthm correctness-of-returns-judgement
+   (implies (and (ev-smtcp-meta-extract-global-facts)
+                 (pseudo-termp term)
+                 (alistp a)
+                 (symbolp fn)
+                 (pseudo-term-listp actuals)
+                 (pseudo-term-listp actuals-total)
+                 (pseudo-termp actuals-judgements)
+                 (pseudo-termp actuals-judgements-total)
+                 (arg-decl-p arg-decl)
+                 (pseudo-termp path-cond)
+                 (type-to-types-alist-p supertype)
+                 (pseudo-termp acc)
+                 (returns-list-p thm-acc)
+                 (ev-smtcp acc a))
+            (ev-smtcp (mv-nth 0 (returns-judgement fn actuals actuals-total actuals-judgements
+                                                   actuals-judgements-total
+                                                   arg-decl path-cond supertype
+                                                   acc thm-acc state))
+                      a)))
+ )

@@ -34,6 +34,13 @@
        (supertype-alst (type-options->supertype options)))
     (look-up-path-cond term judgements supertype-alst)))
 
+(skip-proofs
+ (defthm correctness-of-type-judgement-top
+   (implies (and (ev-smtcp-meta-extract-global-facts)
+                 (alistp a)
+                 (ev-smtcp judgements a))
+            (ev-smtcp (type-judgement-top judgements term options) a))))
+
 (define type-judgement-top-list ((judgements-lst pseudo-termp)
                                  (term-lst pseudo-term-listp)
                                  (options type-options-p))
@@ -52,9 +59,30 @@
          ,(type-judgement-top-list judgements-tl term-tl options)
        'nil)))
 
+(skip-proofs
+ (defthm correctness-of-type-judgement-top-list
+   (implies (and (ev-smtcp-meta-extract-global-facts)
+                 (alistp a)
+                 (ev-smtcp judgements-lst a))
+            (ev-smtcp (type-judgement-top-list judgements term options) a))))
+
+
 ;;-------------------------------------------------------
 ;; quoted judgements
 ;; nil judgements
+
+(defthm ev-smtcp-of-fncall-with-nil
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (alistp a)
+                (symbolp fn)
+                (acl2::logicp fn (w state)))
+           (equal (ev-smtcp (cons fn '('nil)) nil)
+                  (ev-smtcp (cons fn '('nil)) a)))
+  :hints (("Goal"
+           :in-theory (disable ev-smtcp-of-fncall-args)
+           :use ((:instance ev-smtcp-of-fncall-args
+                            (x (cons fn '('nil)))
+                            (a a))))))
 
 (define type-judgement-nil-test ((supertype type-to-types-alist-p)
                                  (acc pseudo-termp)
@@ -65,15 +93,35 @@
        (acc (pseudo-term-fix acc))
        ((unless (consp supertype)) acc)
        ((cons (cons first-type &) rest) supertype)
+       ((unless (acl2::logicp first-type (w state)))
+        (prog2$ (er hard? 'type-inference-bottomup=>type-judgement-nil-test
+                    "~p0 is a program-mode function: ~q0" first-type)
+                acc))
        (term `(,first-type 'nil))
-       ((mv err val) (partial-eval term nil state))
-       ((if err) (type-judgement-nil-test rest acc state))
+       ((mv erp val) (magic-ev-fncall first-type '(nil) state t nil))
+       ((if erp) (type-judgement-nil-test rest acc state))
        ((if val) (type-judgement-nil-test rest `(if ,term ,acc 'nil) state)))
-    (type-judgement-nil-test rest acc state)))
+    (type-judgement-nil-test rest acc state))
+  ///
+  (defthm correctness-of-type-judgement-nil-test
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+                  (alistp a)
+                  (pseudo-termp acc)
+                  (type-to-types-alist-p supertype)
+                  (ev-smtcp acc a))
+             (ev-smtcp (type-judgement-nil-test supertype acc state)
+                       a))))
 
 (define type-judgement-nil ((supertype type-to-types-alist-p) state)
   :returns (judgements pseudo-termp)
-  (type-judgement-nil-test supertype ''t state))
+  (type-judgement-nil-test supertype ''t state)
+  ///
+  (defthm correctness-of-type-judgement-nil
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+                  (alistp a)
+                  (type-to-types-alist-p supertype))
+             (ev-smtcp (type-judgement-nil supertype state)
+                       a))))
 
 (define type-judgement-t ()
   :returns (judgements pseudo-termp)
@@ -89,7 +137,7 @@
   :returns (judgements pseudo-termp)
   (b* ((term (pseudo-term-fix term))
        (options (type-options-fix options))
-       ((unless (mbt (acl2::fquotep term))) nil)
+       ((unless (mbt (acl2::fquotep term))) ''t)
        (const (cadr term)))
     (cond ((integerp const)
            (extend-judgements `(if (integerp ',const) 't 'nil) ''t options state))
@@ -101,9 +149,16 @@
            (type-judgement-nil (type-options->supertype options) state))
           ((symbolp const)
            (extend-judgements `(if (symbolp ',const) 't 'nil) ''t options state))
-          (t (er hard? 'type-inference-bottomup=>type-judgement-quoted
-                 "Type inference for constant term ~p0 is not supported.~%"
-                 term)))))
+          (t (prog2$ (er hard? 'type-inference-bottomup=>type-judgement-quoted
+                         "Type inference for constant term ~p0 is not supported.~%"
+                         term)
+                     ''t))))
+  ///
+  (defthm correctness-of-type-judgement-quoted
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+                  (pseudo-termp term)
+                  (alistp a))
+             (ev-smtcp (type-judgement-quoted term options state) a))))
 
 ;; ------------------------------------------------------------------
 ;;    Variable judgements
@@ -118,7 +173,15 @@
        (options (type-options-fix options))
        (supertype (type-options->supertype options))
        (judge-from-path-cond (look-up-path-cond term path-cond supertype)))
-    (extend-judgements judge-from-path-cond path-cond options state)))
+    (extend-judgements judge-from-path-cond path-cond options state))
+  ///
+  (defthm correctness-of-type-judgement-variable
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+                  (pseudo-termp term)
+                  (pseudo-termp path-cond)
+                  (alistp a)
+                  (ev-smtcp path-cond a))
+             (ev-smtcp (type-judgement-variable term path-cond options state) a))))
 
 ;; ------------------------------------------------------------------
 ;;    The main type-judgements
@@ -135,6 +198,7 @@
  )
 
 (defines type-judgements
+  :flag-local nil
   :well-founded-relation l<
   :verify-guards nil
   :hints (("Goal"
@@ -159,19 +223,17 @@
     :returns (judgements pseudo-termp)
     (b* ((term (pseudo-term-fix term))
          (path-cond (pseudo-term-fix path-cond))
-         ((unless (mbt (and (consp term) (pseudo-lambdap (car term))))) nil)
+         ((unless (mbt (and (consp term) (pseudo-lambdap (car term))))) ''t)
          ((cons fn actuals) term)
          (formals (lambda-formals fn))
          (body (lambda-body fn))
-         (shadowed-path-cond (shadow-path-cond formals path-cond))
+         ;; (shadowed-path-cond (shadow-path-cond formals path-cond))
          (actuals-judgements
           (type-judgement-list actuals path-cond options state))
          (substed-actuals-judgements
           (term-substitution actuals-judgements (pairlis$ actuals formals) t))
          (body-judgements
-          (type-judgement body `(if ,shadowed-path-cond
-                                    ,substed-actuals-judgements 'nil)
-                          options state))
+          (type-judgement body substed-actuals-judgements options state))
          (lambda-judgements
           `((lambda ,formals
               ,body-judgements)
@@ -195,11 +257,12 @@
     :returns (judgements pseudo-termp)
     (b* ((term (pseudo-term-fix term))
          (path-cond (pseudo-term-fix path-cond))
-         ((unless (mbt (and (consp term) (equal (car term) 'if)))) nil)
+         ((unless (mbt (and (consp term) (equal (car term) 'if)))) ''t)
          ((cons & actuals) term)
          ((unless (equal (len actuals) 3))
-          (er hard? 'type-inference-bottomup=>type-judgement-if
-              "Mangled if term: ~q0" term))
+          (prog2$ (er hard? 'type-inference-bottomup=>type-judgement-if
+                      "Mangled if term: ~q0" term)
+                  ''t))
          ((list cond then else) actuals)
          (judge-cond (type-judgement cond path-cond options state))
          (judge-then
@@ -240,7 +303,7 @@
                             (symbolp (car term))
                             (not (equal (car term) 'quote))
                             (not (equal (car term) 'if)))))
-          nil)
+          ''t)
          ((cons fn actuals) term)
          (actuals-judgements
           (type-judgement-list actuals path-cond options state))
@@ -249,8 +312,10 @@
          (functions (type-options->functions options))
          (conspair (assoc-equal fn functions))
          ((unless conspair)
-          (er hard? 'type-inference-bottomup=>type-judgement-fn
-              "There exists no function description for function ~p0. ~%" fn))
+          (prog2$ (er hard? 'type-inference-bottomup=>type-judgement-fn
+                      "There exists no function description for function ~p0. ~
+                       ~%" fn)
+                  ''t))
          (fn-description (cdr conspair))
          ;; return-judgement could be ''t which means it could be anything
          ((mv return-judgement &)
@@ -258,9 +323,10 @@
                              actuals-judgements-top fn-description path-cond
                              (type-options->supertype options) ''t nil state))
          ((if (equal return-judgement ''t))
-          (er hard? 'type-inference-bottomup=>type-judgement-fn
-              "Failed to find type judgements for return of function call ~
-               ~p0~%" term))
+          (prog2$ (er hard? 'type-inference-bottomup=>type-judgement-fn
+                      "Failed to find type judgements for return of function ~
+                       call ~p0~%" term)
+                  ''t))
          (return-judgement-extended
           (extend-judgements return-judgement path-cond options state)))
       `(if ,return-judgement-extended
@@ -302,6 +368,106 @@
       `(if ,first-judge
            ,rest-judge
          'nil)))
+  ///
+  (defthm correctness-of-type-judgement-list-nil
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+                  (pseudo-termp path-cond)
+                  (alistp a)
+                  (ev-smtcp path-cond a))
+             (ev-smtcp (type-judgement-list nil path-cond options state) a))
+    :hints (("Goal"
+             :expand (type-judgement-list nil path-cond options state))))
   )
 
 (verify-guards type-judgement)
+
+;; ------------------------------------------------
+;; Correctness theorems for type-judgement
+
+(defthm-type-judgements-flag
+  (defthm correctness-of-type-judgement-lambda
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+                  (pseudo-termp term)
+                  (pseudo-termp path-cond)
+                  (alistp a)
+                  (ev-smtcp path-cond a))
+             (ev-smtcp (type-judgement-lambda term path-cond options state) a))
+    :flag type-judgement-lambda
+    :hints ((and stable-under-simplificationp
+                 '(:expand (type-judgement-lambda term path-cond options state)))))
+  (defthm correctness-of-type-judgement-if
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+                  (pseudo-termp term)
+                  (pseudo-termp path-cond)
+                  (alistp a)
+                  (ev-smtcp path-cond a))
+             (ev-smtcp (type-judgement-if term path-cond options state) a))
+    :flag type-judgement-if
+    :hints ((and stable-under-simplificationp
+                 '(:in-theory (disable)
+                   :expand (type-judgement-if term path-cond options state)))))
+  (defthm correctness-of-type-judgement-fn
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+                  (pseudo-termp term)
+                  (pseudo-termp path-cond)
+                  (alistp a)
+                  (ev-smtcp path-cond a))
+             (ev-smtcp (type-judgement-fn term path-cond options state) a))
+    :hints ((and stable-under-simplificationp
+                 '(:expand (type-judgement-fn term path-cond options state))))
+    :flag type-judgement-fn)
+  (defthm correctness-of-type-judgement
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+                  (pseudo-termp term)
+                  (pseudo-termp path-cond)
+                  (alistp a)
+                  (ev-smtcp path-cond a))
+             (ev-smtcp (type-judgement term path-cond options state) a))
+    :flag type-judgement
+    :hints ((and stable-under-simplificationp
+                 '(:expand (type-judgement term path-cond options state)))))
+  (defthm correctness-of-type-judgement-list
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+                  (pseudo-term-listp term-lst)
+                  (pseudo-termp path-cond)
+                  (alistp a)
+                  (ev-smtcp path-cond a))
+             (ev-smtcp (type-judgement-list term-lst path-cond options state)
+                       a))
+    :hints ((and stable-under-simplificationp
+                 '(:expand (type-judgement-list term-lst
+                                                path-cond options state))))
+    :flag type-judgement-list)
+  :hints(("Goal"
+          :induct (type-judgements-flag
+                   flag term term-lst path-cond options state)
+          :in-theory (disable symbol-listp
+                              pseudo-term-listp-of-symbol-listp
+                              consp-of-is-conjunct?
+                              acl2::true-listp-of-car-when-true-list-listp
+                              true-list-listp
+                              symbolp-of-fn-call-of-pseudo-termp))))
+
+;; -------------------------------------------------------
+
+(define type-judge-cp ((cl pseudo-term-listp)
+                       (hints t)
+                       state)
+  (b* (((unless (type-options-p hints)) (value (list cl)))
+       (goal (disjoin cl))
+       (judges (type-judgement goal ''t hints state)))
+    (value (list (list `(implies ,judges ,goal))))))
+
+(local (in-theory (enable type-judge-cp)))
+
+(defthm correctness-of-type-judge-cp
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-term-listp cl)
+                (alistp a)
+                (ev-smtcp
+                 (conjoin-clauses
+                  (acl2::clauses-result
+                   (type-judge-cp cl hint state)))
+                 a))
+           (ev-smtcp (disjoin cl) a))
+  :rule-classes :clause-processor)

@@ -118,6 +118,18 @@
   :returns (type-term pseudo-termp)
   (look-up-path-cond-acc term path-cond supertype-alst ''t))
 
+(skip-proofs
+(defthm correctness-of-lookup-path-cond
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-termp term)
+                (pseudo-termp path-cond)
+                (type-to-types-alist-p supertype-alst)
+                (alistp a)
+                (ev-smtcp path-cond a))
+           (ev-smtcp (look-up-path-cond term path-cond supertype-alst)
+                     a)))
+)
+
 #|
 (look-up-path-cond 'r1
                    '(if (if (rational-integer-alistp al)
@@ -202,6 +214,16 @@
                           (path-cond pseudo-termp))
   :returns (shadowed-path-cond pseudo-termp)
   (shadow-path-cond-acc formals path-cond ''t))
+
+(skip-proofs
+ (defthm correctness-of-shadow-path-cond
+   (implies (and (ev-smtcp-meta-extract-global-facts)
+                 (symbol-listp formals)
+                 (pseudo-termp path-cond)
+                 (alistp a)
+                 (ev-smtcp path-cond a))
+            (ev-smtcp (shadow-path-cond formals path-cond) a)))
+ )
 
 #|
 (shadow-path-cond '(x)
