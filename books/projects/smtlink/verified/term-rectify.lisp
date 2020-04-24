@@ -126,15 +126,18 @@
                 (make-typed-term)))
        (yes? (path-test tt.judgements `(,type 'nil) state))
        ((unless yes?) (find-nil-fn tterm path-cond nil-tl options state))
-       (new-term `(,nil-fn))
-       (test `(equal 'nil ,new-term))
-       ((mv err val) (partial-eval test nil state))
-       ((if (or err (not val)))
+       ((unless (acl2::logicp nil-fn (w state)))
+        (prog2$ (er hard? 'term-rectify=>find-nil-fn
+                    "~p0 is a program-mode function: ~q0" nil-fn)
+                (make-typed-term)))
+       ((mv err val) (magic-ev-fncall nil-fn '() state t nil))
+       ((if (or err val))
         (prog2$
          (er hard? 'term-rectify=>find-nil-fn
-             "Cannot estabilish that ~p0 but ~p1 is of type ~p2~%"
-             test tt.term tt.judgements)
+             "Cannot estabilish ~p0 is a nil function.~%"
+             nil-fn)
          (make-typed-term)))
+       (new-term `(,nil-fn))
        (substed-judge
         (term-substitution tt.judgements `((,tt.term . ,new-term)) t))
        (new-judge `(if ,substed-judge 't 'nil)))
