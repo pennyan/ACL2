@@ -13,7 +13,6 @@
 
 (include-book "basics")
 (include-book "judgements")
-(include-book "partial-eval")
 (include-book "term-substitution")
 
 (set-state-ok t)

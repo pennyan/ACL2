@@ -230,10 +230,10 @@
          ;; (shadowed-path-cond (shadow-path-cond formals path-cond))
          (actuals-judgements
           (type-judgement-list actuals path-cond options state))
-         (substed-actuals-judgements
+         (formals-judgements
           (term-substitution actuals-judgements (pairlis$ actuals formals) t))
          (body-judgements
-          (type-judgement body substed-actuals-judgements options state))
+          (type-judgement body formals-judgements options state))
          (lambda-judgements
           `((lambda ,formals
               ,body-judgements)

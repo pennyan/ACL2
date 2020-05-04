@@ -12,6 +12,7 @@
 (include-book "centaur/fty/top" :dir :system)
 
 (include-book "type-options")
+(include-book "evaluator")
 
 (define only-one-var-acc ((term-lst pseudo-term-listp)
                           (term pseudo-termp)
@@ -147,9 +148,9 @@
                      (pseudo-termp (caddr term))))
        :name implies-of-is-conjunct?)
    (ok (implies ok (not (consp (cddddr term))))
+       :name cddddr-when-is-conjunct?
        :hints (("Goal"
-                :in-theory (e/d (pseudo-term-fix))))
-       :name cddddr-when-is-conjunct?)
+                :in-theory (e/d (pseudo-term-fix)))))
    (ok (implies (and ok (pseudo-termp term) (not (equal term ''t)))
                 (< (acl2-count (caddr term))
                    (acl2-count term)))
@@ -159,6 +160,18 @@
                                     symbol-listp)))
        :rule-classes :linear)))
 )
+
+(defthm correctness-of-is-conjunct?
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-termp term)
+                (is-conjunct? term)
+                (not (equal term ''t))
+                (alistp a)
+                (ev-smtcp term a))
+           (and (ev-smtcp (cadr term) a)
+                (ev-smtcp (caddr term) a)))
+  :hints (("Goal"
+           :in-theory (enable is-conjunct?))))
 
 (defthm consp-of-is-conjunct?
   (implies (and (pseudo-termp actuals-judgements)
@@ -174,7 +187,11 @@
                 (pseudo-termp rest))
            (is-conjunct? `(if ,first ,rest 'nil)))
   :hints (("Goal"
-           :in-theory (enable is-conjunct?))))
+           :in-theory (e/d (is-conjunct? pseudo-term-fix)
+                           (implies-of-is-conjunct?
+                            consp-of-is-conjunct?
+                            symbol-listp
+                            pseudo-term-listp-of-cdr-of-pseudo-termp)))))
 
 (define is-conjunct-list? ((judges pseudo-termp)
                            (term pseudo-termp)
@@ -182,7 +199,10 @@
   :returns (ok booleanp)
   :measure (acl2-count (pseudo-term-fix judges))
   :hints (("Goal"
-           :in-theory (enable pseudo-term-fix)))
+           :in-theory (e/d (pseudo-term-fix)
+                           (symbol-listp
+                            pseudo-term-listp-of-symbol-listp
+                            consp-of-is-conjunct?))))
   (b* ((term (pseudo-term-fix term))
        (judges (pseudo-term-fix judges))
        (supertype-alst (type-to-types-alist-fix supertype-alst))

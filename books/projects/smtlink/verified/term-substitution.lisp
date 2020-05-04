@@ -13,6 +13,7 @@
 (include-book "kestrel/std/system/dumb-occur-var-open" :dir :system)
 
 (include-book "../utils/pseudo-term")
+(include-book "evaluator")
 
 (define dumb-occur-vars-or ((var-lst symbol-listp)
                             (term pseudo-termp))

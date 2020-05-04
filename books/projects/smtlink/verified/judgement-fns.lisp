@@ -41,27 +41,69 @@
 
 (verify-guards intersect-judgements-acc)
 
+(defthm correctness-of-intersect-judgements-acc-judge1
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-termp judge1)
+                (pseudo-termp judge2)
+                (pseudo-termp acc)
+                (alistp a)
+                (ev-smtcp acc a)
+                (ev-smtcp judge1 a))
+           (ev-smtcp (intersect-judgements-acc judge1 judge2 acc state) a))
+  :hints (("Goal"
+           :in-theory (e/d (intersect-judgements-acc is-conjunct?)
+                           (pseudo-termp
+                            implies-of-is-conjunct?
+                            acl2::pseudo-termp-opener
+                            symbol-listp
+                            consp-of-is-conjunct?
+                            acl2::symbolp-of-car-when-symbol-listp
+                            acl2::symbol-listp-of-cdr-when-symbol-listp)))))
+
+(defthm correctness-of-intersect-judgements-acc-judge2
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-termp judge1)
+                (pseudo-termp judge2)
+                (pseudo-termp acc)
+                (alistp a)
+                (ev-smtcp acc a)
+                (ev-smtcp judge2 a))
+           (ev-smtcp (intersect-judgements-acc judge1 judge2 acc state) a))
+  :hints (("Goal"
+           :in-theory (e/d (intersect-judgements-acc is-conjunct?)
+                           (pseudo-termp
+                            implies-of-is-conjunct?
+                            acl2::pseudo-termp-opener
+                            symbol-listp
+                            consp-of-is-conjunct?
+                            acl2::symbolp-of-car-when-symbol-listp
+                            acl2::symbol-listp-of-cdr-when-symbol-listp)))))
+
 (define intersect-judgements ((judge1 pseudo-termp)
                               (judge2 pseudo-termp)
                               state)
   :returns (intersect pseudo-termp)
-  (intersect-judgements-acc judge1 judge2 ''t state))
+  (intersect-judgements-acc judge1 judge2 ''t state)
+  ///
+  (defthm correctness-of-intersect-judgements-judge1
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+                  (pseudo-termp judge1)
+                  (pseudo-termp judge2)
+                  (alistp a)
+                  (ev-smtcp judge1 a))
+             (ev-smtcp (intersect-judgements judge1 judge2 state) a))
+    :hints (("Goal"
+             :in-theory (enable intersect-judgements))))
 
-(skip-proofs
- (defthm correctness-of-intersect-judgements-judge1
-   (implies (and (ev-smtcp-meta-extract-global-facts)
-                 (pseudo-termp term)
-                 (alistp a)
-                 (ev-smtcp judge1 a))
-            (ev-smtcp (intersect-judgements judge1 judge2 state) a))))
-
-(skip-proofs
- (defthm correctness-of-intersect-judgements-judge2
-   (implies (and (ev-smtcp-meta-extract-global-facts)
-                 (pseudo-termp term)
-                 (alistp a)
-                 (ev-smtcp judge2 a))
-            (ev-smtcp (intersect-judgements judge1 judge2 state) a))))
+  (defthm correctness-of-intersect-judgements-judge2
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+                  (pseudo-termp judge1)
+                  (pseudo-termp judge2)
+                  (alistp a)
+                  (ev-smtcp judge2 a))
+             (ev-smtcp (intersect-judgements judge1 judge2 state) a))
+    :hints (("Goal"
+             :in-theory (enable intersect-judgements)))))
 
 #|
 (defthm test (implies (integerp x) (rationalp x)))
@@ -98,11 +140,39 @@ state)
 
 (verify-guards union-judgements-acc)
 
+(defthm correctness-of-union-judgements-acc
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-termp judge1)
+                (pseudo-termp judge2)
+                (pseudo-termp acc)
+                (alistp a)
+                (ev-smtcp acc a)
+                (ev-smtcp judge1 a)
+                (ev-smtcp judge2 a))
+           (ev-smtcp (union-judgements-acc judge1 judge2 acc state) a))
+  :hints (("Goal"
+           :in-theory (e/d (union-judgements-acc is-conjunct?)
+                           ()))))
+
 (define union-judgements ((judge1 pseudo-termp)
                           (judge2 pseudo-termp)
                           state)
   :returns (union pseudo-termp)
   (union-judgements-acc judge1 judge2 judge1 state))
+
+(defthm correctness-of-union-judgements
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-termp judge1)
+                (pseudo-termp judge2)
+                (pseudo-termp acc)
+                (alistp a)
+                (ev-smtcp judge1 a)
+                (ev-smtcp judge2 a))
+           (ev-smtcp (union-judgements judge1 judge2 state) a))
+  :hints (("Goal"
+           :in-theory (e/d (union-judgements)
+                           ()))))
+
 
 #|
 (defthm test (implies (integerp x) (rationalp x)))
@@ -164,6 +234,8 @@ state)
   )
 
 (verify-guards super/subtype)
+
+(defthm super/subtype )
 
 #|
 (super/subtype 'integerp '((integerp . (rationalp maybe-integerp))
