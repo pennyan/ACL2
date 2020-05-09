@@ -195,17 +195,21 @@ state)
   :well-founded-relation l<
   :verify-guards nil
 
-  (define super/subtype ((type symbolp)
+  (define super/subtype ((type-judge pseudo-termp)
                          (type-alst type-to-types-alist-p)
                          (closure symbol-listp)
-                         (clock natp)) ;; clock is the length of the supertype-alst
+                         (clock natp))
+    ;; clock is the length of the supertype-alst
+    :guard (type-predicate-p type-judge type-alst)
     :measure (list (nfix clock) (acl2-count (symbol-fix type)))
     :returns (closure symbol-listp)
-    (b* ((type (symbol-fix type))
+    (b* ((type-judge (pseudo-term-fix type-judge))
+         ((unless (mbt (type-predicate-p type-judge type-alst))) closure)
          (type-alst (type-to-types-alist-fix type-alst))
          (closure (symbol-list-fix closure))
          (clock (nfix clock))
          ((if (zp clock)) closure)
+         ((cons type term) type-judge)
          (exist? (member-equal type closure))
          ((if exist?) closure)
          (new-closure (cons type closure))
@@ -214,10 +218,10 @@ state)
           (er hard? 'type-inference-bottomup=>super/subtype
               "Type ~p0 doesn't exist in the supertype alist.~%" type))
          ((unless (cdr item)) new-closure)
-         (type-lst (cdr item)))
-      (super/subtype-list type-lst type-alst new-closure (1- clock))))
+         (type-judge-lst (construct-types-with-term (cdr item) term)))
+      (super/subtype-list type-judge-lst type-alst new-closure (1- clock))))
 
-  (define super/subtype-list ((type-lst symbol-listp)
+  (define super/subtype-list ((type-judge-lst pseudo-termp)
                               (type-alst type-to-types-alist-p)
                               (closure symbol-listp)
                               (clock natp))
@@ -234,8 +238,6 @@ state)
   )
 
 (verify-guards super/subtype)
-
-(defthm super/subtype )
 
 #|
 (super/subtype 'integerp '((integerp . (rationalp maybe-integerp))
@@ -338,6 +340,7 @@ nil 4)
                                    `(if ,type-term ,acc 'nil) state)))
   )
 
+;; TODO: I want to rewrite this function so that it uses terms all the way through
 (define super/subtype-judgement-single ((type-judgement pseudo-termp)
                                         (path-cond pseudo-termp)
                                         (type-alst type-to-types-alist-p)
@@ -350,12 +353,27 @@ nil 4)
        (type-alst (type-to-types-alist-fix type-alst))
        (acc (pseudo-term-fix acc))
        ((unless (mbt (type-predicate-p type-judgement type-alst))) acc)
+       ()
+
+
        ((list root-type term) type-judgement)
        (clock (len type-alst))
        (super/subtypes
         (super/subtype root-type type-alst nil clock)))
     (super/subtype-to-judgements root-type super/subtypes term thms path-cond
                                  acc state)))
+
+(skip-proofs
+ (defthm correctness-of-super/subtype-judgements-single
+   (implies (and (ev-smtcp-meta-extract-global-facts)
+                 (pseudo-termp type-judgement)
+                 (alistp a)
+                 (ev-smtcp type-judgement a)
+                 (ev-smtcp path-cond a)
+                 (ev-smtcp acc a))
+            (ev-smtcp (super/subtype-judgement-single
+                       type-judgement path-cond type-alst thms acc state)
+                      a))))
 
 (define super/subtype-judgements-acc ((judge pseudo-termp)
                                       (path-cond pseudo-termp)
@@ -379,6 +397,20 @@ nil 4)
                                   state)))
 
 (verify-guards super/subtype-judgements-acc)
+
+(defthm correctness-of-super/subtype-judgements-acc
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-termp judge)
+                (pseudo-termp acc)
+                (alistp a)
+                (ev-smtcp judge a)
+                (ev-smtcp path-cond a)
+                (ev-smtcp acc a))
+           (ev-smtcp (super/subtype-judgements-acc judge path-cond type-alst thms
+                                                   acc state)
+                     a))
+  :hints (("Goal"
+           :in-theory (enable super/subtype-judgements-acc))))
 
 (define super/subtype-judgements-fn ((judge pseudo-termp)
                                      (path-cond pseudo-termp)
