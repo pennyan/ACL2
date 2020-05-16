@@ -191,50 +191,237 @@ state)
 ;;-------------------------------------------------------
 ;; Super/subtype judgements
 
+(encapsulate ()
+  (local
+   (in-theory (disable assoc-equal lambda-of-pseudo-lambdap symbol-listp
+                       pseudo-term-listp-of-symbol-listp
+                       acl2::symbol-listp-of-cdr-when-symbol-listp
+                       consp-of-is-conjunct?
+                       acl2::pseudo-lambdap-of-car-when-pseudo-lambda-listp
+                       acl2::pseudo-lambda-listp-of-cdr-when-pseudo-lambda-listp
+                       pseudo-lambdap-of-fn-call-of-pseudo-termp
+                       nil-of-assoc-equal-of-pseudo-term-alistp
+                       pseudo-term-alistp-when-not-consp
+                       consp-of-pseudo-lambdap
+                       acl2::pseudo-lambdap-of-car-when-pseudo-termp
+                       acl2::pseudo-termp-list-cdr
+                       pseudo-term-listp-of-cdr-of-pseudo-termp)))
+
+(define construct-one-super/subtype ((type-judge pseudo-termp)
+                                     (type-tuple type-tuple-p)
+                                     (type-alst type-to-types-alist-p)
+                                     (path-cond pseudo-termp)
+                                     state)
+  :ignore-ok t
+  :guard (type-predicate-p type-judge type-alst)
+  :returns (super/subtype-judge pseudo-termp)
+  (b* (((unless (mbt (and (pseudo-termp type-judge)
+                          (type-predicate-p type-judge type-alst))))
+        ''t)
+       ((type-tuple tu) (type-tuple-fix type-tuple))
+       (path-cond (pseudo-term-fix path-cond))
+       (type-thm (acl2::meta-extract-formula-w tu.thm (w state)))
+       ((unless (pseudo-termp type-thm))
+        (prog2$
+         (er hard? 'judgement-fns=>construct-one-super/subtype
+             "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
+             tu.thm type-thm)
+         ''t))
+       ((list root-type term) type-judge)
+       ((unless (equal root-type tu.type))
+        (prog2$
+         (er hard? 'judgement-fns=>construct-one-super/subtype
+             "The judgement's type ~p0 doesn't match the type-tuple's type ~
+             ~p1~%" root-type tu.type)
+         ''t))
+       ((unless (equal (len tu.formals) 1))
+        (prog2$
+         (er hard? 'judgement-fns=>construct-one-super/subtype
+             "The number of free variables in the type theorem must be one, ~
+              but we find ~p0~%" tu.formals)
+         ''t))
+       (substed-thm
+        (acl2::substitute-into-term type-thm `((,(car tu.formals) . ,term)))))
+    (case-match substed-thm
+      (('implies single-cond (!tu.neighbour-type !term))
+       (if (or (equal tu.neighbour-type 'quote)
+               (not (equal single-cond type-judge)))
+           ''t
+         (caddr substed-thm)))
+      (('implies type-predicates (!tu.neighbour-type !term))
+       (b* (((if (equal tu.neighbour-type 'quote)) ''t)
+            ((unless (path-test-list `(if ,type-judge ,path-cond 'nil)
+                                     type-predicates state))
+             ''t))
+         (caddr substed-thm)))
+      (& ''t))))
+)
+
+(defthm my-substitute-into-term-correct
+  (equal (ev-smtcp (acl2::substitute-into-term x subst) a)
+         (ev-smtcp x (ev-smtcp-alist subst a)))
+  :hints (("Goal"
+           :in-theory (disable acl2::substitute-into-term-correct)
+           :use ((:functional-instance
+                  acl2::substitute-into-term-correct
+                  (acl2::unify-ev ev-smtcp)
+                  (acl2::unify-ev-lst ev-smtcp-lst)
+                  (acl2::unify-ev-alist ev-smtcp-alist))))))
+
+(encapsulate ()
+  (local
+   (defthm crock
+     (implies (and (ev-smtcp-meta-extract-global-facts)
+                   (pseudo-termp term)
+                   (alistp a)
+                   (consp term)
+                   (consp (cdr term))
+                   (consp (cddr term))
+                   (equal (car term) 'implies)
+                   (ev-smtcp term a)
+                   (ev-smtcp (cadr term) a))
+              (ev-smtcp (caddr term) a))))
+
+(defthm correctness-of-construct-one-super/subtype
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-termp type-judge)
+                (pseudo-termp path-cond)
+                (alistp a)
+                (ev-smtcp type-judge a)
+                (ev-smtcp path-cond a)
+                (type-predicate-p type-judge type-alst))
+           (ev-smtcp (construct-one-super/subtype type-judge type-tuple
+                                                  type-alst path-cond state)
+                     a))
+  :hints (("Goal"
+           :in-theory (e/d (construct-one-super/subtype)
+                           (w
+                            symbol-listp
+                            pseudo-term-listp-of-symbol-listp
+                            pseudo-term-listp
+                            consp-of-is-conjunct?
+                            acl2::pseudo-termp-car
+                            acl2::symbol-listp-of-cdr-when-symbol-listp
+                            pseudo-termp
+                            correctness-of-path-test
+                            consp-of-pseudo-lambdap
+                            acl2::pseudo-termp-opener
+                            ev-smtcp-of-booleanp-call
+                            ev-smtcp-of-lambda
+                            implies-of-is-conjunct?
+                            ev-smtcp-meta-extract-formula
+                            my-substitute-into-term-correct
+                            crock
+                            correctness-of-path-test-list
+                            ))
+           :do-not-induct t
+           :use ((:instance ev-smtcp-meta-extract-formula
+                            (name (type-tuple->thm type-tuple))
+                            (st state)
+                            (a (ev-smtcp-alist
+                                (list (cons (car (type-tuple->formals type-tuple))
+                                            (cadr type-judge)))
+                                a)))
+                 (:instance my-substitute-into-term-correct
+                            (x (meta-extract-formula (type-tuple->thm type-tuple)
+                                                                  state))
+                            (subst (list (cons (car (type-tuple->formals type-tuple))
+                                               (cadr type-judge))))
+                            (a a))
+                 (:instance crock
+                            (term (acl2::substitute-into-term
+                                   (meta-extract-formula (type-tuple->thm type-tuple)
+                                                         state)
+                                   (list (cons (car (type-tuple->formals type-tuple))
+                                               (cadr type-judge)))))
+                            (a a))
+                 (:instance correctness-of-path-test-list
+                            (path-cond (list* 'if type-judge path-cond '('nil)))
+                            (expr-conj (cadr (acl2::substitute-into-term
+                                              (meta-extract-formula (type-tuple->thm type-tuple)
+                                                                    state)
+                                              (list (cons (car (type-tuple->formals type-tuple))
+                                                          (cadr type-judge))))))
+                            (a a))
+                 ))))
+)
+
+stop
+
+(define construct-closure ((type-judge pseudo-termp)
+                           (super/subtype-tuple type-tuple-list-p)
+                           (type-alst type-to-types-alist-p)
+                           (path-cond pseudo-termp)
+                           (acc pseudo-termp)
+                           state)
+  :guard (type-predicate-p type-judge type-alst)
+  :returns (new-acc pseudo-termp)
+  (b* (((unless (mbt (type-predicate-p type-judge type-alst))) acc)
+       (type-judge (pseudo-term-fix type-judge))
+       (super/subtype-tuple (type-tuple-list-fix super/subtype-tuple))
+       (path-cond (pseudo-term-fix path-cond))
+       (acc (pseudo-term-fix acc))
+       ((unless (consp super/subtype-tuple)) acc)
+       ((cons first rest) super/subtype-typle))
+    `(if ,(construct-one-super/subtype type-judge tu type-alst path-cond state)
+         acc
+       'nil)))
+
 (defines super/subtype-transitive-closure
   :well-founded-relation l<
   :verify-guards nil
 
   (define super/subtype ((type-judge pseudo-termp)
+                         (path-cond pseudo-termp)
                          (type-alst type-to-types-alist-p)
-                         (closure symbol-listp)
-                         (clock natp))
+                         (closure pseudo-termp)
+                         (clock natp)
+                         state)
     ;; clock is the length of the supertype-alst
     :guard (type-predicate-p type-judge type-alst)
-    :measure (list (nfix clock) (acl2-count (symbol-fix type)))
-    :returns (closure symbol-listp)
+    :measure (list (nfix clock) (acl2-count (pseudo-term-fix type-judge)))
+    :returns (closure pseudo-termp)
     (b* ((type-judge (pseudo-term-fix type-judge))
          ((unless (mbt (type-predicate-p type-judge type-alst))) closure)
          (type-alst (type-to-types-alist-fix type-alst))
-         (closure (symbol-list-fix closure))
+         (closure (pseudo-term-fix closure))
          (clock (nfix clock))
          ((if (zp clock)) closure)
-         ((cons type term) type-judge)
-         (exist? (member-equal type closure))
+         (exist? (look-up-path-cond type-judge closure type-alst))
          ((if exist?) closure)
-         (new-closure (cons type closure))
+         (new-closure `(if ,type-judge ,closure 'nil))
+         ((cons type term) type-judge)
          (item (assoc-equal type type-alst))
          ((unless item)
           (er hard? 'type-inference-bottomup=>super/subtype
               "Type ~p0 doesn't exist in the supertype alist.~%" type))
          ((unless (cdr item)) new-closure)
-         (type-judge-lst (construct-types-with-term (cdr item) term)))
-      (super/subtype-list type-judge-lst type-alst new-closure (1- clock))))
+         (type-judge-lst
+          (construct-closure type-judge (cdr item) type-alst path-cond
+                             new-closure state)))
+      (super/subtype-list type-judge-lst path-cond type-alst new-closure
+                          (1- clock) state)))
 
   (define super/subtype-list ((type-judge-lst pseudo-termp)
+                              (path-cond pseudo-termp)
                               (type-alst type-to-types-alist-p)
-                              (closure symbol-listp)
-                              (clock natp))
-    :measure (list (nfix clock) (acl2-count (symbol-list-fix type-lst)))
-    :returns (closure symbol-listp)
-    (b* ((type-lst (symbol-list-fix type-lst))
+                              (closure pseudo-termp)
+                              (clock natp)
+                              state)
+    :measure (list (nfix clock) (acl2-count (pseudo-term-fix type-judge-lst)))
+    :returns (closure pseudo-termp)
+    (b* ((type-judge-lst (pseudo-term-fix type-judge-lst))
+         (path-cond (pseudo-term-fix path-cond))
          (type-alst (type-to-types-alist-fix type-alst))
-         (closure (symbol-list-fix closure))
+         (closure (pseudo-term-fix closure))
          (clock (nfix clock))
-         ((unless (consp type-lst)) closure)
-         ((cons type-hd type-tl) type-lst)
-         (new-closure (super/subtype type-hd type-alst closure clock)))
-      (super/subtype-list type-tl type-alst new-closure clock)))
+         ((unless (is-conjunct? type-judge-lst)) closure)
+         ((if (equal type-judge-lst ''t)) closure)
+         ((list & type-hd type-tl &) type-lst)
+         (new-closure
+          (super/subtype type-hd path-cond type-alst closure clock state)))
+      (super/subtype-list type-tl path-cond type-alst new-closure clock
+                          state)))
   )
 
 (verify-guards super/subtype)
@@ -253,116 +440,6 @@ nil 4)
 nil 4)
 |#
 
-(local
- (defthm pseudo-termp-of-cadr-of-consp
-   (implies (and (pseudo-termp x)
-                 (not (equal (car x) 'quote))
-                 (consp x)
-                 (consp (cdr x)))
-            (pseudo-termp (cadr x)))
-   :hints (("Goal" :in-theory (enable pseudo-termp)))))
-
-(define look-up-type-tuple-to-thm-alist ((root-type symbolp)
-                                         (type symbolp)
-                                         (thms type-tuple-to-thm-alist-p)
-                                         (term pseudo-termp)
-                                         (path-cond pseudo-termp)
-                                         state)
-  :returns (ok booleanp)
-  :guard-hints (("Goal"
-                 :in-theory (disable assoc-equal
-                                     symbol-listp
-                                     pseudo-term-listp-of-cdr-of-pseudo-termp
-                                     default-cdr
-                                     consp-of-pseudo-lambdap)))
-  :ignore-ok t
-  (b* ((thms (type-tuple-to-thm-alist-fix thms))
-       (path-cond (pseudo-term-fix path-cond))
-       (term (pseudo-term-fix term))
-       (tuple (make-type-tuple :type root-type
-                               :neighbour-type type))
-       (conspair (assoc-equal tuple thms))
-       ((unless conspair) nil)
-       (thm-name (cdr conspair))
-       (type-thm
-        (acl2::meta-extract-formula-w thm-name (w state)))
-       ((unless (pseudo-termp type-thm))
-        (er hard? 'type-inference-bottomup=>look-up-type-tuple-to-thm-alist
-            "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
-            thm-name type-thm))
-       (ok (case-match type-thm
-             (('implies (!root-type var) (!type var)) t)
-             (('implies type-predicates (!type var))
-              (b* (((if (equal type 'quote)) nil)
-                   (substed (term-substitution type-predicates `((,var . ,term)) t)))
-                (path-test-list `(if (,root-type ,term) ,path-cond 'nil)
-                                substed state)))
-             (& nil))))
-    ok))
-
-(encapsulate ()
-  (local (in-theory (disable (:definition pseudo-termp)
-                             (:rewrite lambda-of-pseudo-lambdap))))
-  (local
-   (defthm assoc-equal-of-type-tuple-to-thm-alist-p
-     (implies (and (type-tuple-to-thm-alist-p x)
-                   (assoc-equal y x))
-              (and (consp (assoc-equal y x))
-                   (symbolp (cdr (assoc-equal y x)))))))
-
-  (define super/subtype-to-judgements ((root-type symbolp)
-                                       (types symbol-listp)
-                                       (term pseudo-termp)
-                                       (thms type-tuple-to-thm-alist-p)
-                                       (path-cond pseudo-termp)
-                                       (acc pseudo-termp)
-                                       state)
-    :returns (judgements pseudo-termp)
-    :measure (len types)
-    (b* ((root-type (symbol-fix root-type))
-         (types (symbol-list-fix types))
-         (term (pseudo-term-fix term))
-         (thms (type-tuple-to-thm-alist-fix thms))
-         (acc (pseudo-term-fix acc))
-         ((unless (consp types)) acc)
-         ((cons types-hd types-tl) types)
-         ((if (equal root-type types-hd))
-          (super/subtype-to-judgements root-type types-tl term thms path-cond acc
-                                       state))
-         ((unless (look-up-type-tuple-to-thm-alist root-type types-hd thms
-                                                   term path-cond state))
-          acc)
-         (type-term `(,types-hd ,term))
-         ((if (path-test acc type-term state))
-          (super/subtype-to-judgements root-type types-tl term thms path-cond acc
-                                       state)))
-      (super/subtype-to-judgements root-type types-tl term thms path-cond
-                                   `(if ,type-term ,acc 'nil) state)))
-  )
-
-;; TODO: I want to rewrite this function so that it uses terms all the way through
-(define super/subtype-judgement-single ((type-judgement pseudo-termp)
-                                        (path-cond pseudo-termp)
-                                        (type-alst type-to-types-alist-p)
-                                        (thms type-tuple-to-thm-alist-p)
-                                        (acc pseudo-termp)
-                                        state)
-  :guard (type-predicate-p type-judgement type-alst)
-  :returns (judgements pseudo-termp)
-  (b* ((type-judgement (pseudo-term-fix type-judgement))
-       (type-alst (type-to-types-alist-fix type-alst))
-       (acc (pseudo-term-fix acc))
-       ((unless (mbt (type-predicate-p type-judgement type-alst))) acc)
-       ()
-
-
-       ((list root-type term) type-judgement)
-       (clock (len type-alst))
-       (super/subtypes
-        (super/subtype root-type type-alst nil clock)))
-    (super/subtype-to-judgements root-type super/subtypes term thms path-cond
-                                 acc state)))
-
 (skip-proofs
  (defthm correctness-of-super/subtype-judgements-single
    (implies (and (ev-smtcp-meta-extract-global-facts)
@@ -371,8 +448,8 @@ nil 4)
                  (ev-smtcp type-judgement a)
                  (ev-smtcp path-cond a)
                  (ev-smtcp acc a))
-            (ev-smtcp (super/subtype-judgement-single
-                       type-judgement path-cond type-alst thms acc state)
+            (ev-smtcp (super/subtype type-judgement path-cond type-alst thms
+                                     acc state)
                       a))))
 
 (define super/subtype-judgements-acc ((judge pseudo-termp)

@@ -12,30 +12,25 @@
 (include-book "../utils/pseudo-term")
 (include-book "hint-interface")
 
+(defprod type-tuple
+  ((type symbolp)
+   (neighbour-type symbolp)
+   (formals symbol-listp)
+   (thm symbolp)))
+
+(deflist type-tuple-list
+  :elt-type type-tuple-p
+  :true-listp t)
+
 (defalist type-to-types-alist
   :key-type symbolp
-  :val-type symbol-listp
+  :val-type type-tuple-list-p
   :true-listp t)
 
 (defthm assoc-equal-of-type-to-types-alist
   (implies (and (type-to-types-alist-p x)
                 (assoc-equal y x))
            (consp (assoc-equal y x))))
-
-(defprod type-tuple
-  ((type symbolp)
-   (neighbour-type symbolp)))
-
-(defalist type-tuple-to-thm-alist
-  :key-type type-tuple-p
-  :val-type symbolp
-  :true-listp t)
-
-(defthm assoc-equal-of-type-tuple-to-thm-alist
-  (implies (and (type-tuple-to-thm-alist-p x)
-                (assoc-equal y x))
-           (and (consp (assoc-equal y x))
-                (symbolp (cdr (assoc-equal y x))))))
 
 (defprod return-spec
   ((formals symbol-listp)
@@ -138,9 +133,7 @@
 
 (defprod type-options
   ((supertype type-to-types-alist-p)
-   (supertype-thm type-tuple-to-thm-alist-p)
    (subtype type-to-types-alist-p)
-   (subtype-thm type-tuple-to-thm-alist-p)
    (functions function-description-alist-p)
    (nil-alst symbol-symbol-alistp)  ;; map from type recognizers to its nil-fn
    (alist alist-info-p)
@@ -150,7 +143,9 @@
 (define is-type? ((type symbolp)
                   (supertype-alst type-to-types-alist-p))
   :returns (ok booleanp)
-  (not (null (assoc-equal type (type-to-types-alist-fix supertype-alst)))))
+  (b* ((supertype-alst (type-to-types-alist-fix supertype-alst))
+       (type (symbol-fix type)))
+    (not (null (assoc-equal type supertype-alst)))))
 
 (define is-alist? ((type symbolp)
                    (options type-options-p))
