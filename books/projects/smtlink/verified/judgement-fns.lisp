@@ -18,6 +18,8 @@
 (include-book "path-cond")
 (include-book "evaluator")
 
+(set-state-ok t)
+
 ;;-------------------------------------------------------
 ;;  Intersect judgements
 (define intersect-judgements-acc ((judge1 pseudo-termp)
@@ -213,11 +215,8 @@ state)
                                      (path-cond pseudo-termp)
                                      state)
   :ignore-ok t
-  :guard (type-predicate-p type-judge type-alst)
   :returns (super/subtype-judge pseudo-termp)
-  (b* (((unless (mbt (and (pseudo-termp type-judge)
-                          (type-predicate-p type-judge type-alst))))
-        ''t)
+  (b* ((type-judge (pseudo-term-fix type-judge))
        ((type-tuple tu) (type-tuple-fix type-tuple))
        (path-cond (pseudo-term-fix path-cond))
        (type-thm (acl2::meta-extract-formula-w tu.thm (w state)))
@@ -226,6 +225,13 @@ state)
          (er hard? 'judgement-fns=>construct-one-super/subtype
              "Formula returned by meta-extract ~p0 is not a pseudo-termp: ~p1~%"
              tu.thm type-thm)
+         ''t))
+       ((unless (type-predicate-p type-judge type-alst))
+        (prog2$
+         (er hard? 'judgement-fns=>construct-one-super/subtype
+             "~p0 is not a type-predicate-p. Smtlink doesn't know how to ~
+              calculate super/subtype for it.~%"
+             type-judge)
          ''t))
        ((list root-type term) type-judge)
        ((unless (equal root-type tu.type))
@@ -288,10 +294,9 @@ state)
                 (pseudo-termp path-cond)
                 (alistp a)
                 (ev-smtcp type-judge a)
-                (ev-smtcp path-cond a)
-                (type-predicate-p type-judge type-alst))
-           (ev-smtcp (construct-one-super/subtype type-judge type-tuple
-                                                  type-alst path-cond state)
+                (ev-smtcp path-cond a))
+           (ev-smtcp (construct-one-super/subtype
+                      type-judge type-tuple type-alst path-cond state)
                      a))
   :hints (("Goal"
            :in-theory (e/d (construct-one-super/subtype)
@@ -346,30 +351,48 @@ state)
                  ))))
 )
 
-stop
-
 (define construct-closure ((type-judge pseudo-termp)
                            (super/subtype-tuple type-tuple-list-p)
                            (type-alst type-to-types-alist-p)
                            (path-cond pseudo-termp)
                            (acc pseudo-termp)
                            state)
-  :guard (type-predicate-p type-judge type-alst)
   :returns (new-acc pseudo-termp)
-  (b* (((unless (mbt (type-predicate-p type-judge type-alst))) acc)
+  :measure (len super/subtype-tuple)
+  (b* ((acc (pseudo-term-fix acc))
        (type-judge (pseudo-term-fix type-judge))
        (super/subtype-tuple (type-tuple-list-fix super/subtype-tuple))
        (path-cond (pseudo-term-fix path-cond))
-       (acc (pseudo-term-fix acc))
        ((unless (consp super/subtype-tuple)) acc)
-       ((cons first rest) super/subtype-typle))
-    `(if ,(construct-one-super/subtype type-judge tu type-alst path-cond state)
-         acc
-       'nil)))
+       ((cons first rest) super/subtype-tuple))
+    (construct-closure type-judge rest type-alst path-cond
+                       `(if ,(construct-one-super/subtype
+                              type-judge first type-alst path-cond state)
+                            ,acc
+                          'nil)
+                       state)))
+
+(defthm correctness-of-construct-closure
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-termp type-judge)
+                (type-tuple-list-p super/subtype-tuple)
+                (pseudo-termp path-cond)
+                (pseudo-termp acc)
+                (alistp a)
+                (ev-smtcp type-judge a)
+                (ev-smtcp path-cond a)
+                (ev-smtcp acc a))
+           (ev-smtcp (construct-closure
+                      type-judge super/subtype-tuple
+                      type-alst path-cond acc state)
+                     a))
+  :hints (("Goal"
+           :in-theory (enable construct-closure))))
 
 (defines super/subtype-transitive-closure
   :well-founded-relation l<
   :verify-guards nil
+  :flag-local nil
 
   (define super/subtype ((type-judge pseudo-termp)
                          (path-cond pseudo-termp)
@@ -378,19 +401,19 @@ stop
                          (clock natp)
                          state)
     ;; clock is the length of the supertype-alst
-    :guard (type-predicate-p type-judge type-alst)
-    :measure (list (nfix clock) (acl2-count (pseudo-term-fix type-judge)))
+    :measure (list (nfix clock)
+                   (acl2-count (pseudo-term-fix type-judge)))
     :returns (closure pseudo-termp)
     (b* ((type-judge (pseudo-term-fix type-judge))
-         ((unless (mbt (type-predicate-p type-judge type-alst))) closure)
-         (type-alst (type-to-types-alist-fix type-alst))
          (closure (pseudo-term-fix closure))
+         (type-alst (type-to-types-alist-fix type-alst))
          (clock (nfix clock))
          ((if (zp clock)) closure)
          (exist? (look-up-path-cond type-judge closure type-alst))
          ((if exist?) closure)
          (new-closure `(if ,type-judge ,closure 'nil))
-         ((cons type term) type-judge)
+         ((unless (type-predicate-p type-judge type-alst)) new-closure)
+         ((cons type &) type-judge)
          (item (assoc-equal type type-alst))
          ((unless item)
           (er hard? 'type-inference-bottomup=>super/subtype
@@ -408,7 +431,8 @@ stop
                               (closure pseudo-termp)
                               (clock natp)
                               state)
-    :measure (list (nfix clock) (acl2-count (pseudo-term-fix type-judge-lst)))
+    :measure (list (nfix clock)
+                   (acl2-count (pseudo-term-fix type-judge-lst)))
     :returns (closure pseudo-termp)
     (b* ((type-judge-lst (pseudo-term-fix type-judge-lst))
          (path-cond (pseudo-term-fix path-cond))
@@ -417,7 +441,7 @@ stop
          (clock (nfix clock))
          ((unless (is-conjunct? type-judge-lst)) closure)
          ((if (equal type-judge-lst ''t)) closure)
-         ((list & type-hd type-tl &) type-lst)
+         ((list & type-hd type-tl &) type-judge-lst)
          (new-closure
           (super/subtype type-hd path-cond type-alst closure clock state)))
       (super/subtype-list type-tl path-cond type-alst new-closure clock
@@ -440,17 +464,40 @@ nil 4)
 nil 4)
 |#
 
-(skip-proofs
- (defthm correctness-of-super/subtype-judgements-single
-   (implies (and (ev-smtcp-meta-extract-global-facts)
-                 (pseudo-termp type-judgement)
-                 (alistp a)
-                 (ev-smtcp type-judgement a)
-                 (ev-smtcp path-cond a)
-                 (ev-smtcp acc a))
-            (ev-smtcp (super/subtype type-judgement path-cond type-alst thms
-                                     acc state)
-                      a))))
+(defthm-super/subtype-transitive-closure-flag
+  correctness-of-super/subtype
+  (defthm substitute-into-term-correct
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+                  (pseudo-termp type-judge)
+                  (pseudo-termp path-cond)
+                  (pseudo-termp closure)
+                  (alistp a)
+                  (ev-smtcp type-judge a)
+                  (ev-smtcp path-cond a)
+                  (ev-smtcp closure a))
+             (ev-smtcp (super/subtype
+                        type-judge path-cond type-alst
+                        closure clock state)
+                       a))
+    ;; :hints ((and stable-under-simplificationp
+    ;;              '(:in-theory (enable unify-ev-of-fncall-args))))
+    :flag super/subtype)
+  (defthm correctness-of-super/subtype-list
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+                  (pseudo-termp type-judge-lst)
+                  (pseudo-termp path-cond)
+                  (pseudo-termp closure)
+                  (alistp a)
+                  (ev-smtcp type-judge-lst a)
+                  (ev-smtcp path-cond a)
+                  (ev-smtcp closure a))
+             (ev-smtcp (super/subtype-list
+                        type-judge-lst path-cond type-alst
+                        closure clock state)
+                       a))
+    :flag super/subtype-list))
+
+stop
 
 (define super/subtype-judgements-acc ((judge pseudo-termp)
                                       (path-cond pseudo-termp)

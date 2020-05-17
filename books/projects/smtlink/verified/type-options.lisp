@@ -30,7 +30,8 @@
 (defthm assoc-equal-of-type-to-types-alist
   (implies (and (type-to-types-alist-p x)
                 (assoc-equal y x))
-           (consp (assoc-equal y x))))
+           (and (consp (assoc-equal y x))
+                (type-tuple-list-p (cdr (assoc-equal y x))))))
 
 (defprod return-spec
   ((formals symbol-listp)
