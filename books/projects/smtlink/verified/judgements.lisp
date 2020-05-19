@@ -173,17 +173,6 @@
   :hints (("Goal"
            :in-theory (enable is-conjunct?))))
 
-(define type-predicate-list-p ((judges pseudo-termp)
-                               (supertype-alst type-to-types-alist-p))
-  :returns (ok booleanp)
-  :measure (acl2-count judges)
-  (b* ((judges (pseudo-term-fix judges))
-       ((unless (is-conjunct? judges)) nil)
-       ((if (equal judges ''t)) t)
-       ((list* & judge-hd judge-tl) judges))
-    (and (type-predicate-p judge-hd supertype-alst)
-         (type-predicate-list-p judge-tl supertype-alst))))
-
 (defthm consp-of-is-conjunct?
   (implies (and (pseudo-termp actuals-judgements)
                 (not (equal actuals-judgements ''t))

@@ -416,8 +416,10 @@ state)
          ((cons type &) type-judge)
          (item (assoc-equal type type-alst))
          ((unless item)
-          (er hard? 'type-inference-bottomup=>super/subtype
-              "Type ~p0 doesn't exist in the supertype alist.~%" type))
+          (prog2$
+           (er hard? 'type-inference-bottomup=>super/subtype
+               "Type ~p0 doesn't exist in the supertype alist.~%" type)
+           new-closure))
          ((unless (cdr item)) new-closure)
          (type-judge-lst
           (construct-closure type-judge (cdr item) type-alst path-cond
@@ -464,9 +466,21 @@ nil 4)
 nil 4)
 |#
 
+(encapsulate ()
+  (local (in-theory (disable symbol-listp
+                             pseudo-termp
+                             pseudo-term-listp-of-symbol-listp
+                             consp-of-is-conjunct?
+                             acl2::symbol-listp-of-cdr-when-symbol-listp
+                             acl2::symbol-listp-when-not-consp
+                             consp-of-pseudo-lambdap
+                             correctness-of-path-test-list
+                             consp-of-cddr-of-pseudo-lambdap
+                             ev-smtcp-of-variable)))
+
 (defthm-super/subtype-transitive-closure-flag
-  correctness-of-super/subtype
-  (defthm substitute-into-term-correct
+  correctness-of-super/subtype-thms
+  (defthm correctness-of-syper/subtype
     (implies (and (ev-smtcp-meta-extract-global-facts)
                   (pseudo-termp type-judge)
                   (pseudo-termp path-cond)
@@ -479,8 +493,8 @@ nil 4)
                         type-judge path-cond type-alst
                         closure clock state)
                        a))
-    ;; :hints ((and stable-under-simplificationp
-    ;;              '(:in-theory (enable unify-ev-of-fncall-args))))
+    :hints ((and stable-under-simplificationp
+                 '(:in-theory (e/d (super/subtype) ()))))
     :flag super/subtype)
   (defthm correctness-of-super/subtype-list
     (implies (and (ev-smtcp-meta-extract-global-facts)
@@ -495,14 +509,14 @@ nil 4)
                         type-judge-lst path-cond type-alst
                         closure clock state)
                        a))
+    :hints ((and stable-under-simplificationp
+                 '(:in-theory (e/d (super/subtype-list) ()))))
     :flag super/subtype-list))
-
-stop
+)
 
 (define super/subtype-judgements-acc ((judge pseudo-termp)
                                       (path-cond pseudo-termp)
                                       (type-alst type-to-types-alist-p)
-                                      (thms type-tuple-to-thm-alist-p)
                                       (acc pseudo-termp)
                                       state)
   :returns (judgements pseudo-termp)
@@ -511,27 +525,26 @@ stop
   (b* ((judge (pseudo-term-fix judge))
        (acc (pseudo-term-fix acc))
        ((if (type-predicate-p judge type-alst))
-        (super/subtype-judgement-single judge path-cond type-alst thms acc state))
+        (super/subtype judge path-cond type-alst acc (len type-alst) state))
        ((unless (is-conjunct? judge)) acc)
        ((if (equal judge ''t)) acc)
        ((list* & cond then &) judge)
-       (first-acc (super/subtype-judgements-acc cond path-cond type-alst thms
-                                                acc state)))
-    (super/subtype-judgements-acc then path-cond type-alst thms first-acc
-                                  state)))
+       (first-acc
+        (super/subtype-judgements-acc cond path-cond type-alst acc state)))
+    (super/subtype-judgements-acc then path-cond type-alst first-acc state)))
 
 (verify-guards super/subtype-judgements-acc)
 
 (defthm correctness-of-super/subtype-judgements-acc
   (implies (and (ev-smtcp-meta-extract-global-facts)
                 (pseudo-termp judge)
+                (pseudo-termp path-cond)
                 (pseudo-termp acc)
                 (alistp a)
                 (ev-smtcp judge a)
                 (ev-smtcp path-cond a)
                 (ev-smtcp acc a))
-           (ev-smtcp (super/subtype-judgements-acc judge path-cond type-alst thms
-                                                   acc state)
+           (ev-smtcp (super/subtype-judgements-acc judge path-cond type-alst acc state)
                      a))
   :hints (("Goal"
            :in-theory (enable super/subtype-judgements-acc))))
@@ -539,10 +552,21 @@ stop
 (define super/subtype-judgements-fn ((judge pseudo-termp)
                                      (path-cond pseudo-termp)
                                      (type-alst type-to-types-alist-p)
-                                     (thms type-tuple-to-thm-alist-p)
                                      state)
   :returns (judgements pseudo-termp)
-  (super/subtype-judgements-acc judge path-cond type-alst thms judge state))
+  (super/subtype-judgements-acc judge path-cond type-alst judge state))
+
+(defthm correctness-of-super/subtype-judgements-fn
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-termp judge)
+                (pseudo-termp path-cond)
+                (alistp a)
+                (ev-smtcp judge a)
+                (ev-smtcp path-cond a))
+           (ev-smtcp (super/subtype-judgements-fn judge path-cond type-alst state)
+                     a))
+  :hints (("Goal"
+           :in-theory (enable super/subtype-judgements-fn))))
 
 #|
 (defthm test (implies (integerp x) (rationalp x)))
@@ -564,11 +588,9 @@ state)
   `(if (equal ,which :super)
        (super/subtype-judgements-fn ,judgements ,path-cond
                                     (type-options->supertype ,options)
-                                    (type-options->supertype-thm ,options)
                                     ,state)
      (super/subtype-judgements-fn ,judgements ,path-cond
                                   (type-options->subtype ,options)
-                                  (type-options->subtype-thm ,options)
                                   ,state)))
 
 #|
@@ -605,11 +627,13 @@ state
    (super/subtype-judgements judgements path-cond options state :which :sub)
    path-cond options state :which :super))
 
-(skip-proofs
- (defthm correctness-of-extend-judgements
-   (implies (and (ev-smtcp-meta-extract-global-facts)
-                 (pseudo-termp term)
-                 (alistp a)
-                 (ev-smtcp judgements a)
-                 (ev-smtcp path-cond a))
-            (ev-smtcp (extend-judgements judgements path-cond options state) a))))
+(defthm correctness-of-extend-judgements
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-termp judgements)
+                (pseudo-termp path-cond)
+                (alistp a)
+                (ev-smtcp judgements a)
+                (ev-smtcp path-cond a))
+           (ev-smtcp (extend-judgements judgements path-cond options state) a))
+  :hints (("Goal"
+           :in-theory (enable extend-judgements))))
