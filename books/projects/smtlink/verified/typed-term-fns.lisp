@@ -19,6 +19,7 @@
 (include-book "path-cond")
 (include-book "term-substitution")
 (include-book "typed-term")
+(include-book "evaluator")
 
 ;; reduce not's in term
 (define simple-transformer ((term pseudo-termp))
@@ -30,13 +31,15 @@
           (& term))))
     new-term))
 
-(skip-proofs
- (defthm correctness-of-simple-transformer
-   (implies (and (ev-smtcp-meta-extract-global-facts)
-                 (pseudo-termp term)
-                 (alistp a))
-            (equal (ev-smtcp (simple-transformer term) a)
-                   (ev-smtcp term a)))))
+(defthm correctness-of-simple-transformer
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-termp term)
+                (alistp a))
+           (iff (ev-smtcp (simple-transformer term) a)
+                (ev-smtcp term a)))
+  :hints (("Goal"
+           :do-not-induct t
+           :in-theory (enable simple-transformer))))
 
 ;; ---------------------------------------------
 ;;       Recognizers
