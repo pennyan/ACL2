@@ -34,12 +34,16 @@
        (supertype-alst (type-options->supertype options)))
     (look-up-path-cond term judgements supertype-alst)))
 
-(skip-proofs
- (defthm correctness-of-type-judgement-top
-   (implies (and (ev-smtcp-meta-extract-global-facts)
-                 (alistp a)
-                 (ev-smtcp judgements a))
-            (ev-smtcp (type-judgement-top judgements term options) a))))
+(defthm correctness-of-type-judgement-top
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-termp term)
+                (pseudo-termp judgements)
+                (alistp a)
+                (ev-smtcp judgements a))
+           (ev-smtcp (type-judgement-top judgements term options) a))
+  :hints (("Goal"
+           :do-not-induct t
+           :in-theory (enable type-judgement-top))))
 
 (define type-judgement-top-list ((judgements-lst pseudo-termp)
                                  (term-lst pseudo-term-listp)
@@ -49,9 +53,11 @@
   (b* ((judgements-lst (pseudo-term-fix judgements-lst))
        (term-lst (pseudo-term-list-fix term-lst))
        ((unless (is-conjunct? judgements-lst))
-        (er hard? 'type-inference-bottomup=>type-judgement-top-list
-            "The top of type judgement is not a conjunction of conditions: ~q0"
-            judgements-lst))
+        (prog2$
+         (er hard? 'type-inference-bottomup=>type-judgement-top-list
+             "The top of type judgement is not a conjunction of conditions: ~q0"
+             judgements-lst)
+         ''t))
        ((if (or (equal judgements-lst ''t) (null term-lst))) ''t)
        ((list & judgements-hd judgements-tl &) judgements-lst)
        ((cons term-hd term-tl) term-lst))
@@ -59,13 +65,15 @@
          ,(type-judgement-top-list judgements-tl term-tl options)
        'nil)))
 
-(skip-proofs
- (defthm correctness-of-type-judgement-top-list
-   (implies (and (ev-smtcp-meta-extract-global-facts)
-                 (alistp a)
-                 (ev-smtcp judgements-lst a))
-            (ev-smtcp (type-judgement-top-list judgements term options) a))))
-
+(defthm correctness-of-type-judgement-top-list
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-term-listp term-lst)
+                (pseudo-termp judgements-lst)
+                (alistp a)
+                (ev-smtcp judgements-lst a))
+           (ev-smtcp (type-judgement-top-list judgements-lst term-lst options) a))
+  :hints (("Goal"
+           :in-theory (enable type-judgement-top-list))))
 
 ;;-------------------------------------------------------
 ;; quoted judgements
@@ -383,7 +391,7 @@
 
 ;; ------------------------------------------------
 ;; Correctness theorems for type-judgement
-
+stop
 (defthm-type-judgements-flag
   (defthm correctness-of-type-judgement-lambda
     (implies (and (ev-smtcp-meta-extract-global-facts)
@@ -405,7 +413,107 @@
     :flag type-judgement-if
     :hints ((and stable-under-simplificationp
                  '(:in-theory (disable)
-                   :expand (type-judgement-if term path-cond options state)))))
+                              :expand (type-judgement-if term path-cond options state)
+                              :use (;; (:instance
+                                    ;;  correctness-of-intersect-judgements-judge1
+                                    ;;  (judge1
+                                    ;;   (TERM-SUBSTITUTION
+                                    ;;    (TYPE-JUDGEMENT-TOP
+                                    ;;     (TYPE-JUDGEMENT (CADDR TERM)
+                                    ;;                     (LIST* 'IF
+                                    ;;                            (SIMPLE-TRANSFORMER (CADR TERM))
+                                    ;;                            PATH-COND '('NIL))
+                                    ;;                     OPTIONS STATE)
+                                    ;;     (CADDR TERM)
+                                    ;;     OPTIONS)
+                                    ;;    (LIST (CONS (CADDR TERM) TERM))
+                                    ;;    T))
+                                    ;;  (judge2
+                                    ;;   (TERM-SUBSTITUTION
+                                    ;;    (TYPE-JUDGEMENT-TOP
+                                    ;;     (TYPE-JUDGEMENT (CADDDR TERM)
+                                    ;;                     (LIST* 'IF
+                                    ;;                            (SIMPLE-TRANSFORMER (LIST 'NOT (CADR TERM)))
+                                    ;;                            PATH-COND '('NIL))
+                                    ;;                     OPTIONS STATE)
+                                    ;;     (CADDDR TERM)
+                                    ;;     OPTIONS)
+                                    ;;    (LIST (CONS (CADDDR TERM) TERM))
+                                    ;;    T))
+                                    ;;  (a a))
+                                    ;; (:instance
+                                    ;;  correctness-of-intersect-judgements-judge2
+                                    ;;  (judge1
+                                    ;;   (TERM-SUBSTITUTION
+                                    ;;    (TYPE-JUDGEMENT-TOP
+                                    ;;     (TYPE-JUDGEMENT (CADDR TERM)
+                                    ;;                     (LIST* 'IF
+                                    ;;                            (SIMPLE-TRANSFORMER (CADR TERM))
+                                    ;;                            PATH-COND '('NIL))
+                                    ;;                     OPTIONS STATE)
+                                    ;;     (CADDR TERM)
+                                    ;;     OPTIONS)
+                                    ;;    (LIST (CONS (CADDR TERM) TERM))
+                                    ;;    T))
+                                    ;;  (judge2
+                                    ;;   (TERM-SUBSTITUTION
+                                    ;;    (TYPE-JUDGEMENT-TOP
+                                    ;;     (TYPE-JUDGEMENT (CADDDR TERM)
+                                    ;;                     (LIST* 'IF
+                                    ;;                            (SIMPLE-TRANSFORMER (LIST 'NOT (CADR TERM)))
+                                    ;;                            PATH-COND '('NIL))
+                                    ;;                     OPTIONS STATE)
+                                    ;;     (CADDDR TERM)
+                                    ;;     OPTIONS)
+                                    ;;    (LIST (CONS (CADDDR TERM) TERM))
+                                    ;;    T))
+                                    ;;  (a a))
+                                    ;; (:instance
+                                    ;;  correctness-of-type-judgement-top
+                                    ;;  (judgements (CADDDR TERM))
+                                    ;;  (term (LIST* 'IF
+                                    ;;               (SIMPLE-TRANSFORMER (LIST 'NOT (CADR TERM)))
+                                    ;;               PATH-COND '('NIL)))
+                                    ;;  (options options)
+                                    ;;  (a a))
+                                    ;; (:instance
+                                    ;;  correctness-of-type-judgement-top
+                                    ;;  (judgements (CADDR TERM))
+                                    ;;  (term (LIST* 'IF
+                                    ;;               (SIMPLE-TRANSFORMER (CADR TERM))
+                                    ;;               PATH-COND '('NIL)))
+                                    ;;  (options options)
+                                    ;;  (a a))
+                                    ;; (:instance correctness-of-extend-judgements
+                                    ;;            (judgements (INTERSECT-JUDGEMENTS
+                                    ;;                         (TERM-SUBSTITUTION
+                                    ;;                          (TYPE-JUDGEMENT-TOP
+                                    ;;                           (TYPE-JUDGEMENT (CADDR TERM)
+                                    ;;                                           (LIST* 'IF
+                                    ;;                                                  (SIMPLE-TRANSFORMER (CADR TERM))
+                                    ;;                                                  PATH-COND '('NIL))
+                                    ;;                                           OPTIONS STATE)
+                                    ;;                           (CADDR TERM)
+                                    ;;                           OPTIONS)
+                                    ;;                          (LIST (CONS (CADDR TERM) TERM))
+                                    ;;                          T)
+                                    ;;                         (TERM-SUBSTITUTION
+                                    ;;                          (TYPE-JUDGEMENT-TOP
+                                    ;;                           (TYPE-JUDGEMENT (CADDDR TERM)
+                                    ;;                                           (LIST* 'IF
+                                    ;;                                                  (SIMPLE-TRANSFORMER (LIST 'NOT (CADR TERM)))
+                                    ;;                                                  PATH-COND '('NIL))
+                                    ;;                                           OPTIONS STATE)
+                                    ;;                           (CADDDR TERM)
+                                    ;;                           OPTIONS)
+                                    ;;                          (LIST (CONS (CADDDR TERM) TERM))
+                                    ;;                          T)
+                                    ;;                         STATE))
+                                    ;;            (path-cond path-cond)
+                                    ;;            (options options)
+                                    ;;            (state state)
+                                    ;;            (a a))
+                                    )))))
   (defthm correctness-of-type-judgement-fn
     (implies (and (ev-smtcp-meta-extract-global-facts)
                   (pseudo-termp term)
