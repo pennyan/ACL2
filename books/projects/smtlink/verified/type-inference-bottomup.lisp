@@ -392,6 +392,7 @@
 ;; ------------------------------------------------
 ;; Correctness theorems for type-judgement
 stop
+
 (defthm-type-judgements-flag
   (defthm correctness-of-type-judgement-lambda
     (implies (and (ev-smtcp-meta-extract-global-facts)
@@ -476,14 +477,14 @@ stop
                                     ;;               PATH-COND '('NIL)))
                                     ;;  (options options)
                                     ;;  (a a))
-                                    ;; (:instance
-                                    ;;  correctness-of-type-judgement-top
-                                    ;;  (judgements (CADDR TERM))
-                                    ;;  (term (LIST* 'IF
-                                    ;;               (SIMPLE-TRANSFORMER (CADR TERM))
-                                    ;;               PATH-COND '('NIL)))
-                                    ;;  (options options)
-                                    ;;  (a a))
+                                    (:instance
+                                     correctness-of-type-judgement-top
+                                     (judgements (caddr term))
+                                     (term (list* 'if
+                                                  (simple-transformer (cadr term))
+                                                  path-cond '('nil)))
+                                     (options options)
+                                     (a a))
                                     ;; (:instance correctness-of-extend-judgements
                                     ;;            (judgements (INTERSECT-JUDGEMENTS
                                     ;;                         (TERM-SUBSTITUTION
