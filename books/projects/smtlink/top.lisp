@@ -16,11 +16,13 @@
 (include-book "verified/Smtlink")
 (include-book "verified/hint-interface")
 (include-book "verified/hint-please")
+(include-book "verified/evaluator")
 (include-book "verified/type-hyp")
 (include-book "verified/add-hypo-cp")
 (include-book "verified/expand-cp")
 (include-book "verified/type-extract-cp")
 (include-book "verified/uninterpreted-fn-cp")
+(include-book "verified/type-inference/type-inference")
 
 ;; trusted
 (include-book "trusted/prove")

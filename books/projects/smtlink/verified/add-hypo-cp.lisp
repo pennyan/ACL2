@@ -12,18 +12,11 @@
 (include-book "hint-please")
 (include-book "hint-interface")
 (include-book "computed-hints")
+(include-book "evaluator")
 
 (defsection add-hypo-cp
   :parents (verified)
   :short "Verified clause-processor for adding user hypotheses"
-
-  ;; -----------------------------------------------------------------
-  ;;       Define evaluators
-
-  (defevaluator ev-add-hypo ev-lst-add-hypo
-    ((not x) (if x y z) (hint-please hint)))
-
-  (def-join-thms ev-add-hypo)
 
   ;; -----------------------------------------------------------------
   ;; Defines the clause-processor for adding hypotheses
@@ -56,15 +49,15 @@
       (implies (and (pseudo-termp G)
                     (alistp b)
                     (hint-pair-listp hinted-hypos)
-                    (ev-add-hypo
+                    (ev-smtcp
                      (disjoin
                       (mv-nth 1 (add-hypo-subgoals hinted-hypos G)))
                      b)
-                    (ev-add-hypo
+                    (ev-smtcp
                      (conjoin-clauses
                       (mv-nth 0 (add-hypo-subgoals hinted-hypos G)))
                      b))
-               (ev-add-hypo G b))
+               (ev-smtcp G b))
       :hints (("Goal"
                :induct (add-hypo-subgoals hinted-hypos G)))))
 
@@ -93,7 +86,11 @@
          (G (disjoin cl))
          ((mv aux-hypo-clauses list-of-not-Hs)
           (add-hypo-subgoals hinted-hypos G))
-         (cl0 `((hint-please ',the-hint) ,@list-of-not-Hs ,G)))
+         (cl0 `((hint-please ',the-hint) ,@list-of-not-Hs ,G))
+         (- (cw " ---------- Finished add-hypo clause-processor ----------- ~%"))
+         (- (cw "The clause: ~%"))
+         (- (cw "~q0" `(,cl0 ,@aux-hypo-clauses)))
+         (- (cw " ---------------------------------------------------------- ~%")))
       `(,cl0 ,@aux-hypo-clauses)))
 
   ;; proving correctness of the clause processor
@@ -102,12 +99,13 @@
   (defthm correctness-of-add-hypos
     (implies (and (pseudo-term-listp cl)
                   (alistp b)
-                  (ev-add-hypo
+                  (ev-smtcp
                    (conjoin-clauses (add-hypo-cp cl smtlink-hint))
                    b))
-             (ev-add-hypo (disjoin cl) b))
+             (ev-smtcp (disjoin cl) b))
     :hints (("Goal"
-             :in-theory (disable add-hypo-subgoals-correctness)
+             :in-theory (disable add-hypo-subgoals-correctness
+                                 ev-smtcp-of-disjoin)
              :use ((:instance add-hypo-subgoals-correctness
                               (g (disjoin cl))
                               (hinted-hypos (smtlink-hint->hypotheses smtlink-hint))

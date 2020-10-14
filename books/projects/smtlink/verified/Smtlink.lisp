@@ -12,6 +12,7 @@
 (include-book "std/basic/defs" :dir :system)
 (include-book "centaur/fty/baselists" :dir :system)
 
+(include-book "evaluator")
 (include-book "hint-interface")
 (include-book "hint-please")
 (include-book "../config")
@@ -1426,7 +1427,11 @@
          (next-cp (cdr (assoc-equal 'process-hint *SMT-architecture*)))
          ((if (null next-cp)) (list cl))
          (cp-hint `(:clause-processor (,next-cp clause ',combined-hint)))
-         (subgoal-lst (cons `(hint-please ',cp-hint) cl)))
+         (subgoal-lst (cons `(hint-please ',cp-hint) cl))
+         (- (cw " ---------- Finished process-hint clause-processor ---------- ~%"))
+         (- (cw "The clause: ~%"))
+         (- (cw "~q0" (list subgoal-lst)))
+         (- (cw " ------------------------------------------------------------ ~%")))
       (list subgoal-lst)))
   )
 
@@ -1576,21 +1581,16 @@
 (defsection process-hint-clause-processor
   :parents (Smtlink-process-user-hint)
 
-  (defevaluator ev-process-hint ev-lst-process-hint
-    ((not x) (if x y z) (hint-please hint)))
-
-  (def-join-thms ev-process-hint)
-
   (encapsulate ()
     (local (in-theory (enable process-hint)))
 
     (defthm correctness-of-process-hint
       (implies (and (pseudo-term-listp cl)
                     (alistp b)
-                    (ev-process-hint
+                    (ev-smtcp
                      (conjoin-clauses (process-hint cl hint))
                      b))
-               (ev-process-hint (disjoin cl) b))
+               (ev-smtcp (disjoin cl) b))
       :rule-classes :clause-processor))
 
   ;; Smtlink is a macro that generates a clause processor hint. This clause

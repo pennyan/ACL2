@@ -18,6 +18,7 @@
 (include-book "pseudo-lambda-lemmas")
 (include-book "hint-interface")
 (include-book "extractor")
+(include-book "evaluator")
 (include-book "basics")
 (include-book "hint-please")
 (include-book "computed-hints")
@@ -719,14 +720,6 @@
     (change-smtlink-hint h :fty-types fty-types)))
 
 ;; -----------------------------------------------------------------
-;;       Define evaluators
-
-(defevaluator ev-expand-cp ev-lst-expand-cp
-  ((not x) (if x y z) (hint-please hint)))
-
-(def-join-thms ev-expand-cp)
-
-;; -----------------------------------------------------------------
 
 ;; Define the function expansion clause processor
 ;; Expanded-G
@@ -793,7 +786,10 @@
        (cl0 `((hint-please ',the-hint) ,expanded-G))
        ;; generate-second clause
        (cl1 `((hint-please ',main-hint) (not ,expanded-G) ,G))
-       )
+       (- (cw " ---------- Finished expand clause-processor ----------- ~%"))
+       (- (cw "The clause: ~%"))
+       (- (cw "~q0" `(,cl0 ,cl1)))
+       (- (cw " ------------------------------------------------------- ~%")))
     `(,cl0 ,cl1)))
 
 (defmacro expand-cp (clause hint)
@@ -805,8 +801,8 @@
 (defthm correctness-of-expand-cp
   (implies (and (pseudo-term-listp cl)
                 (alistp b)
-                (ev-expand-cp
+                (ev-smtcp
                  (conjoin-clauses (expand-cp-fn cl smtlink-hint))
                  b))
-           (ev-expand-cp (disjoin cl) b))
+           (ev-smtcp (disjoin cl) b))
   :rule-classes :clause-processor)

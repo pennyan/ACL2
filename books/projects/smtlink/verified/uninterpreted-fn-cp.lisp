@@ -11,6 +11,7 @@
 (include-book "std/util/define" :dir :system)
 (include-book "pseudo-lambda-lemmas")
 (include-book "hint-please")
+(include-book "evaluator")
 (include-book "hint-interface")
 (include-book "computed-hints")
 
@@ -18,14 +19,6 @@
   :parents (verified)
   :short "Verified clause-processor for proving return types of uninterpreted
   functions."
-
-;; -----------------------------------------------------------------
-;;       Define evaluators
-
-(defevaluator ev-uninterpreted ev-lst-uninterpreted
-  ((not x) (if x y z) (hint-please hint)))
-
-(def-join-thms ev-uninterpreted)
 
 ;; -----------------------------------------------------------------
 
@@ -473,15 +466,15 @@
     (implies (and (pseudo-termp G)
                   (alistp b)
                   (hint-pair-listp hint-pair-lst)
-                  (ev-uninterpreted
+                  (ev-smtcp
                    (disjoin
                     (mv-nth 1 (uninterpreted-subgoals hint-pair-lst G tag)))
                    b)
-                  (ev-uninterpreted
+                  (ev-smtcp
                    (conjoin-clauses
                     (mv-nth 0 (uninterpreted-subgoals hint-pair-lst G tag)))
                    b))
-             (ev-uninterpreted G b))
+             (ev-smtcp G b))
     :hints (("Goal"
              :induct (uninterpreted-subgoals hint-pair-lst G tag)))))
 
@@ -520,7 +513,10 @@
        (the-hint
         `(:clause-processor (,next-cp clause ',h state)))
        (cl0 `((hint-please ',the-hint) ,@list-of-not-Ts ,G))
-       )
+       (- (cw " ---------- Finished uninterpreted-fn clause-processor ----------- ~%"))
+       (- (cw "The clause: ~%"))
+       (- (cw "~q0" `(,cl0 ,@list-of-T-thm)))
+       (- (cw " ----------------------------------------------------------------- ~%")))
     `(,cl0 ,@list-of-T-thm)))
 
 ;; proving correctness of the uninterpreted-fn-cp clause processor
@@ -529,12 +525,13 @@
 (defthm correctness-of-uninterpreted-fn-cp
   (implies (and (pseudo-term-listp cl)
                 (alistp b)
-                (ev-uninterpreted
+                (ev-smtcp
                  (conjoin-clauses (uninterpreted-fn-cp cl smtlink-hint))
                  b))
-           (ev-uninterpreted (disjoin cl) b))
+           (ev-smtcp (disjoin cl) b))
   :hints (("Goal"
-           :in-theory (disable uninterpreted-subgoals-correctness)
+           :in-theory (disable uninterpreted-subgoals-correctness
+                               ev-smtcp-of-disjoin)
            :use ((:instance uninterpreted-subgoals-correctness
                             (g (disjoin cl))
                             (hint-pair-lst

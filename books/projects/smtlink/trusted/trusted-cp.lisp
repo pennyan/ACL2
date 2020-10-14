@@ -48,7 +48,11 @@
                                                  type-hyp)
                               :expand ((:free (x) (hide x)))))
                            ,smt-precond
-                           ,(disjoin cl)))))
+                           ,(disjoin cl))))
+           (- (cw " ---------- Finished the trusted clause-processor ---------- ~%"))
+           (- (cw "The clause: ~%"))
+           (- (cw "~q0" (list subgoal-lst)))
+           (- (cw " ----------------------------------------------------------- ~%")))
         (if res
             (prog2$ (cw "Proved!~%") (mv nil subgoal-lst state))
           (mv (cons "NOTE: Unable to prove goal with ~

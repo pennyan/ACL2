@@ -12,20 +12,12 @@
 (include-book "hint-please")
 (include-book "hint-interface")
 (include-book "extractor")
+(include-book "evaluator")
 (include-book "type-hyp")
 
 (defsection type-extract-cp
   :parents (verified)
   :short "Verified clause-processor for extracting type declarations"
-
-  ;; -----------------------------------------------------------------
-  ;;       Define evaluators
-
-  (defevaluator ev-extract ev-lst-extract
-    ((not x) (if x y z) (implies x y)
-     (hint-please hint)))
-
-  (def-join-thms ev-extract)
 
   ;; -----------------------------------------------------------------
   ;; Defines the clause-processor for extracting type declarations
@@ -76,7 +68,11 @@
                                :expand ((:free (x) (hide x)))))
                 (not (implies (type-hyp (hide ,type-decl-list) ':type)
                               ,G/type))
-                ,G)))
+                ,G))
+         (- (cw " ---------- Finished type-extract clause-processor ---------- ~%"))
+         (- (cw "The clause: ~%"))
+         (- (cw "~q0" `(,cl0 ,cl1)))
+         (- (cw " ------------------------------------------------------------ ~%")))
       `(,cl0 ,cl1)))
 
   (defmacro type-extract-cp (clause hint)
@@ -89,9 +85,9 @@
   (defthm correctness-of-type-extract-cp
     (implies (and (pseudo-term-listp cl)
                   (alistp b)
-                  (ev-extract
+                  (ev-smtcp
                    (conjoin-clauses (type-extract-fn cl smtlink-hint))
                    b))
-             (ev-extract (disjoin cl) b))
+             (ev-smtcp (disjoin cl) b))
     :rule-classes :clause-processor)
   )
