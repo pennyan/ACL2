@@ -705,7 +705,7 @@
     :returns (fixed-term smt-solver-params-p
                          :hints (("Goal" :in-theory (enable smt-solver-params-p))))
     :short "Fixing function for smt-solver-params."
-    (mbe :logic (if (smt-solver-params-p term) term (true-list-fix term))
+    (mbe :logic (if (smt-solver-params-p term) term (acl2::true-list-fix term))
          :exec term))
 
   (encapsulate ()

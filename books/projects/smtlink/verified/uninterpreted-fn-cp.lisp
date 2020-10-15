@@ -9,7 +9,7 @@
 (include-book "std/util/bstar" :dir :system)
 (include-book "xdoc/top" :dir :system)
 (include-book "std/util/define" :dir :system)
-(include-book "pseudo-lambda-lemmas")
+(include-book "../utils/pseudo-lambda-lemmas")
 (include-book "hint-please")
 (include-book "evaluator")
 (include-book "hint-interface")

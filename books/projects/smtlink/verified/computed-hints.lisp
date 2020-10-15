@@ -69,7 +69,7 @@ allowing the user to use Smtlink inside of a Smtlink proof.</p>
     :hints (("Goal" :in-theory (disable true-list-fix-preserve-length)
              :use ((:instance true-list-fix-preserve-length
                               (x kwd-alist)))))
-    (b* ((kwd-alist (true-list-fix kwd-alist))
+    (b* ((kwd-alist (acl2::true-list-fix kwd-alist))
          ((unless (consp kwd-alist)) (mv nil nil))
          ((if (eq key (car kwd-alist)))
           (mv nil kwd-alist))
@@ -94,9 +94,9 @@ allowing the user to use Smtlink inside of a Smtlink proof.</p>
                        :use ((:instance
                               true-listp-of-my-split-kwd-alist.post
                               (key :in-theory)
-                              (kwd-alist (true-list-fix kwd-alist)))))))
+                              (kwd-alist (acl2::true-list-fix kwd-alist)))))))
     :guard-debug t
-    (b* ((kwd-alist (true-list-fix kwd-alist))
+    (b* ((kwd-alist (acl2::true-list-fix kwd-alist))
          ((mv pre post)
           (my-split-kwd-alist :in-theory kwd-alist)))
       (cond ((and (consp post)
@@ -137,8 +137,8 @@ allowing the user to use Smtlink inside of a Smtlink proof.</p>
                        :use ((:instance
                               true-listp-of-my-split-kwd-alist.post
                               (key :expand)
-                              (kwd-alist (true-list-fix kwd-alist)))))))
-    (b* ((kwd-alist (true-list-fix kwd-alist))
+                              (kwd-alist (acl2::true-list-fix kwd-alist)))))))
+    (b* ((kwd-alist (acl2::true-list-fix kwd-alist))
          ((mv pre post)
           (my-split-kwd-alist :expand kwd-alist)))
       (cond ((and (consp post)

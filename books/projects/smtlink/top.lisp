@@ -22,7 +22,7 @@
 (include-book "verified/expand-cp")
 (include-book "verified/type-extract-cp")
 (include-book "verified/uninterpreted-fn-cp")
-(include-book "verified/type-inference/type-inference")
+;;(include-book "verified/type-inference/type-inference")
 
 ;; trusted
 (include-book "trusted/prove")

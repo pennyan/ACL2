@@ -15,7 +15,7 @@
 (include-book "centaur/fty/baselists" :dir :system)
 
 ;; Include SMT books
-(include-book "pseudo-lambda-lemmas")
+(include-book "../utils/pseudo-lambda-lemmas")
 (include-book "hint-interface")
 (include-book "extractor")
 (include-book "evaluator")
